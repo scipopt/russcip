@@ -7,7 +7,7 @@ make sure [SCIP](https://www.scipopt.org/index.php#download) 8.0.3 is installed 
 ## Example
 solve a mixed integer program 
 ```
-cargo run -- PRBOLEM_PATH
+cargo run -- PROBLEM_PATH
 ```
 
 
