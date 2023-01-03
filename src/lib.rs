@@ -5,7 +5,7 @@
 use std::{ffi::CString, mem::MaybeUninit};
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 
-macro_rules! scip_result {
+macro_rules! scip_call {
     ($res:expr) => {
         let res = unsafe { $res };
         if res != SCIP_Retcode_SCIP_OKAY {
@@ -21,20 +21,20 @@ pub struct Model {
 impl Model {
     pub fn new() -> Result<Self, SCIP_RETCODE> {
         let mut model: *mut SCIP = unsafe { MaybeUninit::uninit().assume_init() };
-        scip_result!(SCIPcreate(&mut model));
+        scip_call!(SCIPcreate(&mut model));
         Ok(Model { scip: model })
     }
     pub fn include_default_plugins(&mut self) -> Result<(), SCIP_RETCODE> {
-        scip_result! { SCIPincludeDefaultPlugins(self.scip)};
+        scip_call! { SCIPincludeDefaultPlugins(self.scip)};
         Ok(())
     }
     pub fn read_prob(&mut self, filename: &str) -> Result<(), SCIP_RETCODE> {
         let filename = CString::new(filename).unwrap();
-        scip_result! { SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
+        scip_call! { SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
         Ok(())
     }
     pub fn solve(&mut self) -> Result<(), SCIP_RETCODE> {
-        scip_result! { SCIPsolve(self.scip) };
+        scip_call! { SCIPsolve(self.scip) };
         Ok(())
     }
 }
