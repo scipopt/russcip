@@ -39,6 +39,14 @@ impl Model {
         scip_call! { c_api::SCIPsolve(self.scip) };
         Ok(())
     }
+    pub fn get_status(&mut self) -> SCIPStatus {
+        let status = unsafe { c_api::SCIPgetStatus(self.scip) };
+        SCIPStatus::from_i8(status as i8).unwrap()
+    }
+    pub fn print_version(&self) -> Result<(), SCIPRetcode> {
+        unsafe { c_api::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
+        Ok(())
+    }
 }
 
 impl Drop for Model {
