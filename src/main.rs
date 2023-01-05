@@ -1,4 +1,4 @@
-use russcip::*;
+use russcip::model::Model;
 
 fn main() {
     let scip = Model::new().unwrap();
