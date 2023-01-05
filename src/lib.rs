@@ -11,7 +11,7 @@ macro_rules! scip_call {
     ($res:expr) => {
         let res = unsafe { $res };
         if res != c_api::SCIP_Retcode_SCIP_OKAY {
-            return Err(SCIPRetcode::from_i8(res as i8).unwrap());
+            return Err(SCIPRetcode::from_c_scip_retcode(res).unwrap());
         }
     };
 }
@@ -41,13 +41,23 @@ impl Model {
     }
     pub fn get_status(&mut self) -> SCIPStatus {
         let status = unsafe { c_api::SCIPgetStatus(self.scip) };
-        SCIPStatus::from_i8(status as i8).unwrap()
+        SCIPStatus::from_c_scip_status(status).unwrap()
     }
+
+    pub fn get_obj_val(&mut self) -> f64 {
+        unsafe { c_api::SCIPgetPrimalbound(self.scip) }
+    }
+
+    pub fn get_n_vars(&mut self) -> usize {
+        unsafe { c_api::SCIPgetNVars(self.scip) as usize }
+    }
+
     pub fn print_version(&self) -> Result<(), SCIPRetcode> {
         unsafe { c_api::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
         Ok(())
     }
 }
+
 
 impl Drop for Model {
     fn drop(&mut self) {
@@ -80,28 +90,28 @@ pub enum SCIPRetcode {
 }
 
 impl SCIPRetcode {
-    pub fn from_i8(val: i8) -> Option<Self> {
+    pub fn from_c_scip_retcode(val: c_api::SCIP_Retcode) -> Option<Self> {
         match val {
-            1 => Some(SCIPRetcode::OKAY),
-            0 => Some(SCIPRetcode::ERROR),
-            -1 => Some(SCIPRetcode::NOMEMORY),
-            -2 => Some(SCIPRetcode::READERROR),
-            -3 => Some(SCIPRetcode::WRITEERROR),
-            -4 => Some(SCIPRetcode::NOFILE),
-            -5 => Some(SCIPRetcode::FILECREATEERROR),
-            -6 => Some(SCIPRetcode::LPERROR),
-            -7 => Some(SCIPRetcode::NOPROBLEM),
-            -8 => Some(SCIPRetcode::INVALIDCALL),
-            -9 => Some(SCIPRetcode::INVALIDDATA),
-            -10 => Some(SCIPRetcode::INVALIDRESULT),
-            -11 => Some(SCIPRetcode::PLUGINNOTFOUND),
-            -12 => Some(SCIPRetcode::PARAMETERUNKNOWN),
-            -13 => Some(SCIPRetcode::PARAMETERWRONGTYPE),
-            -14 => Some(SCIPRetcode::PARAMETERWRONGVAL),
-            -15 => Some(SCIPRetcode::KEYALREADYEXISTING),
-            -16 => Some(SCIPRetcode::MAXDEPTHLEVEL),
-            -17 => Some(SCIPRetcode::BRANCHERROR),
-            -18 => Some(SCIPRetcode::NOTIMPLEMENTED),
+            c_api::SCIP_Retcode_SCIP_OKAY => Some(SCIPRetcode::OKAY),
+            c_api::SCIP_Retcode_SCIP_ERROR => Some(SCIPRetcode::ERROR),
+            c_api::SCIP_Retcode_SCIP_NOMEMORY => Some(SCIPRetcode::NOMEMORY),
+            c_api::SCIP_Retcode_SCIP_READERROR => Some(SCIPRetcode::READERROR),
+            c_api::SCIP_Retcode_SCIP_WRITEERROR => Some(SCIPRetcode::WRITEERROR),
+            c_api::SCIP_Retcode_SCIP_NOFILE => Some(SCIPRetcode::NOFILE),
+            c_api::SCIP_Retcode_SCIP_FILECREATEERROR => Some(SCIPRetcode::FILECREATEERROR),
+            c_api::SCIP_Retcode_SCIP_LPERROR => Some(SCIPRetcode::LPERROR),
+            c_api::SCIP_Retcode_SCIP_NOPROBLEM => Some(SCIPRetcode::NOPROBLEM),
+            c_api::SCIP_Retcode_SCIP_INVALIDCALL => Some(SCIPRetcode::INVALIDCALL),
+            c_api::SCIP_Retcode_SCIP_INVALIDDATA => Some(SCIPRetcode::INVALIDDATA),
+            c_api::SCIP_Retcode_SCIP_INVALIDRESULT => Some(SCIPRetcode::INVALIDRESULT),
+            c_api::SCIP_Retcode_SCIP_PLUGINNOTFOUND => Some(SCIPRetcode::PLUGINNOTFOUND),
+            c_api::SCIP_Retcode_SCIP_PARAMETERUNKNOWN => Some(SCIPRetcode::PARAMETERUNKNOWN),
+            c_api::SCIP_Retcode_SCIP_PARAMETERWRONGTYPE => Some(SCIPRetcode::PARAMETERWRONGTYPE),
+            c_api::SCIP_Retcode_SCIP_PARAMETERWRONGVAL => Some(SCIPRetcode::PARAMETERWRONGVAL),
+            c_api::SCIP_Retcode_SCIP_KEYALREADYEXISTING => Some(SCIPRetcode::KEYALREADYEXISTING),
+            c_api::SCIP_Retcode_SCIP_MAXDEPTHLEVEL => Some(SCIPRetcode::MAXDEPTHLEVEL),
+            c_api::SCIP_Retcode_SCIP_BRANCHERROR => Some(SCIPRetcode::BRANCHERROR),
+            c_api::SCIP_Retcode_SCIP_NOTIMPLEMENTED => Some(SCIPRetcode::NOTIMPLEMENTED),
             _ => None,
         }
     }
@@ -127,24 +137,24 @@ pub enum SCIPStatus {
 }
 
 impl SCIPStatus {
-    pub fn from_i8(val: i8) -> Option<Self> {
+    pub fn from_c_scip_status(val: c_api::SCIP_Status) -> Option<Self> {
         match val {
-            0 => Some(SCIPStatus::UNKNOWN),
-            1 => Some(SCIPStatus::USERINTERRUPT),
-            2 => Some(SCIPStatus::NODELIMIT),
-            3 => Some(SCIPStatus::TOTALNODELIMIT),
-            4 => Some(SCIPStatus::STALLNODELIMIT),
-            5 => Some(SCIPStatus::TIMELIMIT),
-            6 => Some(SCIPStatus::MEMLIMIT),
-            7 => Some(SCIPStatus::GAPLIMIT),
-            8 => Some(SCIPStatus::SOLLIMIT),
-            9 => Some(SCIPStatus::BESTSOLLIMIT),
-            10 => Some(SCIPStatus::RESTARTLIMIT),
-            11 => Some(SCIPStatus::OPTIMAL),
-            12 => Some(SCIPStatus::INFEASIBLE),
-            13 => Some(SCIPStatus::UNBOUNDED),
-            14 => Some(SCIPStatus::INFORUNBD),
-            15 => Some(SCIPStatus::TERMINATE),
+            c_api::SCIP_Status_SCIP_STATUS_UNKNOWN => Some(SCIPStatus::UNKNOWN),
+            c_api::SCIP_Status_SCIP_STATUS_USERINTERRUPT => Some(SCIPStatus::USERINTERRUPT),
+            c_api::SCIP_Status_SCIP_STATUS_NODELIMIT => Some(SCIPStatus::NODELIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_TOTALNODELIMIT => Some(SCIPStatus::TOTALNODELIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_STALLNODELIMIT => Some(SCIPStatus::STALLNODELIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_TIMELIMIT => Some(SCIPStatus::TIMELIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_MEMLIMIT => Some(SCIPStatus::MEMLIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_GAPLIMIT => Some(SCIPStatus::GAPLIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_SOLLIMIT => Some(SCIPStatus::SOLLIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_BESTSOLLIMIT => Some(SCIPStatus::BESTSOLLIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_RESTARTLIMIT => Some(SCIPStatus::RESTARTLIMIT),
+            c_api::SCIP_Status_SCIP_STATUS_OPTIMAL => Some(SCIPStatus::OPTIMAL),
+            c_api::SCIP_Status_SCIP_STATUS_INFEASIBLE => Some(SCIPStatus::INFEASIBLE),
+            c_api::SCIP_Status_SCIP_STATUS_UNBOUNDED => Some(SCIPStatus::UNBOUNDED),
+            c_api::SCIP_Status_SCIP_STATUS_INFORUNBD => Some(SCIPStatus::INFORUNBD),
+            c_api::SCIP_Status_SCIP_STATUS_TERMINATE => Some(SCIPStatus::TERMINATE),
             _ => None,
         }
     }
