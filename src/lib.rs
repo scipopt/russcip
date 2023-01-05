@@ -2,7 +2,7 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-use std::{ffi::CString, mem::MaybeUninit};
+use std::{ffi::CString, fmt, mem::MaybeUninit, rc::Rc};
 mod c_api {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
@@ -26,10 +26,12 @@ impl Model {
         scip_call!(c_api::SCIPcreate(&mut model));
         Ok(Model { scip: model })
     }
+
     pub fn include_default_plugins(&mut self) -> Result<(), SCIPRetcode> {
         scip_call! { c_api::SCIPincludeDefaultPlugins(self.scip)};
         Ok(())
     }
+
     pub fn read_prob(&mut self, filename: &str) -> Result<(), SCIPRetcode> {
         let filename = CString::new(filename).unwrap();
         scip_call! { c_api::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
@@ -39,16 +41,16 @@ impl Model {
         scip_call! { c_api::SCIPsolve(self.scip) };
         Ok(())
     }
-    pub fn get_status(&mut self) -> SCIPStatus {
+    pub fn get_status(&self) -> SCIPStatus {
         let status = unsafe { c_api::SCIPgetStatus(self.scip) };
         SCIPStatus::from_c_scip_status(status).unwrap()
     }
 
-    pub fn get_obj_val(&mut self) -> f64 {
+    pub fn get_obj_val(&self) -> f64 {
         unsafe { c_api::SCIPgetPrimalbound(self.scip) }
     }
 
-    pub fn get_n_vars(&mut self) -> usize {
+    pub fn get_n_vars(&self) -> usize {
         unsafe { c_api::SCIPgetNVars(self.scip) as usize }
     }
 
@@ -56,14 +58,116 @@ impl Model {
         unsafe { c_api::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
         Ok(())
     }
-}
 
+    pub fn get_best_sol(&self) -> Result<Solution, SCIPRetcode> {
+        let sol = unsafe { c_api::SCIPgetBestSol(self.scip) };
+        let sol = Solution::new(Rc::new(self), sol)?;
+        Ok(sol)
+    }
+
+    pub fn get_vars(&self) -> Vec<Variable> {
+        let n_vars = self.get_n_vars();
+        let mut vars = Vec::with_capacity(n_vars);
+        let scip_vars = unsafe { c_api::SCIPgetVars(self.scip) };
+        for i in 0..n_vars {
+            let scip_var = unsafe { *scip_vars.offset(i as isize) };
+            vars.push(Variable::new(scip_var));
+        }
+        vars
+    }
+
+    pub fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), SCIPRetcode> {
+        let param = CString::new(param).unwrap();
+        let value = CString::new(value).unwrap();
+        scip_call! { c_api::SCIPsetStringParam(self.scip, param.as_ptr(), value.as_ptr()) };
+        Ok(())
+    }
+
+    pub fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), SCIPRetcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { c_api::SCIPsetIntParam(self.scip, param.as_ptr(), value) };
+        Ok(())
+    }
+
+    pub fn set_real_param(&mut self, param: &str, value: f64) -> Result<(), SCIPRetcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { c_api::SCIPsetRealParam(self.scip, param.as_ptr(), value) };
+        Ok(())
+    }
+}
 
 impl Drop for Model {
     fn drop(&mut self) {
         unsafe { c_api::SCIPfree(&mut self.scip) };
     }
 }
+
+pub struct Solution<'a> {
+    model: Rc<&'a Model>,
+    scip_sol: *mut c_api::SCIP_SOL,
+}
+
+impl<'a> Solution<'a> {
+    pub fn new(
+        scip_ptr: Rc<&'a Model>,
+        scip_sol_prt: *mut c_api::SCIP_Sol,
+    ) -> Result<Self, SCIPRetcode> {
+        Ok(Solution {
+            model: scip_ptr,
+            scip_sol: scip_sol_prt,
+        })
+    }
+
+    pub fn get_obj_val(&self) -> f64 {
+        unsafe { c_api::SCIPgetSolOrigObj(self.model.scip, self.scip_sol) }
+    }
+
+    pub fn get_var_val(&self, var: &Variable) -> f64 {
+        unsafe { c_api::SCIPgetSolVal(self.model.scip, self.scip_sol, var.scip_var) }
+    }
+}
+
+impl<'a> fmt::Debug for Solution<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let obj_val = self.get_obj_val();
+        write!(f, "Solution {{ obj_val: {} }}", obj_val)?;
+        for var in self.model.get_vars() {
+            let val = self.get_var_val(&var);
+            write!(f, "Var {}={}", var.get_name(), val)?;
+        }
+        Ok(())
+    }
+}
+
+pub struct Variable {
+    scip_var: *mut c_api::SCIP_VAR,
+}
+
+impl Variable {
+    pub fn new(scip_var: *mut c_api::SCIP_VAR) -> Self {
+        Variable { scip_var }
+    }
+
+    pub fn get_name(&self) -> String {
+        let name = unsafe { c_api::SCIPvarGetName(self.scip_var) };
+        let name = unsafe { std::ffi::CStr::from_ptr(name) };
+        name.to_str().unwrap().to_string()
+    }
+
+    pub fn get_obj(&self) -> f64 {
+        unsafe { c_api::SCIPvarGetObj(self.scip_var) }
+    }
+
+    pub fn get_lb(&self) -> f64 {
+        unsafe { c_api::SCIPvarGetLbLocal(self.scip_var) }
+    }
+
+    pub fn get_ub(&self) -> f64 {
+        unsafe { c_api::SCIPvarGetUbLocal(self.scip_var) }
+    }
+}
+
+// TODO: implement parameter overloading for variable to use SCIP's tolerance values
 
 #[derive(Debug)]
 pub enum SCIPRetcode {
@@ -117,6 +221,7 @@ impl SCIPRetcode {
     }
 }
 
+#[derive(Debug)]
 pub enum SCIPStatus {
     UNKNOWN,
     USERINTERRUPT,
@@ -158,11 +263,4 @@ impl SCIPStatus {
             _ => None,
         }
     }
-}
-
-pub fn solve(problem_path: String) {
-    let mut model = Model::new().unwrap();
-    model.include_default_plugins().unwrap();
-    model.read_prob(&problem_path).unwrap();
-    model.solve().unwrap();
 }

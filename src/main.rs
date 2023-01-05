@@ -1,8 +1,30 @@
-use russcip::solve;
+use russcip::*;
 
 fn main() {
-    let filename = std::env::args()
+    let scip = Model::new().unwrap();
+    scip.print_version().unwrap();
+    
+    let path = std::env::args()
         .nth(1)
         .expect("Expected filename of lp file as an argument");
-    solve(filename)
+
+    let mut model = Model::new().unwrap();
+    model.include_default_plugins().unwrap();
+    model.read_prob(&path).unwrap();
+    model.set_real_param("limits/time", 1.).unwrap();
+    model.solve().unwrap();
+    let sol = model.get_best_sol().unwrap();
+
+    let status = model.get_status();
+    println!("Status: {:?}", status);
+    println!("Obj val: {}", model.get_obj_val());
+    println!("N vars: {}", model.get_n_vars());
+    let vars = model.get_vars();
+    println!("Best solution found: ");
+    for var in vars {
+        let val = sol.get_var_val(&var);
+        if val > 0. {
+            println!("{}: {}", var.get_name(), val);
+        }
+    }
 }
