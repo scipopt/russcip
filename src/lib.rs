@@ -130,10 +130,12 @@ impl<'a> Solution<'a> {
 impl<'a> fmt::Debug for Solution<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let obj_val = self.get_obj_val();
-        write!(f, "Solution {{ obj_val: {} }}", obj_val)?;
+        write!(f, "Solution with obj val: {}\n", obj_val)?;
         for var in self.model.get_vars() {
             let val = self.get_var_val(&var);
-            write!(f, "Var {}={}", var.get_name(), val)?;
+            if val > 0.0 {
+                write!(f, "Var {}={}\n", var.get_name(), val)?;
+            }
         }
         Ok(())
     }
