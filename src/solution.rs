@@ -1,32 +1,32 @@
 use crate::c_api;
 use crate::model::Model;
 use crate::variable::Variable;
-use crate::retcode::SCIPRetcode;
+use crate::retcode::Retcode;
 use std::fmt;
 use std::rc::Rc;
 
 pub struct Solution<'a> {
     model: Rc<&'a Model>,
-    scip_sol: *mut c_api::SCIP_SOL,
+    ptr: *mut c_api::SCIP_SOL,
 }
 
 impl<'a> Solution<'a> {
     pub fn new(
         scip_ptr: Rc<&'a Model>,
         scip_sol_prt: *mut c_api::SCIP_Sol,
-    ) -> Result<Self, SCIPRetcode> {
+    ) -> Result<Self, Retcode> {
         Ok(Solution {
             model: scip_ptr,
-            scip_sol: scip_sol_prt,
+            ptr: scip_sol_prt,
         })
     }
 
     pub fn get_obj_val(&self) -> f64 {
-        unsafe { c_api::SCIPgetSolOrigObj(self.model.scip, self.scip_sol) }
+        unsafe { c_api::SCIPgetSolOrigObj(self.model.scip, self.ptr) }
     }
 
     pub fn get_var_val(&self, var: &Variable) -> f64 {
-        unsafe { c_api::SCIPgetSolVal(self.model.scip, self.scip_sol, var.scip_var) }
+        unsafe { c_api::SCIPgetSolVal(self.model.scip, self.ptr, var.ptr) }
     }
 }
 

@@ -1,19 +1,19 @@
 use russcip::model::Model;
 
 fn main() {
-    let scip = Model::new().unwrap();
-    scip.print_version().unwrap();
+    let scip = Model::new();
+    scip.print_version();
     
     let path = std::env::args()
         .nth(1)
         .expect("Expected filename of lp file as an argument");
 
-    let mut model = Model::new().unwrap();
-    model.include_default_plugins().unwrap();
-    model.read_prob(&path).unwrap();
-    // model.set_real_param("limits/time", 1.).unwrap();
-    model.solve().unwrap();
-    let sol = model.get_best_sol().unwrap();
+    let mut model = Model::new();
+    model.include_default_plugins();
+    model.read_prob(&path);
+    // model.set_real_param("limits/time", 1.);
+    model.solve();
+    let sol = model.get_best_sol();
 
     let status = model.get_status();
     println!("Status: {:?}", status);
