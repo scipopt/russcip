@@ -1,4 +1,4 @@
-pub mod c_api;
+use scip_sys as c_api;
 pub mod model;
 pub mod variable;
 pub mod constraint;

@@ -1,0 +1,11 @@
+[package]
+name = "scip-sys"
+version = "0.1.0"
+edition = "2021"
+links = "scip"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = "0.63"
+cc = "1.0.73"
