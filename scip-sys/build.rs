@@ -6,9 +6,9 @@ use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=SCIPOPTDIR");
-
     let scip_dir = env::var("SCIPOPTDIR");
-    match scip_dir {
+
+    match &scip_dir {
         Ok(scip_dir) => {
             println!(
                 "cargo:warning=SCIPOPTDIR was defined, using SCIP from {}",
@@ -16,11 +16,9 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             let lib_dir = PathBuf::from(&scip_dir).join("lib");
             let lib_dir_path = lib_dir.to_str().unwrap();
+
             if lib_dir.exists() {
-                println!(
-                    "cargo:warning=Using SCIP from {}",
-                    lib_dir_path
-                );
+                println!("cargo:warning=Using SCIP from {}", lib_dir_path);
                 println!("cargo:rustc-link-search={}", lib_dir_path);
             } else {
                 panic!(
@@ -40,12 +38,27 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             println!("cargo:rustc-link-lib=dylib=scip");
         }
-    }
+    };
 
-    println!("cargo:rerun-if-changed=scip-wrapper.h");
+    let scip_header_file = &scip_dir.clone().map_or("scip-wrapper.h".to_owned(), |scip_dir| { 
+        PathBuf::from(scip_dir)
+        .join("include")
+        .join("scip")
+        .join("scip.h")
+        .to_str().unwrap().to_owned()
+    });
+
+    let scipdefplugins_header_file = scip_dir.map_or("scipdefplugins-wrapper.h".to_owned(), |scip_dir| { 
+        PathBuf::from(scip_dir)
+        .join("include")
+        .join("scip")
+        .join("scipdefplugins.h")
+        .to_str().unwrap().to_owned()
+    });
 
     let bindings = bindgen::Builder::default()
-        .header("scip-wrapper.h")
+        .header(scip_header_file)
+        .header(scipdefplugins_header_file)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()?;
 
