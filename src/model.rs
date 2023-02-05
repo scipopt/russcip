@@ -61,7 +61,7 @@ impl Model {
         let scip_vars = unsafe { c_api::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.offset(i as isize) };
-            vars.push(Variable::new(scip_var));
+            vars.push(Variable::new(self.scip, scip_var));
         }
         vars
     }
@@ -106,7 +106,7 @@ impl Model {
             var_type.into(),
         ) };
         scip_call! { c_api::SCIPaddVar(self.scip, var) };
-        Variable::new(var)
+        Variable::new(self.scip, var)
     }
 
     pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) {
@@ -151,7 +151,7 @@ impl Model {
         let scip_conss = unsafe { c_api::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.offset(i as isize) };
-            conss.push(Constraint::new(scip_cons));
+            conss.push(Constraint::new(self.scip, scip_cons));
         }
         conss
     }
