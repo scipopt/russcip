@@ -2,11 +2,12 @@ use crate::c_api;
 
 pub struct Variable {
     pub(crate) ptr: *mut c_api::SCIP_VAR,
+    pub(crate) scip_ptr: *mut c_api::SCIP,
 }
 
 impl Variable {
-    pub fn new(scip_var: *mut c_api::SCIP_VAR) -> Self {
-        Variable { ptr: scip_var }
+    pub fn new(scip_ptr: *mut c_api::SCIP, scip_var: *mut c_api::SCIP_VAR) -> Self {
+        Variable { scip_ptr, ptr: scip_var }
     }
 
     pub fn get_name(&self) -> String {
@@ -30,6 +31,12 @@ impl Variable {
     pub fn get_type(&self) -> VarType {
         let var_type = unsafe { c_api::SCIPvarGetType(self.ptr) };
         var_type.into()
+    }
+}
+
+impl Drop for Variable {
+    fn drop(&mut self) {
+        unsafe { c_api::SCIPreleaseVar(self.scip_ptr, &mut self.ptr) };
     }
 }
 
@@ -89,6 +96,5 @@ impl Into<VarStatus> for c_api::SCIP_Varstatus {
         }
     }
 }
-
 
 // TODO: implement parameter overloading for variable to use SCIP's tolerance values
