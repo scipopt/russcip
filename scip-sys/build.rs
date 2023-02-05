@@ -57,11 +57,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     let bindings = bindgen::Builder::default()
-        .blocklist_type("FP_NAN")
-        .blocklist_type("FP_INFINITE")
-        .blocklist_type("FP_ZERO")
-        .blocklist_type("FP_SUBNORMAL")
-        .blocklist_type("FP_NORMAL")
+        .blocklist_item("FP_NAN")
+        .blocklist_item("FP_INFINITE")
+        .blocklist_item("FP_ZERO")
+        .blocklist_item("FP_SUBNORMAL")
+        .blocklist_item("FP_NORMAL")
         .header(scip_header_file)
         .header(scipdefplugins_header_file)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
