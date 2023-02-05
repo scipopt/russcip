@@ -48,11 +48,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         .to_str().unwrap().to_owned()
     });
 
-    let scipdefplugins_header_file = scip_dir.map_or("scipdefplugins-wrapper.h".to_owned(), |scip_dir| { 
+    let scipdefplugins_header_file = &scip_dir.clone().map_or("scipdefplugins-wrapper.h".to_owned(), |scip_dir| { 
         PathBuf::from(scip_dir)
         .join("include")
         .join("scip")
         .join("scipdefplugins.h")
+        .to_str().unwrap().to_owned()
+    });
+
+    let include_dir = &scip_dir.clone().map_or("/usr/include".to_owned(), |scip_dir| { 
+        PathBuf::from(scip_dir)
+        .join("include")
         .to_str().unwrap().to_owned()
     });
 
@@ -64,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .blocklist_item("FP_NORMAL")
         .header(scip_header_file)
         .header(scipdefplugins_header_file)
+        .clang_args(["-I", include_dir.as_str()])
         .parse_callbacks(Box::new(bindgen::CargoCallbacks))
         .generate()?;
 
