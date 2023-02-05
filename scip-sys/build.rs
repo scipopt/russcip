@@ -30,13 +30,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 );
             }
             println!("cargo:rustc-link-search={}", lib_dir_path);
-            println!("cargo:rustc-link-lib=dylib=scip");
+            println!("cargo:rustc-link-lib=scip");
         }
         Err(_) => {
             println!(
                 "cargo:warning=SCIPOPTDIR was not defined, looking for SCIP in system libraries"
             );
-            println!("cargo:rustc-link-lib=dylib=scip");
+            println!("cargo:rustc-link-lib=scip");
         }
     };
 
