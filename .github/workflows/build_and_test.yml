@@ -10,7 +10,7 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  Linux-test:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: true
