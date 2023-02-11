@@ -4,8 +4,15 @@ A Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The pro
 ## Dependecies 
 make sure [SCIP](https://www.scipopt.org/index.php#download) 8.0.3 is installed and included in the library path, or define an environment variable `SCIPOPTDIR` with the install directory. 
 
+## Install
+Add the following to your `Cargo.toml` file. 
+```
+[dependencies]
+russcip = { git = "https://github.com/mmghannam/russcip" }
+```
+
 ## Example
-solve a mixed integer program 
+Model and solve an integer program.
 ```
 use russcip::model::Model;
 use russcip::status::Status;
