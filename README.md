@@ -1,4 +1,6 @@
 # russcip
+[![Build and Test](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
+
 A Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
 
 ## Dependencies 
