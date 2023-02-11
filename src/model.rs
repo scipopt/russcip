@@ -1,4 +1,4 @@
-use std::mem::MaybeUninit;
+use std::mem;
 
 use crate::c_api;
 use crate::constraint::Constraint;
@@ -15,7 +15,7 @@ pub struct Model {
 
 impl Model {
     pub fn new() -> Self {
-        let mut model: *mut c_api::SCIP = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut model: *mut c_api::SCIP = unsafe { mem::zeroed() };
         scip_call!(c_api::SCIPcreate(&mut model));
         Model { scip: model }
     }
@@ -97,7 +97,7 @@ impl Model {
         var_type: VarType,
     ) -> Variable {
         let name = CString::new(name).unwrap();
-        let mut var: *mut c_api::SCIP_VAR = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut var: *mut c_api::SCIP_VAR = unsafe { mem::zeroed() };
         scip_call! { c_api::SCIPcreateVarBasic(
             self.scip,
             &mut var,
@@ -114,7 +114,7 @@ impl Model {
     pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) -> Constraint {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
-        let mut scip_cons: *mut c_api::SCIP_CONS = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut scip_cons: *mut c_api::SCIP_CONS = unsafe { mem::zeroed() };
         scip_call! { c_api::SCIPcreateConsBasicLinear(
             self.scip,
             &mut scip_cons,
