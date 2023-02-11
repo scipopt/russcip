@@ -111,7 +111,7 @@ impl Model {
         Variable::new(self.scip, var)
     }
 
-    pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) {
+    pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) -> Constraint {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons: *mut c_api::SCIP_CONS = unsafe { MaybeUninit::uninit().assume_init() };
@@ -129,6 +129,7 @@ impl Model {
             scip_call! { c_api::SCIPaddCoefLinear(self.scip, scip_cons, var.ptr, coefs[i]) };
         }
         scip_call! { c_api::SCIPaddCons(self.scip, scip_cons) };
+        Constraint::new(self.scip, scip_cons)
     }
 
     pub fn create_prob(&mut self, name: &str) {
@@ -153,6 +154,8 @@ impl Model {
         let scip_conss = unsafe { c_api::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.offset(i as isize) };
+            // increase scip cons's reference count
+            scip_call!(c_api::SCIPcaptureCons(self.scip, scip_cons));
             conss.push(Constraint::new(self.scip, scip_cons));
         }
         conss
@@ -180,8 +183,6 @@ impl Model {
             true.into(),
         ) };
     }
-
-
 }
 
 impl Drop for Model {
@@ -234,8 +235,6 @@ impl Into<c_api::SCIP_OBJSENSE> for ObjSense {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-
     use super::*;
     use crate::status::Status;
 
