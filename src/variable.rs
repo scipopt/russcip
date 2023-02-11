@@ -1,3 +1,5 @@
+use core::panic;
+
 use crate::c_api;
 
 pub struct Variable {
@@ -7,7 +9,10 @@ pub struct Variable {
 
 impl Variable {
     pub fn new(scip_ptr: *mut c_api::SCIP, scip_var: *mut c_api::SCIP_VAR) -> Self {
-        Variable { scip_ptr, ptr: scip_var }
+        Variable {
+            scip_ptr,
+            ptr: scip_var,
+        }
     }
 
     pub fn get_name(&self) -> String {
@@ -71,9 +76,8 @@ impl From<VarType> for c_api::SCIP_Vartype {
     }
 }
 
-
 pub enum VarStatus {
-    Original, 
+    Original,
     Loose,
     Column,
     Fixed,

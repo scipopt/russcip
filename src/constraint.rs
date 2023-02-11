@@ -20,13 +20,7 @@ impl Constraint {
 
 impl Drop for Constraint {
     fn drop(&mut self) {
-        // release all vars in constraint
-        let nvars = unsafe { c_api::SCIPgetNVarsLinear(self.scip_ptr, self.ptr) };
-        let vars = unsafe { c_api::SCIPgetVarsLinear(self.scip_ptr, self.ptr) };
-        for i in 0..nvars {
-            let mut var = unsafe { *vars.offset(i as isize) };
-            unsafe { c_api::SCIPreleaseVar(self.scip_ptr, &mut var) };
-        }
+        unsafe { c_api::SCIPreleaseCons(self.scip_ptr, &mut self.ptr) };
     }
 }
 
