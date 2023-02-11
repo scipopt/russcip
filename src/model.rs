@@ -61,6 +61,8 @@ impl Model {
         let scip_vars = unsafe { c_api::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.offset(i as isize) };
+            // increase scip var's reference count
+            scip_call!(c_api::SCIPcaptureVar(self.scip, scip_var));
             vars.push(Variable::new(self.scip, scip_var));
         }
         vars
@@ -232,6 +234,8 @@ impl Into<c_api::SCIP_OBJSENSE> for ObjSense {
 
 #[cfg(test)]
 mod tests {
+    use std::mem;
+
     use super::*;
     use crate::status::Status;
 
