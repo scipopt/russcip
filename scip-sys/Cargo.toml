@@ -2,10 +2,12 @@
 name = "scip-sys"
 version = "0.1.0"
 edition = "2021"
+description = "Bindings for the C SCIP solver."
+license = "Apache-2.0"
 links = "scip"
 
 [dependencies]
 
 [build-dependencies]
-bindgen = "0.63"
+bindgen = "0.64"
 cc = "1.0.73"
