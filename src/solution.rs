@@ -1,4 +1,4 @@
-use crate::c_api;
+use crate::ffi;
 use crate::model::Model;
 use crate::variable::Variable;
 use crate::retcode::Retcode;
@@ -7,13 +7,13 @@ use std::rc::Rc;
 
 pub struct Solution<'a> {
     model: Rc<&'a Model>,
-    ptr: *mut c_api::SCIP_SOL,
+    ptr: *mut ffi::SCIP_SOL,
 }
 
 impl<'a> Solution<'a> {
     pub fn new(
         scip_ptr: Rc<&'a Model>,
-        scip_sol_prt: *mut c_api::SCIP_Sol,
+        scip_sol_prt: *mut ffi::SCIP_Sol,
     ) -> Result<Self, Retcode> {
         Ok(Solution {
             model: scip_ptr,
@@ -22,11 +22,11 @@ impl<'a> Solution<'a> {
     }
 
     pub fn get_obj_val(&self) -> f64 {
-        unsafe { c_api::SCIPgetSolOrigObj(self.model.scip, self.ptr) }
+        unsafe { ffi::SCIPgetSolOrigObj(self.model.scip, self.ptr) }
     }
 
     pub fn get_var_val(&self, var: &Variable) -> f64 {
-        unsafe { c_api::SCIPgetSolVal(self.model.scip, self.ptr, var.ptr) }
+        unsafe { ffi::SCIPgetSolVal(self.model.scip, self.ptr, var.ptr) }
     }
 }
 

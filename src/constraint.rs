@@ -1,18 +1,18 @@
-use crate::c_api;
+use crate::ffi;
 
 pub struct Constraint {
-    pub(crate) ptr: *mut c_api::SCIP_CONS,
-    pub(crate) scip_ptr: *mut c_api::SCIP,
+    pub(crate) ptr: *mut ffi::SCIP_CONS,
+    pub(crate) scip_ptr: *mut ffi::SCIP,
 }
 
 impl Constraint {
-    pub fn new(scip_ptr: *mut c_api::SCIP, ptr: *mut c_api::SCIP_CONS) -> Self {
+    pub fn new(scip_ptr: *mut ffi::SCIP, ptr: *mut ffi::SCIP_CONS) -> Self {
         Constraint { scip_ptr, ptr }
     }
 
     pub fn get_name(&self) -> String {
         unsafe {
-            let name = c_api::SCIPconsGetName(self.ptr);
+            let name = ffi::SCIPconsGetName(self.ptr);
             String::from(std::ffi::CStr::from_ptr(name).to_str().unwrap())
         }
     }
@@ -20,7 +20,7 @@ impl Constraint {
 
 impl Drop for Constraint {
     fn drop(&mut self) {
-        unsafe { c_api::SCIPreleaseCons(self.scip_ptr, &mut self.ptr) };
+        unsafe { ffi::SCIPreleaseCons(self.scip_ptr, &mut self.ptr) };
     }
 }
 

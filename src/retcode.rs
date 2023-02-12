@@ -1,4 +1,4 @@
-use crate::c_api;
+use crate::ffi;
 
 #[derive(Debug)]
 pub enum Retcode {
@@ -25,28 +25,28 @@ pub enum Retcode {
 }
 
 impl Retcode {
-    pub fn from_c_scip_retcode(val: c_api::SCIP_Retcode) -> Option<Self> {
+    pub fn from_c_scip_retcode(val: ffi::SCIP_Retcode) -> Option<Self> {
         match val {
-            c_api::SCIP_Retcode_SCIP_OKAY => Some(Retcode::OKAY),
-            c_api::SCIP_Retcode_SCIP_ERROR => Some(Retcode::ERROR),
-            c_api::SCIP_Retcode_SCIP_NOMEMORY => Some(Retcode::NOMEMORY),
-            c_api::SCIP_Retcode_SCIP_READERROR => Some(Retcode::READERROR),
-            c_api::SCIP_Retcode_SCIP_WRITEERROR => Some(Retcode::WRITEERROR),
-            c_api::SCIP_Retcode_SCIP_NOFILE => Some(Retcode::NOFILE),
-            c_api::SCIP_Retcode_SCIP_FILECREATEERROR => Some(Retcode::FILECREATEERROR),
-            c_api::SCIP_Retcode_SCIP_LPERROR => Some(Retcode::LPERROR),
-            c_api::SCIP_Retcode_SCIP_NOPROBLEM => Some(Retcode::NOPROBLEM),
-            c_api::SCIP_Retcode_SCIP_INVALIDCALL => Some(Retcode::INVALIDCALL),
-            c_api::SCIP_Retcode_SCIP_INVALIDDATA => Some(Retcode::INVALIDDATA),
-            c_api::SCIP_Retcode_SCIP_INVALIDRESULT => Some(Retcode::INVALIDRESULT),
-            c_api::SCIP_Retcode_SCIP_PLUGINNOTFOUND => Some(Retcode::PLUGINNOTFOUND),
-            c_api::SCIP_Retcode_SCIP_PARAMETERUNKNOWN => Some(Retcode::PARAMETERUNKNOWN),
-            c_api::SCIP_Retcode_SCIP_PARAMETERWRONGTYPE => Some(Retcode::PARAMETERWRONGTYPE),
-            c_api::SCIP_Retcode_SCIP_PARAMETERWRONGVAL => Some(Retcode::PARAMETERWRONGVAL),
-            c_api::SCIP_Retcode_SCIP_KEYALREADYEXISTING => Some(Retcode::KEYALREADYEXISTING),
-            c_api::SCIP_Retcode_SCIP_MAXDEPTHLEVEL => Some(Retcode::MAXDEPTHLEVEL),
-            c_api::SCIP_Retcode_SCIP_BRANCHERROR => Some(Retcode::BRANCHERROR),
-            c_api::SCIP_Retcode_SCIP_NOTIMPLEMENTED => Some(Retcode::NOTIMPLEMENTED),
+            ffi::SCIP_Retcode_SCIP_OKAY => Some(Retcode::OKAY),
+            ffi::SCIP_Retcode_SCIP_ERROR => Some(Retcode::ERROR),
+            ffi::SCIP_Retcode_SCIP_NOMEMORY => Some(Retcode::NOMEMORY),
+            ffi::SCIP_Retcode_SCIP_READERROR => Some(Retcode::READERROR),
+            ffi::SCIP_Retcode_SCIP_WRITEERROR => Some(Retcode::WRITEERROR),
+            ffi::SCIP_Retcode_SCIP_NOFILE => Some(Retcode::NOFILE),
+            ffi::SCIP_Retcode_SCIP_FILECREATEERROR => Some(Retcode::FILECREATEERROR),
+            ffi::SCIP_Retcode_SCIP_LPERROR => Some(Retcode::LPERROR),
+            ffi::SCIP_Retcode_SCIP_NOPROBLEM => Some(Retcode::NOPROBLEM),
+            ffi::SCIP_Retcode_SCIP_INVALIDCALL => Some(Retcode::INVALIDCALL),
+            ffi::SCIP_Retcode_SCIP_INVALIDDATA => Some(Retcode::INVALIDDATA),
+            ffi::SCIP_Retcode_SCIP_INVALIDRESULT => Some(Retcode::INVALIDRESULT),
+            ffi::SCIP_Retcode_SCIP_PLUGINNOTFOUND => Some(Retcode::PLUGINNOTFOUND),
+            ffi::SCIP_Retcode_SCIP_PARAMETERUNKNOWN => Some(Retcode::PARAMETERUNKNOWN),
+            ffi::SCIP_Retcode_SCIP_PARAMETERWRONGTYPE => Some(Retcode::PARAMETERWRONGTYPE),
+            ffi::SCIP_Retcode_SCIP_PARAMETERWRONGVAL => Some(Retcode::PARAMETERWRONGVAL),
+            ffi::SCIP_Retcode_SCIP_KEYALREADYEXISTING => Some(Retcode::KEYALREADYEXISTING),
+            ffi::SCIP_Retcode_SCIP_MAXDEPTHLEVEL => Some(Retcode::MAXDEPTHLEVEL),
+            ffi::SCIP_Retcode_SCIP_BRANCHERROR => Some(Retcode::BRANCHERROR),
+            ffi::SCIP_Retcode_SCIP_NOTIMPLEMENTED => Some(Retcode::NOTIMPLEMENTED),
             _ => None,
         }
     }

@@ -41,7 +41,7 @@
 //! }
 
 
-use scip_sys as c_api;
+use scip_sys as ffi;
 pub mod model;
 pub mod variable;
 pub mod constraint;
@@ -53,7 +53,7 @@ pub mod retcode;
 macro_rules! scip_call {
     ($res:expr) => {
         let res = unsafe { $res };
-        if res != c_api::SCIP_Retcode_SCIP_OKAY {
+        if res != ffi::SCIP_Retcode_SCIP_OKAY {
             let retcode = crate::retcode::Retcode::from_c_scip_retcode(res).expect(format!("Unknown SCIP return code {}", res).as_str());
             panic!("SCIP call failed with return code {:?}", retcode);
         }
