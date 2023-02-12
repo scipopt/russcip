@@ -1,7 +1,9 @@
 # russcip
-[![Build and Test](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
+[![tests](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
 
-A Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
+A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
+
+This crate also exposes access to the SCIP's C-API through the `ffi` module. 
 
 ## Dependencies 
 make sure [SCIP](https://www.scipopt.org/index.php#download) 8.0.3 is installed and included in the library path, or define an environment variable `SCIPOPTDIR` with the install directory. 
