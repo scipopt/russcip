@@ -7,7 +7,11 @@ A Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The pro
 make sure [SCIP](https://www.scipopt.org/index.php#download) 8.0.3 is installed and included in the library path, or define an environment variable `SCIPOPTDIR` with the install directory. 
 
 ## Install
-Add the following to your `Cargo.toml` file. 
+By running
+```bash
+cargo add russcip
+```
+or to get the most recent version, add the following to your `Cargo.toml`
 ```
 [dependencies]
 russcip = { git = "https://github.com/mmghannam/russcip" }
