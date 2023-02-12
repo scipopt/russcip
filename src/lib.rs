@@ -41,7 +41,7 @@
 //! }
 
 
-use scip_sys as ffi;
+pub use scip_sys as ffi;
 pub mod model;
 pub mod variable;
 pub mod constraint;
