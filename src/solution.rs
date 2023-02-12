@@ -1,43 +1,47 @@
-use crate::ffi;
-use crate::model::Model;
-use crate::variable::Variable;
-use crate::retcode::Retcode;
 use std::fmt;
-use std::rc::Rc;
 
-pub struct Solution<'a> {
-    model: Rc<&'a Model>,
+use crate::ffi;
+use crate::variable::Variable;
+
+pub struct Solution {
+    scip_ptr: *mut ffi::SCIP,
     ptr: *mut ffi::SCIP_SOL,
 }
 
-impl<'a> Solution<'a> {
+impl Solution {
     pub fn new(
-        scip_ptr: Rc<&'a Model>,
+        scip_ptr: *mut ffi::SCIP,
         scip_sol_prt: *mut ffi::SCIP_Sol,
-    ) -> Result<Self, Retcode> {
-        Ok(Solution {
-            model: scip_ptr,
+    ) -> Self {
+        Solution {
+            scip_ptr,
             ptr: scip_sol_prt,
-        })
+        }
     }
 
     pub fn get_obj_val(&self) -> f64 {
-        unsafe { ffi::SCIPgetSolOrigObj(self.model.scip, self.ptr) }
+        unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr, self.ptr) }
     }
 
     pub fn get_var_val(&self, var: &Variable) -> f64 {
-        unsafe { ffi::SCIPgetSolVal(self.model.scip, self.ptr, var.ptr) }
+        unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.ptr, var.ptr) }
     }
 }
 
-impl<'a> fmt::Debug for Solution<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl fmt::Debug for Solution {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let obj_val = self.get_obj_val();
         write!(f, "Solution with obj val: {}\n", obj_val)?;
-        for var in self.model.get_vars() {
-            let val = self.get_var_val(&var);
+        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr) };
+        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr) };
+        for i in 0..n_vars {
+            let var = unsafe { *vars.offset(i as isize) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.ptr, var) };
             if val > 0.0 {
-                write!(f, "Var {}={}\n", var.get_name(), val)?;
+                let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
+                // from CString
+                let name = unsafe { std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap() };
+                write!(f, "Var {}={}\n", name, val)?;
             }
         }
         Ok(())

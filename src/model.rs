@@ -7,7 +7,6 @@ use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarType, Variable};
 use std::ffi::CString;
-use std::rc::Rc;
 
 pub struct Model {
     pub(crate) scip: *mut ffi::SCIP,
@@ -52,7 +51,7 @@ impl Model {
 
     pub fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
-        Solution::new(Rc::new(self), sol).unwrap()
+        Solution::new(self.scip, sol)
     }
 
     pub fn get_vars(&self) -> Vec<Variable> {
