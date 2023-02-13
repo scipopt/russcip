@@ -33,6 +33,15 @@ impl<'a> Variable<'a> {
         }
     }
 
+    pub fn get_index(&self) -> usize {
+        let id = unsafe { ffi::SCIPvarGetIndex(self.raw) }; 
+        if id < 0 {
+            panic!("Variable index is negative");
+        } else {
+            id as usize
+        }
+    }
+    
     pub fn get_name(&self) -> String {
         let name = unsafe { ffi::SCIPvarGetName(self.raw) };
         let name = unsafe { std::ffi::CStr::from_ptr(name) };
@@ -119,4 +128,24 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
     }
 }
 
-// TODO: implement parameter overloading for variable to use SCIP's tolerance values
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn var_data() {
+        let mut model = Model::new();
+        model.include_default_plugins();
+        model.create_prob("test");
+        let var = Variable::new(&model, 0.0, 1.0, 2.0, "x", VarType::Binary);
+        assert_eq!(var.get_index(), 0);
+        assert_eq!(var.get_lb(), 0.0);
+        assert_eq!(var.get_ub(), 1.0);
+        assert_eq!(var.get_obj(), 2.0);
+        assert_eq!(var.get_name(), "x");
+        assert_eq!(var.get_type(), VarType::Binary);
+    }
+}
+

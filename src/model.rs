@@ -52,7 +52,10 @@ impl Model {
 
     pub fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
-        Solution { model: &self, raw: sol } 
+        Solution {
+            model: &self,
+            raw: sol,
+        }
     }
 
     pub fn get_vars(&self) -> Vec<Variable> {
@@ -63,7 +66,10 @@ impl Model {
             let scip_var = unsafe { *scip_vars.offset(i as isize) };
             // increase scip var's reference count
             scip_call!(ffi::SCIPcaptureVar(self.scip, scip_var));
-            vars.push(Variable { model: &self, raw: scip_var });
+            vars.push(Variable {
+                model: &self,
+                raw: scip_var,
+            });
         }
         vars
     }
@@ -124,7 +130,10 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        Constraint { model: &self, raw: scip_cons }
+        Constraint {
+            model: &self,
+            raw: scip_cons,
+        }
     }
 
     pub fn create_prob(&mut self, name: &str) {
@@ -151,7 +160,10 @@ impl Model {
             let scip_cons = unsafe { *scip_conss.offset(i as isize) };
             // increase scip cons's reference count
             scip_call!(ffi::SCIPcaptureCons(self.scip, scip_cons));
-            conss.push(Constraint { model: &self, raw: scip_cons });
+            conss.push(Constraint {
+                model: &self,
+                raw: scip_cons,
+            });
         }
         conss
     }
@@ -287,22 +299,27 @@ mod tests {
         assert!(x2.get_obj() == 4.);
     }
 
-    #[test]
-    fn build_model_with_functions() {
+    fn create_model() -> Model {
         let mut model = Model::new();
         model.include_default_plugins();
         model.create_prob("test");
         model.set_obj_sense(ObjSense::Maximize);
         model.hide_output();
+        {
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-
-        assert_eq!(model.get_vars().len(), 2);
         model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
-
         model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
-
+        }
+        model
+    }
+    
+    #[test]
+    fn build_model_with_functions() {
+        let model = create_model();
+        assert_eq!(model.get_vars().len(), 2);
         assert_eq!(model.get_n_conss(), 2);
+
         let conss = model.get_conss();
         assert_eq!(conss.len(), 2);
         assert_eq!(conss[0].get_name(), "c1");
