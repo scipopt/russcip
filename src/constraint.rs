@@ -1,26 +1,22 @@
-use crate::ffi;
+use crate::{ffi, model::Model};
 
-pub struct Constraint {
-    pub(crate) ptr: *mut ffi::SCIP_CONS,
-    pub(crate) scip_ptr: *mut ffi::SCIP,
+pub struct Constraint<'a> {
+    pub(crate) model: &'a Model,
+    pub(crate) raw: *mut ffi::SCIP_CONS,
 }
 
-impl Constraint {
-    pub fn new(scip_ptr: *mut ffi::SCIP, ptr: *mut ffi::SCIP_CONS) -> Self {
-        Constraint { scip_ptr, ptr }
-    }
-
+impl<'a> Constraint<'a> {
     pub fn get_name(&self) -> String {
         unsafe {
-            let name = ffi::SCIPconsGetName(self.ptr);
+            let name = ffi::SCIPconsGetName(self.raw);
             String::from(std::ffi::CStr::from_ptr(name).to_str().unwrap())
         }
     }
 }
 
-impl Drop for Constraint {
+impl<'a> Drop for Constraint<'a> {
     fn drop(&mut self) {
-        unsafe { ffi::SCIPreleaseCons(self.scip_ptr, &mut self.ptr) };
+        unsafe { ffi::SCIPreleaseCons(self.model.scip, &mut self.raw) };
     }
 }
 

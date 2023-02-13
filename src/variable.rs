@@ -1,47 +1,65 @@
 use core::panic;
+use std::{ffi::CString, mem};
 
-use crate::ffi;
+use crate::{ffi, model::Model, scip_call};
 
-pub struct Variable {
-    pub(crate) ptr: *mut ffi::SCIP_VAR,
-    pub(crate) scip_ptr: *mut ffi::SCIP,
+pub struct Variable<'a> {
+    pub(crate) raw: *mut ffi::SCIP_VAR,
+    pub(crate) model: &'a Model,
 }
 
-impl Variable {
-    pub fn new(scip_ptr: *mut ffi::SCIP, scip_var: *mut ffi::SCIP_VAR) -> Self {
+impl<'a> Variable<'a> {
+    pub fn new(model: &'a Model,
+    lb: f64,
+    ub: f64,
+    obj: f64,
+    name: &str,
+    var_type: VarType) -> Self {
+        let name = CString::new(name).unwrap();
+        let mut var_ptr: *mut ffi::SCIP_VAR = unsafe { mem::zeroed() };
+        scip_call! { ffi::SCIPcreateVarBasic(
+            model.scip,
+            &mut var_ptr,
+            name.as_ptr(),
+            lb,
+            ub,
+            obj,
+            var_type.into(),
+        ) };
+        scip_call! { ffi::SCIPaddVar(model.scip, var_ptr) };
         Variable {
-            scip_ptr,
-            ptr: scip_var,
+            raw: var_ptr,
+            model
         }
     }
 
     pub fn get_name(&self) -> String {
-        let name = unsafe { ffi::SCIPvarGetName(self.ptr) };
+        let name = unsafe { ffi::SCIPvarGetName(self.raw) };
         let name = unsafe { std::ffi::CStr::from_ptr(name) };
         name.to_str().unwrap().to_string()
     }
 
     pub fn get_obj(&self) -> f64 {
-        unsafe { ffi::SCIPvarGetObj(self.ptr) }
+        unsafe { ffi::SCIPvarGetObj(self.raw) }
     }
 
     pub fn get_lb(&self) -> f64 {
-        unsafe { ffi::SCIPvarGetLbLocal(self.ptr) }
+        unsafe { ffi::SCIPvarGetLbLocal(self.raw) }
     }
 
     pub fn get_ub(&self) -> f64 {
-        unsafe { ffi::SCIPvarGetUbLocal(self.ptr) }
+        unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
     }
 
     pub fn get_type(&self) -> VarType {
-        let var_type = unsafe { ffi::SCIPvarGetType(self.ptr) };
+        let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
         var_type.into()
     }
 }
 
-impl Drop for Variable {
+impl<'a> Drop for Variable<'a> {
     fn drop(&mut self) {
-        unsafe { ffi::SCIPreleaseVar(self.scip_ptr, &mut self.ptr) };
+        unsafe { ffi::SCIPreleaseVar(self.model.scip, &mut self.raw) };
     }
 }
 

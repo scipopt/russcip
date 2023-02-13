@@ -1,13 +1,14 @@
 use std::mem;
 
-use crate::ffi;
 use crate::constraint::Constraint;
+use crate::ffi;
 use crate::scip_call;
 use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarType, Variable};
 use std::ffi::CString;
 
+#[non_exhaustive]
 pub struct Model {
     pub(crate) scip: *mut ffi::SCIP,
 }
@@ -28,7 +29,7 @@ impl Model {
         scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
     }
 
-    pub fn solve(&mut self) {
+    pub fn solve(&self) {
         scip_call! { ffi::SCIPsolve(self.scip) };
     }
 
@@ -51,7 +52,7 @@ impl Model {
 
     pub fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
-        Solution::new(self.scip, sol)
+        Solution { model: &self, raw: sol } 
     }
 
     pub fn get_vars(&self) -> Vec<Variable> {
@@ -62,7 +63,7 @@ impl Model {
             let scip_var = unsafe { *scip_vars.offset(i as isize) };
             // increase scip var's reference count
             scip_call!(ffi::SCIPcaptureVar(self.scip, scip_var));
-            vars.push(Variable::new(self.scip, scip_var));
+            vars.push(Variable { model: &self, raw: scip_var });
         }
         vars
     }
@@ -88,29 +89,24 @@ impl Model {
     }
 
     pub fn add_var(
-        &mut self,
+        &self,
         lb: f64,
         ub: f64,
         obj: f64,
         name: &str,
         var_type: VarType,
     ) -> Variable {
-        let name = CString::new(name).unwrap();
-        let mut var: *mut ffi::SCIP_VAR = unsafe { mem::zeroed() };
-        scip_call! { ffi::SCIPcreateVarBasic(
-            self.scip,
-            &mut var,
-            name.as_ptr(),
-            lb,
-            ub,
-            obj,
-            var_type.into(),
-        ) };
-        scip_call! { ffi::SCIPaddVar(self.scip, var) };
-        Variable::new(self.scip, var)
+        Variable::new(&self, lb, ub, obj, name, var_type.into())
     }
 
-    pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) -> Constraint {
+    pub fn add_cons(
+        &self,
+        vars: &[&Variable],
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Constraint {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons: *mut ffi::SCIP_CONS = unsafe { mem::zeroed() };
@@ -125,10 +121,10 @@ impl Model {
             rhs,
         ) };
         for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.ptr, coefs[i]) };
+            scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        Constraint::new(self.scip, scip_cons)
+        Constraint { model: &self, raw: scip_cons }
     }
 
     pub fn create_prob(&mut self, name: &str) {
@@ -155,7 +151,7 @@ impl Model {
             let scip_cons = unsafe { *scip_conss.offset(i as isize) };
             // increase scip cons's reference count
             scip_call!(ffi::SCIPcaptureCons(self.scip, scip_cons));
-            conss.push(Constraint::new(self.scip, scip_cons));
+            conss.push(Constraint { model: &self, raw: scip_cons });
         }
         conss
     }
@@ -282,7 +278,7 @@ mod tests {
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
         assert_eq!(model.get_n_vars(), 2);
         assert_eq!(model.get_vars().len(), 2);
-        assert!(x1.ptr != x2.ptr);
+        assert!(x1.raw != x2.raw);
         assert!(x1.get_type() == VarType::Integer);
         assert!(x2.get_type() == VarType::Continuous);
         assert!(x1.get_name() == "x1");
@@ -302,21 +298,9 @@ mod tests {
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 
         assert_eq!(model.get_vars().len(), 2);
-        model.add_cons(
-            &[&x1, &x2],
-            &[2., 1.],
-            -f64::INFINITY,
-            100.,
-            "c1",
-        );
+        model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
 
-        model.add_cons(
-            &[&x1, &x2],
-            &[1., 2.],
-            -f64::INFINITY,
-            80.,
-            "c2",
-        );
+        model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
         assert_eq!(model.get_n_conss(), 2);
         let conss = model.get_conss();
