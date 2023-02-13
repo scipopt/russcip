@@ -1,4 +1,4 @@
-name: Build and Test
+name: tests
 
 env:
   version: 8.0.3
