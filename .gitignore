@@ -3,3 +3,4 @@
 Cargo.lock
 *.mps
 example
+scip-sys/target
