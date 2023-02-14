@@ -11,3 +11,4 @@ links = "scip"
 [build-dependencies]
 bindgen = "0.64"
 cc = "1.0.73"
+glob = "0.3.1"

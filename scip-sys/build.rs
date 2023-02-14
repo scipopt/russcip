@@ -3,6 +3,7 @@ extern crate bindgen;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
+use glob::glob;
 
 fn _build_from_scip_dir(path: String) -> bindgen::Builder {
     let lib_dir = PathBuf::from(&path).join("lib");
@@ -46,20 +47,32 @@ fn _build_from_scip_dir(path: String) -> bindgen::Builder {
         .clang_arg(format!("-I{}", include_dir_path))
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-env-changed=SCIPOPTDIR");
-    let scip_env_var = env::var("SCIPOPTDIR");
-    let conda_prefix_env_var = env::var("CONDA_PREFIX");
-    let conda_env_var = env::var("CONDA");
+fn lib_scip_in_dir(path: &str) -> bool {
+    glob(&format!("{}/lib/libscip*", path)).unwrap().count() > 0
+}
 
-    let builder;
-    if let Ok(scip_dir) = scip_env_var {
-        builder = _build_from_scip_dir(scip_dir);
-    } else if let Ok(scip_dir) = conda_prefix_env_var {
-        builder = _build_from_scip_dir(scip_dir);
-    } else if let Ok(scip_dir) = conda_env_var {
-        builder = _build_from_scip_dir(scip_dir);
-    } else {
+fn main() -> Result<(), Box<dyn Error>> {
+    let env_vars = vec![
+        "SCIPOPTDIR",
+        "CONDA_PREFIX",
+        "CONDA",
+    ];
+    let mut builder = bindgen::Builder::default();
+    let mut found_scip = false;
+    for env_var_name in env_vars {
+        let env_var = env::var(env_var_name);
+        if let Ok(scip_dir) = env_var {
+            if lib_scip_in_dir(&scip_dir) {
+                println!("cargo:rerun-if-env-changed={}", env_var_name);
+                builder = _build_from_scip_dir(scip_dir);
+                found_scip = true;
+                break;
+            }
+            
+        }
+    }
+    
+    if !found_scip {
         println!("cargo:warning=SCIPOPTDIR was not defined, looking for SCIP in system libraries");
         let scip_header_file = "scip-wrapper.h";
         let scipdefplugins_header_file = "scipdefplugins-wrapper.h";
