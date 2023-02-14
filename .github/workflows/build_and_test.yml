@@ -39,6 +39,7 @@ jobs:
         run: |
           conda create -n test
           conda init
+          source {{ runner.workspace }}.bashrc
           conda activate test
           conda install -y --channel conda-forge scip
 
