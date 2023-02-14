@@ -28,6 +28,22 @@ jobs:
         run: |
           cargo build
           cargo test
+          
+  Linux-conda-test:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install dependencies (SCIPOptSuite)
+        run: |
+          conda install -y --channel conda-forge scip
+
+      - name: Build and test
+        run: |
+          cargo build
+          cargo test
 
   # TODO: fix windows workflow 
   # Windows-test:
