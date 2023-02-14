@@ -38,6 +38,7 @@ jobs:
       - name: Install dependencies (SCIPOptSuite)
         run: |
           conda create -n test
+          conda init
           conda activate test
           conda install -y --channel conda-forge scip
 
