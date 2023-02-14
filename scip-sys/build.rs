@@ -71,6 +71,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 println!("cargo:warning=SCIP was not found in {}", env_var_name);
             }
             
+        } else {
+            println!("cargo:warning={} is not set", env_var_name);
         }
     }
     

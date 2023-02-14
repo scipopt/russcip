@@ -32,6 +32,8 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: true
+    env:
+      CONDA_PREFIX: $CONDA/envs/test
     steps:
       - uses: actions/checkout@v2
       - uses: conda-incubator/setup-miniconda@v2
@@ -40,7 +42,6 @@ jobs:
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          export CONDA_PREFIX=$CONDA/envs/test
           conda install -y --channel conda-forge scip
 
       - name: Build and test
