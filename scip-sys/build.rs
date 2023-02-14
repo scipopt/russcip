@@ -62,13 +62,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rerun-if-env-changed={}", env_var_name);
         let env_var = env::var(env_var_name);
         if let Ok(scip_dir) = env_var {
-            println!("cargo:warning=Looking for SCIP in {}", env_var_name);
+            println!("cargo:warning=Looking for SCIP in {}", scip_dir);
             if lib_scip_in_dir(&scip_dir) {
                 builder = _build_from_scip_dir(scip_dir);
                 found_scip = true;
                 break;
             } else {
-                println!("cargo:warning=SCIP was not found in {}", env_var_name);
+                println!("cargo:warning=SCIP was not found in {}", scip_dir);
             }
             
         } else {

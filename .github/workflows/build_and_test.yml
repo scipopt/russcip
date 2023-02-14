@@ -37,14 +37,14 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
-          
+
       - name: Install dependencies (SCIPOptSuite)
         run: |
           conda install -y --channel conda-forge scip
+          echo "SCIPOPTDIR=$CONDA_PREFIX" >> $GITHUB_ENV
 
       - name: Build and test
         run: |
-          export CONDA_PREFIX=$CONDA/envs/test
           cargo build
           cargo test
 
