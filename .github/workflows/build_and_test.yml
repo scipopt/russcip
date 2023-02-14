@@ -37,7 +37,7 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
-      env:
+      - env:
         CONDA_PREFIX: $CONDA/envs/test
       - name: Install dependencies (SCIPOptSuite)
         run: |
