@@ -40,9 +40,8 @@ jobs:
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          conda activate test
-          conda install -y --channel conda-forge scip
           export CONDA_PREFIX=$CONDA/envs/test
+          conda install -y --channel conda-forge scip
 
       - name: Build and test
         run: |
