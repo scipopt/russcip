@@ -8,4 +8,4 @@ version = "0.1.6"
 edition = "2021"
 
 [dependencies]
-scip-sys = { path = "scip-sys", version = "0.1.0" }
+scip-sys = { path = "scip-sys", version = "0.1.1" }
