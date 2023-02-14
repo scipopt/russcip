@@ -49,11 +49,15 @@ fn _build_from_scip_dir(path: String) -> bindgen::Builder {
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=SCIPOPTDIR");
     let scip_env_var = env::var("SCIPOPTDIR");
-    let conda_prefix = env::var("CONDA_PREFIX");
+    let conda_prefix_env_var = env::var("CONDA_PREFIX");
+    let conda_env_var = env::var("CONDA");
+
     let builder;
     if let Ok(scip_dir) = scip_env_var {
         builder = _build_from_scip_dir(scip_dir);
-    } else if let Ok(scip_dir) = conda_prefix {
+    } else if let Ok(scip_dir) = conda_prefix_env_var {
+        builder = _build_from_scip_dir(scip_dir);
+    } else if let Ok(scip_dir) = conda_env_var {
         builder = _build_from_scip_dir(scip_dir);
     } else {
         println!("cargo:warning=SCIPOPTDIR was not defined, looking for SCIP in system libraries");
