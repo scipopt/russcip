@@ -43,7 +43,7 @@ jobs:
           conda install -y --channel conda-forge scip
           whereis scip
           echo "SCIPOPTDIR=$CONDA" >> $GITHUB_ENV
-          ls $CONDA
+          ls $CONDA/lib
 
       - name: Build and test
         run: |
