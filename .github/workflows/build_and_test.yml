@@ -37,8 +37,15 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
+
+      - name: Install dependencies (SCIPOptSuite)
         run: |
           conda install -y --channel conda-forge scip
+          sudo cp $CONDA/lib/libscip.so.7.0 /usr/lib/libscip.so.7.0
+          unset CONDA
+
+      - name: Build and test
+        run: |
           cargo test
 
   # TODO: fix windows workflow 
