@@ -18,11 +18,6 @@ jobs:
       fail-fast: true
     steps:
       - uses: actions/checkout@v2
-      - uses: conda-incubator/setup-miniconda@v2
-        with:
-          auto-activate-base: true
-          activate-environment: ""
-
       - name: Install dependencies (SCIPOptSuite)
         run: |
           wget --quiet --no-check-certificate https://scipopt.org/download/release/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
@@ -42,6 +37,8 @@ jobs:
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
+          conda create -n test
+          conda activate test
           conda install -y --channel conda-forge scip
 
       - name: Build and test

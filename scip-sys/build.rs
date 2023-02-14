@@ -55,15 +55,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let env_vars = vec![
         "SCIPOPTDIR",
         "CONDA_PREFIX",
-        "CONDA",
     ];
     let mut builder = bindgen::Builder::default();
     let mut found_scip = false;
     for env_var_name in env_vars {
+        println!("cargo:rerun-if-env-changed={}", env_var_name);
         let env_var = env::var(env_var_name);
         if let Ok(scip_dir) = env_var {
             if lib_scip_in_dir(&scip_dir) {
-                println!("cargo:rerun-if-env-changed={}", env_var_name);
                 builder = _build_from_scip_dir(scip_dir);
                 found_scip = true;
                 break;
@@ -73,7 +72,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     
     if !found_scip {
-        println!("cargo:warning=SCIPOPTDIR was not defined, looking for SCIP in system libraries");
+        println!("cargo:warning=SCIP was not found in SCIPOPTDIR or in Conda environemnt, looking for SCIP in system libraries");
         let scip_header_file = "scip-wrapper.h";
         let scipdefplugins_header_file = "scipdefplugins-wrapper.h";
         builder = bindgen::Builder::default()
