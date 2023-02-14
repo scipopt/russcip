@@ -37,16 +37,8 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
-
-      - name: Install dependencies (SCIPOptSuite)
         run: |
           conda install -y --channel conda-forge scip
-          whereis scip
-          echo "SCIPOPTDIR=$CONDA" >> $GITHUB_ENV
-          ls $CONDA/lib
-
-      - name: Build and test
-        run: |
           cargo test
 
   # TODO: fix windows workflow 
