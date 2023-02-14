@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies (SCIPOptSuite)
         run: |
           conda install -y --channel conda-forge scip
-          echo "SCIPOPTDIR=$CONDA_PREFIX" >> $GITHUB_ENV
+          echo "SCIPOPTDIR=$CONDA/envs/test" >> $GITHUB_ENV
 
       - name: Build and test
         run: |
