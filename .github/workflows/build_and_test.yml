@@ -45,6 +45,7 @@ jobs:
 
       - name: Build and test
         run: |
+          export CONDA_PREFIX=$CONDA/envs/test
           cargo build
           cargo test
 
