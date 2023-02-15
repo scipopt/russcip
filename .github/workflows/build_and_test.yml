@@ -21,8 +21,9 @@ jobs:
       - name: Install dependencies (SCIPOptSuite)
         run: |
           wget --quiet --no-check-certificate https://scipopt.org/download/release/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
-          sudo apt-get -y install libgsl-dev
-          sudo apt-get update && sudo apt-get install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
+          sudo apt-get update
+          sudo apt-get upgrade
+          sudo apt-get install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
 
       - name: Build and test
         run: |
