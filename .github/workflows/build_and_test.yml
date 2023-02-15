@@ -20,8 +20,8 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          wget --quiet --no-check-certificate https://scipopt.org/download/release/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.sh
-          sudo apt-get update && sh ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.sh
+          wget --quiet --no-check-certificate https://scipopt.org/download/release/SCIPOptSuite-${{ env.version }}-Linux-debian.deb
+          sudo apt-get update && sudo apt-get install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
 
       - name: Build and test
         run: |
