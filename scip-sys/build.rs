@@ -22,6 +22,8 @@ fn _build_from_scip_dir(path: String) -> bindgen::Builder {
         );
     }
     println!("cargo:rustc-link-search={}", lib_dir_path);
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir_path);
+
 
     let include_dir = PathBuf::from(&path).join("include");
     let include_dir_path = include_dir.to_str().unwrap();
