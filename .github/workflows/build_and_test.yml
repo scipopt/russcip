@@ -37,6 +37,8 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
+          allow-softlinks: true
+
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
