@@ -47,10 +47,6 @@ jobs:
           echo "DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
           echo "PATH=$CONDA/envs/test/bin:$PATH" >> "${GITHUB_ENV}"
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
-          echo $LD_LIBRARY_PATH
-          echo $DYLD_LIBRARY_PATH
-          echo $PATH
-          echo $CONDA_PREFIX
 
       - name: Build
         run: |
