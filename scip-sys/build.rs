@@ -22,6 +22,8 @@ fn _build_from_scip_dir(path: String) -> bindgen::Builder {
         );
     }
     println!("cargo:rustc-link-search={}", lib_dir_path);
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir_path);
+
 
     let include_dir = PathBuf::from(&path).join("include");
     let include_dir_path = include_dir.to_str().unwrap();
@@ -62,12 +64,17 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("cargo:rerun-if-env-changed={}", env_var_name);
         let env_var = env::var(env_var_name);
         if let Ok(scip_dir) = env_var {
+            println!("cargo:warning=Looking for SCIP in {}", scip_dir);
             if lib_scip_in_dir(&scip_dir) {
                 builder = _build_from_scip_dir(scip_dir);
                 found_scip = true;
                 break;
+            } else {
+                println!("cargo:warning=SCIP was not found in {}", scip_dir);
             }
             
+        } else {
+            println!("cargo:warning={} is not set", env_var_name);
         }
     }
     
