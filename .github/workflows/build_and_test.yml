@@ -50,6 +50,8 @@ jobs:
 
       - name: Build and test
         run: |
+          export DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:$CONDA_PREFIX/lib
+          echo $DYLD_LIBRARY_PATH
           cargo test -vv
 
   # TODO: fix windows workflow 
