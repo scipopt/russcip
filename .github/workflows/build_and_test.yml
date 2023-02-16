@@ -52,7 +52,11 @@ jobs:
           echo $PATH
           echo $CONDA_PREFIX
 
-      - name: Build and test
+      - name: Build
+        run: |
+          cargo build
+
+      - name: Test
         run: |
           cargo test
 
