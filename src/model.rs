@@ -86,7 +86,7 @@ impl Model {
     pub fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
         Solution {
-            model: &self,
+            scip_ptr: self.scip,
             raw: sol,
         }
     }
