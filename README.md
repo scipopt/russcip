@@ -1,12 +1,14 @@
 # russcip
 [![tests](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
 
-A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
-
-This crate also exposes access to the SCIP's C-API through the `ffi` module. 
-
+A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). This crate also exposes access to the SCIP's C-API through the `ffi` module. 
+The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
 ## Dependencies 
-make sure [SCIP](https://www.scipopt.org/index.php#download) 8.0.3 is installed and included in the library path, or define an environment variable `SCIPOPTDIR` with the install directory. 
+Make sure SCIP is installed, the easiest way to install it is to install a precompiled package from [here](https://scipopt.org/index.php#download) or through conda by running
+```
+conda install --channel conda-forge scip
+```
+After which `russcip` would be able to find the installation in the current Conda environment. Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable. 
 
 ## Install
 By running
@@ -36,8 +38,10 @@ fn main() {
     model.hide_output();
 
     // Add variables
-    let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-    let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+    let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+    let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+    let x1 = model.get_var(x1_id).unwrap();
+    let x2 = model.get_var(x2_id).unwrap();
 
     // Add constraints
     model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
@@ -61,4 +65,6 @@ fn main() {
 
 ```
 
+## About SCIP
 
+SCIP is currently one of the fastest non-commercial solvers for mixed integer programming (MIP) and mixed integer nonlinear programming (MINLP). It is also a framework for constraint integer programming and branch-cut-and-price. It allows for total control of the solution process and the access of detailed information down to the guts of the solver.
