@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::mem;
 
 use crate::constraint::Constraint;
@@ -5,19 +6,25 @@ use crate::ffi;
 use crate::scip_call;
 use crate::solution::Solution;
 use crate::status::Status;
-use crate::variable::{VarType, Variable};
+use crate::variable::{VarId, VarType, Variable};
 use std::ffi::CString;
 
 #[non_exhaustive]
 pub struct Model {
     pub(crate) scip: *mut ffi::SCIP,
+    pub(crate) vars: BTreeMap<VarId, Variable>,
+    pub(crate) conss: Vec<Constraint>,
 }
 
 impl Model {
     pub fn new() -> Self {
         let mut model: *mut ffi::SCIP = unsafe { mem::zeroed() };
         scip_call!(ffi::SCIPcreate(&mut model));
-        Model { scip: model }
+        Model {
+            scip: model,
+            vars: BTreeMap::new(),
+            conss: Vec::new(),
+        }
     }
 
     pub fn include_default_plugins(&mut self) {
@@ -27,6 +34,32 @@ impl Model {
     pub fn read_prob(&mut self, filename: &str) {
         let filename = CString::new(filename).unwrap();
         scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
+        self._set_vars();
+        self._set_conss();
+    }
+
+    fn _set_vars(&mut self) {
+        let n_vars = self.get_n_vars();
+        let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
+        for i in 0..n_vars {
+            let scip_var = unsafe { *scip_vars.add(i) };
+            let var = Variable {
+                raw: scip_var,
+            };
+            self.vars.insert(var.get_index(), var);
+        }
+    }
+
+    fn _set_conss(&mut self) {
+        let n_conss = self.get_n_conss();
+        let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
+        for i in 0..n_conss {
+            let scip_cons = unsafe { *scip_conss.add(i) };
+            let cons = Constraint {
+                raw: scip_cons,
+            };
+            self.conss.push(cons);
+        }
     }
 
     pub fn solve(&self) {
@@ -59,19 +92,18 @@ impl Model {
     }
 
     pub fn get_vars(&self) -> Vec<Variable> {
-        let n_vars = self.get_n_vars();
-        let mut vars = Vec::with_capacity(n_vars);
-        let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
-        for i in 0..n_vars {
-            let scip_var = unsafe { *scip_vars.offset(i as isize) };
-            // increase scip var's reference count
-            scip_call!(ffi::SCIPcaptureVar(self.scip, scip_var));
-            vars.push(Variable {
-                model: &self,
-                raw: scip_var,
-            });
+        self.vars.values().map(|v| 
+        Variable { 
+            raw: v.raw, 
         }
-        vars
+        ).collect()
+    }
+
+    pub fn get_var(&self, var_id: VarId) -> Option<Variable> {
+        self.vars.get(&var_id).map(|v| 
+            Variable {
+                raw: v.raw,
+            })
     }
 
     pub fn set_str_param(&mut self, param: &str, value: &str) {
@@ -94,25 +126,21 @@ impl Model {
         self.set_int_param("display/verblevel", 0);
     }
 
-    pub fn add_var(
-        &self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Variable {
-        Variable::new(&self, lb, ub, obj, name, var_type.into())
+    pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> VarId {
+        let var = Variable::new(self.scip, lb, ub, obj, name, var_type.into());
+        let var_id = var.get_index();
+        self.vars.insert(var_id, var);
+        var_id
     }
 
     pub fn add_cons(
-        &self,
+        &mut self,
         vars: &[&Variable],
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Constraint {
+    ) {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons: *mut ffi::SCIP_CONS = unsafe { mem::zeroed() };
@@ -130,10 +158,10 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        Constraint {
-            model: &self,
+        let cons = Constraint {
             raw: scip_cons,
-        }
+        };
+        self.conss.push(cons);
     }
 
     pub fn create_prob(&mut self, name: &str) {
@@ -152,20 +180,8 @@ impl Model {
         unsafe { ffi::SCIPgetNConss(self.scip) as usize }
     }
 
-    pub fn get_conss(&self) -> Vec<Constraint> {
-        let n_conss = self.get_n_conss();
-        let mut conss = Vec::with_capacity(n_conss);
-        let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
-        for i in 0..n_conss {
-            let scip_cons = unsafe { *scip_conss.offset(i as isize) };
-            // increase scip cons's reference count
-            scip_call!(ffi::SCIPcaptureCons(self.scip, scip_cons));
-            conss.push(Constraint {
-                model: &self,
-                raw: scip_cons,
-            });
-        }
-        conss
+    pub fn get_conss(&self) -> &Vec<Constraint> {
+        &self.conss
     }
 
     pub fn set_presolving(&mut self, presolving: ParamSetting) {
@@ -190,10 +206,8 @@ impl Model {
             true.into(),
         ) };
     }
-}
 
-impl Drop for Model {
-    fn drop(&mut self) {
+    pub fn free(&mut self) {
         unsafe { ffi::SCIPfree(&mut self.scip) };
     }
 }
@@ -259,6 +273,10 @@ mod tests {
         let obj_val = model.get_obj_val();
         assert_eq!(obj_val, 200.);
 
+        //test constraints
+        let conss = model.get_conss();
+        assert_eq!(conss.len(), 2);
+        
         //test solution values
         let sol = model.get_best_sol();
         let vars = model.get_vars();
@@ -286,8 +304,10 @@ mod tests {
         model.create_prob("test");
         model.set_obj_sense(ObjSense::Maximize);
         model.hide_output();
-        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
+        let x1 = model.get_var(x1_id).unwrap();
+        let x2 = model.get_var(x2_id).unwrap();
         assert_eq!(model.get_n_vars(), 2);
         assert_eq!(model.get_vars().len(), 2);
         assert!(x1.raw != x2.raw);
@@ -305,15 +325,17 @@ mod tests {
         model.create_prob("test");
         model.set_obj_sense(ObjSense::Maximize);
         model.hide_output();
-        {
-        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let x1 = model.get_var(x1_id).unwrap();
+        let x2 = model.get_var(x2_id).unwrap();
         model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
         model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
-        }
+        
         model
     }
-    
+
     #[test]
     fn build_model_with_functions() {
         let model = create_model();

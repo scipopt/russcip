@@ -1,24 +1,26 @@
+use crate::{ffi, scip_call};
 use core::panic;
 use std::{ffi::CString, mem};
 
-use crate::{ffi, model::Model, scip_call};
-
-pub struct Variable<'a> {
+pub type VarId = usize;
+#[derive(Debug)]
+pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
-    pub(crate) model: &'a Model,
 }
 
-impl<'a> Variable<'a> {
-    pub fn new(model: &'a Model,
-    lb: f64,
-    ub: f64,
-    obj: f64,
-    name: &str,
-    var_type: VarType) -> Self {
+impl Variable {
+    pub fn new(
+        scip_ptr: *mut ffi::SCIP,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Self {
         let name = CString::new(name).unwrap();
         let mut var_ptr: *mut ffi::SCIP_VAR = unsafe { mem::zeroed() };
         scip_call! { ffi::SCIPcreateVarBasic(
-            model.scip,
+            scip_ptr,
             &mut var_ptr,
             name.as_ptr(),
             lb,
@@ -26,22 +28,21 @@ impl<'a> Variable<'a> {
             obj,
             var_type.into(),
         ) };
-        scip_call! { ffi::SCIPaddVar(model.scip, var_ptr) };
+        scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
         Variable {
             raw: var_ptr,
-            model
         }
     }
 
     pub fn get_index(&self) -> usize {
-        let id = unsafe { ffi::SCIPvarGetIndex(self.raw) }; 
+        let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
         if id < 0 {
             panic!("Variable index is negative");
         } else {
             id as usize
         }
     }
-    
+
     pub fn get_name(&self) -> String {
         let name = unsafe { ffi::SCIPvarGetName(self.raw) };
         let name = unsafe { std::ffi::CStr::from_ptr(name) };
@@ -66,11 +67,6 @@ impl<'a> Variable<'a> {
     }
 }
 
-impl<'a> Drop for Variable<'a> {
-    fn drop(&mut self) {
-        unsafe { ffi::SCIPreleaseVar(self.model.scip, &mut self.raw) };
-    }
-}
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarType {
@@ -133,19 +129,20 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::Model;
 
     #[test]
     fn var_data() {
         let mut model = Model::new();
         model.include_default_plugins();
         model.create_prob("test");
-        let var = Variable::new(&model, 0.0, 1.0, 2.0, "x", VarType::Binary);
+        let mut var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary);
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
         assert_eq!(var.get_obj(), 2.0);
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
+        unsafe { ffi::SCIPreleaseVar(model.scip, &mut var.raw) };
     }
 }
-
