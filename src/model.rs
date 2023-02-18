@@ -195,6 +195,15 @@ impl Model {
     }
 }
 
+impl Default for Model {
+    fn default() -> Self {
+        let mut model = Model::new();
+        model.include_default_plugins();
+        model.create_prob("problem");
+        model
+    }
+}
+
 pub enum ParamSetting {
     Default,
     Aggressive,
