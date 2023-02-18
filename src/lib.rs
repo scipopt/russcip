@@ -1,6 +1,6 @@
 //! # russcip
 //! Safe Rust interface for SCIP.
-//! 
+//!
 //! # Example
 //! Model and solve an integer program.
 //! ```rust
@@ -8,8 +8,8 @@
 //! use russcip::model::ObjSense;
 //! use russcip::status::Status;
 //! use russcip::variable::VarType;
-//! 
-//! 
+//!
+//!
 //! // Create model
 //! let mut model = Model::new();
 //! model.include_default_plugins();
@@ -42,21 +42,21 @@
 //!     println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
 //! }
 
-
 pub use scip_sys as ffi;
-pub mod model;
-pub mod variable;
 pub mod constraint;
-pub mod status;
-pub mod solution;
+pub mod model;
 pub mod retcode;
+pub mod solution;
+pub mod status;
+pub mod variable;
 
 #[macro_export]
 macro_rules! scip_call {
     ($res:expr) => {
         let res = unsafe { $res };
         if res != ffi::SCIP_Retcode_SCIP_OKAY {
-            let retcode = crate::retcode::Retcode::from_c_scip_retcode(res).expect(format!("Unknown SCIP return code {}", res).as_str());
+            let retcode = crate::retcode::Retcode::from_c_scip_retcode(res)
+                .expect(format!("Unknown SCIP return code {}", res).as_str());
             panic!("SCIP call failed with return code {:?}", retcode);
         }
     };

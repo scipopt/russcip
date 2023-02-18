@@ -29,9 +29,7 @@ impl Variable {
             var_type.into(),
         ) };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Variable {
-            raw: var_ptr,
-        }
+        Variable { raw: var_ptr }
     }
 
     pub fn get_index(&self) -> usize {
@@ -66,7 +64,6 @@ impl Variable {
         var_type.into()
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarType {
@@ -123,8 +120,6 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
         }
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

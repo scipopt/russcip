@@ -43,9 +43,7 @@ impl Model {
         let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            let var = Variable {
-                raw: scip_var,
-            };
+            let var = Variable { raw: scip_var };
             self.vars.insert(var.get_index(), var);
         }
     }
@@ -55,9 +53,7 @@ impl Model {
         let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            let cons = Constraint {
-                raw: scip_cons,
-            };
+            let cons = Constraint { raw: scip_cons };
             self.conss.push(cons);
         }
     }
@@ -92,18 +88,14 @@ impl Model {
     }
 
     pub fn get_vars(&self) -> Vec<Variable> {
-        self.vars.values().map(|v| 
-        Variable { 
-            raw: v.raw, 
-        }
-        ).collect()
+        self.vars
+            .values()
+            .map(|v| Variable { raw: v.raw })
+            .collect()
     }
 
     pub fn get_var(&self, var_id: VarId) -> Option<Variable> {
-        self.vars.get(&var_id).map(|v| 
-            Variable {
-                raw: v.raw,
-            })
+        self.vars.get(&var_id).map(|v| Variable { raw: v.raw })
     }
 
     pub fn set_str_param(&mut self, param: &str, value: &str) {
@@ -133,14 +125,7 @@ impl Model {
         var_id
     }
 
-    pub fn add_cons(
-        &mut self,
-        vars: &[&Variable],
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-    ) {
+    pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons: *mut ffi::SCIP_CONS = unsafe { mem::zeroed() };
@@ -158,9 +143,7 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        let cons = Constraint {
-            raw: scip_cons,
-        };
+        let cons = Constraint { raw: scip_cons };
         self.conss.push(cons);
     }
 
@@ -276,7 +259,7 @@ mod tests {
         //test constraints
         let conss = model.get_conss();
         assert_eq!(conss.len(), 2);
-        
+
         //test solution values
         let sol = model.get_best_sol();
         let vars = model.get_vars();
@@ -325,14 +308,14 @@ mod tests {
         model.create_prob("test");
         model.set_obj_sense(ObjSense::Maximize);
         model.hide_output();
-        
+
         let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         let x1 = model.get_var(x1_id).unwrap();
         let x2 = model.get_var(x2_id).unwrap();
         model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
         model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
-        
+
         model
     }
 
