@@ -315,12 +315,12 @@ mod tests {
 
      #[test]
     fn call_solve_without_problem() {
-        Model::new().solve();
+        assert!(Model::new().unwrap().solve().is_err());
     }
 
     #[test]
     fn solution_without_problem() {
-        let mut model = Model::new();
+        let mut model = Model::new().unwrap();
         let sol = model.get_best_sol();
         sol.get_obj_val();
     }
@@ -328,11 +328,11 @@ mod tests {
     #[test]
     fn drop_problem_before_solution() {
         let sol = {
-            let mut model = Model::new();
-            model.hide_output();
-            model.include_default_plugins();
-            model.read_prob("data/test/simple.lp");
-            model.solve();
+            let mut model = Model::new().unwrap();
+            model.hide_output().unwrap();
+            model.include_default_plugins().unwrap();
+            model.read_prob("data/test/simple.lp").unwrap();
+            model.solve().unwrap();
             model.get_best_sol()
         };
         assert_eq!(sol.get_obj_val(), 200.);
@@ -340,8 +340,8 @@ mod tests {
 
     #[test]
     fn drop_variable_after_problem() {
-        let mut model = Model::new();
-        let var_id = model.add_var(0., 0., 0., "", VarType::Binary);
+        let mut model = Model::new().unwrap();
+        let var_id = model.add_var(0., 0., 0., "", VarType::Binary).unwrap();
         let var = model.get_var(var_id).unwrap();
         drop(model);
         drop(var);
