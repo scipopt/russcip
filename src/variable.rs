@@ -1,4 +1,4 @@
-use crate::{ffi, scip_call};
+use crate::{ffi, retcode::Retcode, scip_call};
 use core::panic;
 use std::{ffi::CString, mem::MaybeUninit};
 
@@ -17,7 +17,7 @@ impl Variable {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> Self {
+    ) -> Result<Self, Retcode> {
         let name = CString::new(name).unwrap();
         let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
@@ -31,7 +31,10 @@ impl Variable {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Variable { raw: var_ptr, scip_ptr }
+        Ok(Variable {
+            raw: var_ptr,
+            scip_ptr,
+        })
     }
 
     pub fn get_index(&self) -> usize {
@@ -126,20 +129,21 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Model;
+    use crate::{model::Model, retcode::Retcode};
 
     #[test]
-    fn var_data() {
-        let mut model = Model::new();
+    fn var_data() -> Result<(), Retcode> {
+        let mut model = Model::new()?;
         model.include_default_plugins();
         model.create_prob("test");
-        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary);
+        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary)?;
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
         assert_eq!(var.get_obj(), 2.0);
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
+        Ok(())
     }
 }
 
