@@ -44,7 +44,11 @@ impl Model {
         let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            let var = Variable { raw: scip_var };
+            unsafe { ffi::SCIPcaptureVar(self.scip, scip_var) };
+            let var = Variable {
+                scip_ptr: self.scip,
+                raw: scip_var,
+            };
             self.vars.insert(var.get_index(), var);
         }
     }
@@ -54,7 +58,8 @@ impl Model {
         let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            let cons = Constraint { raw: scip_cons };
+            unsafe { ffi::SCIPcaptureCons(self.scip, scip_cons) };
+            let cons = Constraint { scip_ptr: self.scip, raw: scip_cons };
             self.conss.push(cons);
         }
     }
@@ -91,12 +96,23 @@ impl Model {
     pub fn get_vars(&self) -> Vec<Variable> {
         self.vars
             .values()
-            .map(|v| Variable { raw: v.raw })
+            .map(|v| {
+                unsafe { ffi::SCIPcaptureVar(self.scip, v.raw) };
+                Variable {
+                    scip_ptr: self.scip,
+                    raw: v.raw,
+                }
+            })
             .collect()
     }
 
     pub fn get_var(&mut self, var_id: VarId) -> Option<Variable> {
-        self.vars.get(&var_id).map(|v| Variable { raw: v.raw })
+        self.vars.get(&var_id).map(|v| {
+            unsafe { ffi::SCIPcaptureVar(self.scip, v.raw) };
+            Variable {
+            scip_ptr: self.scip,
+            raw: v.raw,
+        }})
     }
 
     pub fn set_str_param(&mut self, param: &str, value: &str) {
@@ -145,7 +161,7 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        let cons = Constraint { raw: scip_cons };
+        let cons = Constraint { scip_ptr: self.scip, raw: scip_cons };
         self.conss.push(cons);
     }
 
@@ -199,6 +215,14 @@ impl Default for Model {
         model.include_default_plugins();
         model.create_prob("problem");
         model
+    }
+}
+
+impl Drop for Model {
+    fn drop(&mut self) {
+        self.vars.clear();
+        self.conss.clear();
+        scip_call! { ffi::SCIPfree(&mut self.scip) };
     }
 }
 
