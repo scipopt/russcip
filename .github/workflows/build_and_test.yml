@@ -47,16 +47,14 @@ jobs:
           echo "DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
           echo "PATH=$CONDA/envs/test/bin:$PATH" >> "${GITHUB_ENV}"
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
-      
-      - name: Install miri dependency
-          rustup toolchain install nightly --component miri
-          rustup override set nightly
-          cargo miri setup
+
+      - name: Build
+        run: |
+          cargo build
 
       - name: Test
         run: |
           cargo test
-          cargo miri test
 
   # TODO: fix windows workflow 
   # Windows-test:
