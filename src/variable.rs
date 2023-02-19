@@ -6,6 +6,7 @@ pub type VarId = usize;
 #[derive(Debug)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
+    pub(crate) scip_ptr: *mut ffi::SCIP,
 }
 
 impl Variable {
@@ -30,7 +31,7 @@ impl Variable {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Variable { raw: var_ptr }
+        Variable { raw: var_ptr, scip_ptr }
     }
 
     pub fn get_index(&self) -> usize {
@@ -139,5 +140,11 @@ mod tests {
         assert_eq!(var.get_obj(), 2.0);
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
+    }
+}
+
+impl Drop for Variable {
+    fn drop(&mut self) {
+        unsafe { ffi::SCIPreleaseVar(self.scip_ptr, &mut self.raw) };
     }
 }
