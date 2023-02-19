@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::mem;
+use std::mem::MaybeUninit;
 
 use crate::constraint::Constraint;
 use crate::ffi;
@@ -18,10 +18,11 @@ pub struct Model {
 
 impl Model {
     pub fn new() -> Self {
-        let mut model: *mut ffi::SCIP = unsafe { mem::zeroed() };
-        scip_call!(ffi::SCIPcreate(&mut model));
+        let mut scip_ptr = MaybeUninit::uninit();
+        scip_call!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
+        let scip_ptr = unsafe { scip_ptr.assume_init() };
         Model {
-            scip: model,
+            scip: scip_ptr,
             vars: BTreeMap::new(),
             conss: Vec::new(),
         }
@@ -58,28 +59,28 @@ impl Model {
         }
     }
 
-    pub fn solve(&self) {
+    pub fn solve(&mut self) {
         scip_call! { ffi::SCIPsolve(self.scip) };
     }
 
-    pub fn get_status(&self) -> Status {
+    pub fn get_status(&mut self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.scip) };
         Status::from_c_scip_status(status).unwrap()
     }
 
-    pub fn get_obj_val(&self) -> f64 {
+    pub fn get_obj_val(&mut self) -> f64 {
         unsafe { ffi::SCIPgetPrimalbound(self.scip) }
     }
 
-    pub fn get_n_vars(&self) -> usize {
+    pub fn get_n_vars(&mut self) -> usize {
         unsafe { ffi::SCIPgetNVars(self.scip) as usize }
     }
 
-    pub fn print_version(&self) {
+    pub fn print_version(&mut self) {
         unsafe { ffi::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
     }
 
-    pub fn get_best_sol(&self) -> Solution {
+    pub fn get_best_sol(&mut self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
         Solution {
             scip_ptr: self.scip,
@@ -94,7 +95,7 @@ impl Model {
             .collect()
     }
 
-    pub fn get_var(&self, var_id: VarId) -> Option<Variable> {
+    pub fn get_var(&mut self, var_id: VarId) -> Option<Variable> {
         self.vars.get(&var_id).map(|v| Variable { raw: v.raw })
     }
 
@@ -128,10 +129,10 @@ impl Model {
     pub fn add_cons(&mut self, vars: &[&Variable], coefs: &[f64], lhs: f64, rhs: f64, name: &str) {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
-        let mut scip_cons: *mut ffi::SCIP_CONS = unsafe { mem::zeroed() };
+        let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicLinear(
             self.scip,
-            &mut scip_cons,
+            scip_cons.as_mut_ptr(),
             c_name.as_ptr(),
             0,
             std::ptr::null_mut(),
@@ -139,6 +140,7 @@ impl Model {
             lhs,
             rhs,
         ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
@@ -159,11 +161,11 @@ impl Model {
         scip_call! { ffi::SCIPsetObjsense(self.scip, sense.into()) };
     }
 
-    pub fn get_n_conss(&self) -> usize {
+    pub fn get_n_conss(&mut self) -> usize {
         unsafe { ffi::SCIPgetNConss(self.scip) as usize }
     }
 
-    pub fn get_conss(&self) -> &Vec<Constraint> {
+    pub fn get_conss(&mut self) -> &Vec<Constraint> {
         &self.conss
     }
 
@@ -179,7 +181,7 @@ impl Model {
         scip_call! { ffi::SCIPsetHeuristics(self.scip, heuristics.into(), true.into()) };
     }
 
-    pub fn write(&self, path: &str, ext: &str) {
+    pub fn write(&mut self, path: &str, ext: &str) {
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
         scip_call! { ffi::SCIPwriteOrigProblem(
@@ -188,10 +190,6 @@ impl Model {
             c_ext.as_ptr(),
             true.into(),
         ) };
-    }
-
-    pub fn free(&mut self) {
-        unsafe { ffi::SCIPfree(&mut self.scip) };
     }
 }
 
@@ -330,7 +328,7 @@ mod tests {
 
     #[test]
     fn build_model_with_functions() {
-        let model = create_model();
+        let mut model = create_model();
         assert_eq!(model.get_vars().len(), 2);
         assert_eq!(model.get_n_conss(), 2);
 

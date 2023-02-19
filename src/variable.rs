@@ -1,6 +1,6 @@
 use crate::{ffi, scip_call};
 use core::panic;
-use std::{ffi::CString, mem};
+use std::{ffi::CString, mem::MaybeUninit};
 
 pub type VarId = usize;
 #[derive(Debug)]
@@ -18,16 +18,17 @@ impl Variable {
         var_type: VarType,
     ) -> Self {
         let name = CString::new(name).unwrap();
-        let mut var_ptr: *mut ffi::SCIP_VAR = unsafe { mem::zeroed() };
+        let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
             scip_ptr,
-            &mut var_ptr,
+            var_ptr.as_mut_ptr(),
             name.as_ptr(),
             lb,
             ub,
             obj,
             var_type.into(),
         ) };
+        let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
         Variable { raw: var_ptr }
     }
@@ -131,13 +132,12 @@ mod tests {
         let mut model = Model::new();
         model.include_default_plugins();
         model.create_prob("test");
-        let mut var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary);
+        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary);
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
         assert_eq!(var.get_obj(), 2.0);
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
-        unsafe { ffi::SCIPreleaseVar(model.scip, &mut var.raw) };
     }
 }
