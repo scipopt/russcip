@@ -49,7 +49,6 @@ jobs:
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
       
       - name: Install miri dependency
-        run: |
           rustup toolchain install nightly --component miri
           rustup override set nightly
           cargo miri setup
