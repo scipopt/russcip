@@ -313,6 +313,40 @@ mod tests {
     use super::*;
     use crate::status::Status;
 
+     #[test]
+    fn call_solve_without_problem() {
+        assert!(Model::new().unwrap().solve().is_err());
+    }
+
+    #[test]
+    fn solution_without_problem() {
+        let mut model = Model::new().unwrap();
+        let sol = model.get_best_sol();
+        sol.get_obj_val();
+    }
+
+    #[test]
+    fn drop_problem_before_solution() {
+        let sol = {
+            let mut model = Model::new().unwrap();
+            model.hide_output().unwrap();
+            model.include_default_plugins().unwrap();
+            model.read_prob("data/test/simple.lp").unwrap();
+            model.solve().unwrap();
+            model.get_best_sol()
+        };
+        assert_eq!(sol.get_obj_val(), 200.);
+    }
+
+    #[test]
+    fn drop_variable_after_problem() {
+        let mut model = Model::new().unwrap();
+        let var_id = model.add_var(0., 0., 0., "", VarType::Binary).unwrap();
+        let var = model.get_var(var_id).unwrap();
+        drop(model);
+        drop(var);
+    }
+
     #[test]
     fn solve_from_lp_file() -> Result<(), Retcode> {
         let mut model = Model::new()?;
