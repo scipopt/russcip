@@ -30,9 +30,7 @@ impl Variable {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Ok(Variable {
-            raw: var_ptr,
-        })
+        Ok(Variable { raw: var_ptr })
     }
 
     pub fn get_index(&self) -> usize {
@@ -145,4 +143,3 @@ mod tests {
         Ok(())
     }
 }
-

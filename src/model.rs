@@ -25,7 +25,7 @@ pub struct Model {
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
     pub(crate) best_sol: Option<Solution>,
-    pub(crate) state: State, 
+    pub(crate) state: State,
 }
 
 impl Model {
@@ -62,9 +62,7 @@ impl Model {
         let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            let var = Variable {
-                raw: scip_var,
-            };
+            let var = Variable { raw: scip_var };
             self.vars.insert(var.get_index(), var);
         }
     }
@@ -74,10 +72,10 @@ impl Model {
         let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            unsafe { ffi::SCIPcaptureCons(self.scip, scip_cons); }
-            let cons = Constraint {
-                raw: scip_cons,
-            };
+            unsafe {
+                ffi::SCIPcaptureCons(self.scip, scip_cons);
+            }
+            let cons = Constraint { raw: scip_cons };
             self.conss.push(cons);
         }
     }
@@ -199,9 +197,7 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        let cons = Constraint {
-            raw: scip_cons,
-        };
+        let cons = Constraint { raw: scip_cons };
         self.conss.push(cons);
         Ok(())
     }
@@ -331,7 +327,7 @@ mod tests {
     use super::*;
     use crate::status::Status;
 
-     #[test]
+    #[test]
     fn call_solve_without_problem() {
         assert!(Model::new().unwrap().solve().is_err());
     }
