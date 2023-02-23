@@ -130,13 +130,14 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
 mod tests {
     use super::*;
     use crate::{model::Model, retcode::Retcode};
+    use crate::model::MutPtr;
 
     #[test]
     fn var_data() -> Result<(), Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.create_prob("test");
-        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary)?;
+        model.include_default_plugins()?;
+        model.create_prob("test")?;
+        let var = Variable::new(model.scip.ptr(), 0.0, 1.0, 2.0, "x", VarType::Binary)?;
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
