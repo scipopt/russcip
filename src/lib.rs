@@ -43,6 +43,9 @@
 //!   Ok(())
 //! }
 
+extern crate doc_comment;
+doc_comment::doctest!("../README.md");
+
 pub use scip_sys as ffi;
 pub mod constraint;
 pub mod model;
