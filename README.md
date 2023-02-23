@@ -16,6 +16,8 @@ conda install --channel conda-forge scip
 ```
 After which `russcip` would be able to find the installation in the current Conda environment. Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable. 
 
+*russcip* is tested against SCIP 8.0.3 but it might work for other versions depending on which functionality you use. 
+
 ## Install
 By running
 ```bash
