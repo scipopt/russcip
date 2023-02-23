@@ -2,7 +2,6 @@ use crate::ffi;
 
 pub struct Constraint {
     pub(crate) raw: *mut ffi::SCIP_CONS,
-    pub(crate) scip_ptr: *mut ffi::SCIP,
 }
 
 impl Constraint {

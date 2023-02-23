@@ -63,7 +63,6 @@ impl Model {
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
             let var = Variable {
-                scip_ptr: self.scip,
                 raw: scip_var,
             };
             self.vars.insert(var.get_index(), var);
@@ -77,7 +76,6 @@ impl Model {
             let scip_cons = unsafe { *scip_conss.add(i) };
             unsafe { ffi::SCIPcaptureCons(self.scip, scip_cons); }
             let cons = Constraint {
-                scip_ptr: self.scip,
                 raw: scip_cons,
             };
             self.conss.push(cons);
@@ -202,7 +200,6 @@ impl Model {
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
         let cons = Constraint {
-            scip_ptr: self.scip,
             raw: scip_cons,
         };
         self.conss.push(cons);

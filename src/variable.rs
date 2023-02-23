@@ -6,7 +6,6 @@ pub type VarId = usize;
 #[derive(Debug)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
-    pub(crate) scip_ptr: *mut ffi::SCIP,
 }
 
 impl Variable {
@@ -33,7 +32,6 @@ impl Variable {
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
         Ok(Variable {
             raw: var_ptr,
-            scip_ptr,
         })
     }
 
