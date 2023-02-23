@@ -62,6 +62,9 @@ impl Model {
         let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
+            unsafe {
+                ffi::SCIPcaptureVar(self.scip, scip_var);
+            }
             let var = Variable { raw: scip_var };
             self.vars.insert(var.get_index(), var);
         }
