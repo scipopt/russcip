@@ -54,6 +54,10 @@ fn lib_scip_in_dir(path: &str) -> bool {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    if std::env::var("DOCS_RS").is_ok() {
+        return Ok(()); // Don't build on docs.rs
+    }
+
     let env_vars = vec![
         "SCIPOPTDIR",
         "CONDA_PREFIX",
