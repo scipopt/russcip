@@ -1,59 +1,88 @@
 use core::panic;
 use std::collections::BTreeMap;
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
-use crate::scip_call;
+use crate::{scip_call, scip_call_expect};
 use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
 use std::ffi::CString;
 
-#[derive(Debug, PartialEq, Eq)]
-pub enum State {
-    Created,
-    PluginsIncluded,
-    ProblemCreated,
-    Solved,
+#[non_exhaustive]
+pub struct Model<State> {
+    pub(crate) scip: *mut ffi::SCIP,
+    state: State
 }
 
-#[non_exhaustive]
-pub struct Model {
-    pub(crate) scip: *mut ffi::SCIP,
+pub struct Unsolved; 
+pub struct PluginsIncluded;
+
+pub struct ProblemCreated {
+    pub(crate) vars: BTreeMap<VarId, Variable>,
+    pub(crate) conss: Vec<Constraint>
+}
+
+pub struct Solved  {
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
     pub(crate) best_sol: Option<Solution>,
-    pub(crate) state: State,
 }
 
-impl Model {
-    pub fn new() -> Result<Self, Retcode> {
+
+impl Model<Unsolved> {
+    pub fn new() -> Self { 
+        Self::try_new().expect("Failed to create SCIP instance")
+    }
+
+    pub fn try_new() -> Result<Self, Retcode> {
         let mut scip_ptr = MaybeUninit::uninit();
         scip_call!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         Ok(Model {
             scip: scip_ptr,
-            vars: BTreeMap::new(),
-            conss: Vec::new(),
-            best_sol: None,
-            state: State::Created,
+            state: Unsolved
         })
     }
 
-    pub fn include_default_plugins(&mut self) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPincludeDefaultPlugins(self.scip)};
-        self.state = State::PluginsIncluded;
-        Ok(())
+    pub fn include_default_plugins(&mut self) -> Model<PluginsIncluded> {
+        scip_call_expect!(ffi::SCIPincludeDefaultPlugins(self.scip), "Failed to include default plugins");
+        Model { 
+            state: PluginsIncluded,
+            scip: self.scip
+        }
     }
+}
 
+impl Model<PluginsIncluded> {
+    pub fn create_prob(&mut self, name: &str) -> Model<ProblemCreated> {
+        let name = CString::new(name).unwrap();
+        scip_call_expect!(ffi::SCIPcreateProbBasic(self.scip, name.as_ptr()), "Failed to create problem");
+        Model {
+            state: ProblemCreated {
+                vars: BTreeMap::new(),
+                conss: Vec::new()
+            },
+            scip: self.scip
+        }
+    }
+}
+
+
+impl Model<ProblemCreated> {
+    
+}
+
+
+impl<T> Model<T>  {
     pub fn read_prob(&mut self, filename: &str) -> Result<(), Retcode> {
         let filename = CString::new(filename).unwrap();
         scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
         self._set_vars();
         self._set_conss();
-        self.state = State::ProblemCreated;
         Ok(())
     }
 
@@ -93,9 +122,6 @@ impl Model {
     }
 
     pub fn solve(&mut self) -> Result<(), Retcode> {
-        if self.state != State::ProblemCreated {
-            return Err(Retcode::InvalidCall);
-        }
         scip_call! { ffi::SCIPsolve(self.scip) };
         if self.get_status() == Status::OPTIMAL {
             self._set_best_sol();
@@ -205,16 +231,6 @@ impl Model {
         Ok(())
     }
 
-    pub fn create_prob(&mut self, name: &str) -> Result<(), Retcode> {
-        let name = CString::new(name).unwrap();
-        scip_call! { ffi::SCIPcreateProbBasic(
-            self.scip,
-            name.as_ptr(),
-        ) };
-        self.state = State::ProblemCreated;
-        Ok(())
-    }
-
     pub fn set_obj_sense(&mut self, sense: ObjSense) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPsetObjsense(self.scip, sense.into()) };
         Ok(())
@@ -256,7 +272,7 @@ impl Model {
     }
 }
 
-impl Default for Model {
+impl Default for Model<Unsolved> {
     fn default() -> Self {
         let mut model = Model::new().expect("Failed to create SCIP model");
         model
@@ -269,7 +285,7 @@ impl Default for Model {
     }
 }
 
-impl Drop for Model {
+impl<T> Drop for Model<T> {
     fn drop(&mut self) {
         for var in self.vars.values_mut() {
             scip_call_panic!(ffi::SCIPreleaseVar(self.scip, &mut var.raw));
@@ -432,7 +448,7 @@ mod tests {
         Ok(())
     }
 
-    fn create_model() -> Result<Model, Retcode> {
+    fn create_model() -> Result<Model<ProblemCreated>, Retcode> {
         let mut model = Model::new()?;
         model.include_default_plugins()?;
         model.create_prob("test")?;
