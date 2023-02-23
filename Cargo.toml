@@ -4,9 +4,9 @@ authors = ["Mohammad Ghannam <mohammad.m.ghannam@gmail.com>"]
 description = "Rust interface for SCIP."
 license = "Apache-2.0"
 repository = "https://github.com/mmghannam/russcip"
-version = "0.1.9"
+version = "0.1.11"
 edition = "2021"
 
 [dependencies]
-scip-sys = { path = "scip-sys", version = "0.1.1" }
+scip-sys = { path = "scip-sys", version = "0.1.2" }
 doc-comment = "0.3.3"
