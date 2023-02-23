@@ -118,15 +118,15 @@ impl Model {
     }
 
     pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
-        self.best_sol.as_ref().map(|s| Box::new(s))
+        self.best_sol.as_ref().map(Box::new)
     }
 
     pub fn get_vars(&self) -> Vec<Box<&Variable>> {
-        self.vars.values().map(|v| Box::new(v)).collect()
+        self.vars.values().map(Box::new).collect()
     }
 
     pub fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>> {
-        self.vars.get(&var_id).map(|v| Box::new(v))
+        self.vars.get(&var_id).map(Box::new)
     }
 
     pub fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -161,7 +161,7 @@ impl Model {
         name: &str,
         var_type: VarType,
     ) -> Result<VarId, Retcode> {
-        let var = Variable::new(self.scip, lb, ub, obj, name, var_type.into())?;
+        let var = Variable::new(self.scip, lb, ub, obj, name, var_type)?;
         let var_id = var.get_index();
         self.vars.insert(var_id, var);
         Ok(var_id)
@@ -287,9 +287,9 @@ pub enum ParamSetting {
     Off,
 }
 
-impl Into<ffi::SCIP_PARAMSETTING> for ParamSetting {
-    fn into(self) -> ffi::SCIP_PARAMSETTING {
-        match self {
+impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
+    fn from(val: ParamSetting) -> Self {
+        match val {
             ParamSetting::Default => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_DEFAULT,
             ParamSetting::Aggressive => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_AGGRESSIVE,
             ParamSetting::Fast => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_FAST,
@@ -313,9 +313,9 @@ impl From<ffi::SCIP_OBJSENSE> for ObjSense {
     }
 }
 
-impl Into<ffi::SCIP_OBJSENSE> for ObjSense {
-    fn into(self) -> ffi::SCIP_OBJSENSE {
-        match self {
+impl From<ObjSense> for ffi::SCIP_OBJSENSE {
+    fn from(val: ObjSense) -> Self {
+        match val {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
         }

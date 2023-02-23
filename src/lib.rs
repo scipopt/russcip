@@ -55,8 +55,8 @@ pub mod variable;
 macro_rules! scip_call {
     ($res:expr) => {
         let res = unsafe { $res };
-        let retcode = crate::retcode::Retcode::from(res);
-        if retcode != crate::retcode::Retcode::Okay {
+        let retcode = $crate::retcode::Retcode::from(res);
+        if retcode != $crate::retcode::Retcode::Okay {
             return Err(retcode);
         }
     };
@@ -66,8 +66,8 @@ macro_rules! scip_call {
 macro_rules! scip_call_panic {
     ($res:expr) => {
         let res = unsafe { $res };
-        let retcode = crate::retcode::Retcode::from(res);
-        if retcode != crate::retcode::Retcode::Okay {
+        let retcode = $crate::retcode::Retcode::from(res);
+        if retcode != $crate::retcode::Retcode::Okay {
             panic!("SCIP call failed with retcode {:?}", retcode);
         }
     };
