@@ -6,7 +6,6 @@ pub type VarId = usize;
 #[derive(Debug)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
-    pub(crate) scip_ptr: *mut ffi::SCIP,
 }
 
 impl Variable {
@@ -31,10 +30,7 @@ impl Variable {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Ok(Variable {
-            raw: var_ptr,
-            scip_ptr,
-        })
+        Ok(Variable { raw: var_ptr })
     }
 
     pub fn get_index(&self) -> usize {
@@ -134,9 +130,10 @@ mod tests {
     #[test]
     fn var_data() -> Result<(), Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.create_prob("test");
-        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary)?;
+        model.include_default_plugins()?;
+        model.create_prob("test")?;
+        let var_id = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary)?;
+        let var = model.get_var(var_id).unwrap();
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
@@ -144,11 +141,5 @@ mod tests {
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
         Ok(())
-    }
-}
-
-impl Drop for Variable {
-    fn drop(&mut self) {
-        unsafe { ffi::SCIPreleaseVar(self.scip_ptr, &mut self.raw) };
     }
 }

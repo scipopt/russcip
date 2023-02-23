@@ -1,3 +1,4 @@
+use core::panic;
 use std::collections::BTreeMap;
 use std::mem::MaybeUninit;
 
@@ -10,11 +11,21 @@ use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
 use std::ffi::CString;
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum State {
+    Created,
+    PluginsIncluded,
+    ProblemCreated,
+    Solved,
+}
+
 #[non_exhaustive]
 pub struct Model {
     pub(crate) scip: *mut ffi::SCIP,
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
+    pub(crate) best_sol: Option<Solution>,
+    pub(crate) state: State,
 }
 
 impl Model {
@@ -26,11 +37,14 @@ impl Model {
             scip: scip_ptr,
             vars: BTreeMap::new(),
             conss: Vec::new(),
+            best_sol: None,
+            state: State::Created,
         })
     }
 
     pub fn include_default_plugins(&mut self) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPincludeDefaultPlugins(self.scip)};
+        self.state = State::PluginsIncluded;
         Ok(())
     }
 
@@ -39,6 +53,7 @@ impl Model {
         scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
         self._set_vars();
         self._set_conss();
+        self.state = State::ProblemCreated;
         Ok(())
     }
 
@@ -47,11 +62,7 @@ impl Model {
         let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            unsafe { ffi::SCIPcaptureVar(self.scip, scip_var) };
-            let var = Variable {
-                scip_ptr: self.scip,
-                raw: scip_var,
-            };
+            let var = Variable { raw: scip_var };
             self.vars.insert(var.get_index(), var);
         }
     }
@@ -61,17 +72,31 @@ impl Model {
         let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            unsafe { ffi::SCIPcaptureCons(self.scip, scip_cons) };
-            let cons = Constraint {
-                scip_ptr: self.scip,
-                raw: scip_cons,
-            };
+            unsafe {
+                ffi::SCIPcaptureCons(self.scip, scip_cons);
+            }
+            let cons = Constraint { raw: scip_cons };
             self.conss.push(cons);
         }
     }
 
+    fn _set_best_sol(&mut self) {
+        let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
+        let sol = Solution {
+            scip_ptr: self.scip,
+            raw: sol,
+        };
+        self.best_sol = Some(sol);
+    }
+
     pub fn solve(&mut self) -> Result<(), Retcode> {
+        if self.state != State::ProblemCreated {
+            return Err(Retcode::InvalidCall);
+        }
         scip_call! { ffi::SCIPsolve(self.scip) };
+        if self.get_status() == Status::OPTIMAL {
+            self._set_best_sol();
+        }
         Ok(())
     }
 
@@ -84,7 +109,7 @@ impl Model {
         unsafe { ffi::SCIPgetPrimalbound(self.scip) }
     }
 
-    pub fn get_n_vars(&mut self) -> usize {
+    pub fn get_n_vars(&self) -> usize {
         unsafe { ffi::SCIPgetNVars(self.scip) as usize }
     }
 
@@ -92,35 +117,16 @@ impl Model {
         unsafe { ffi::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
     }
 
-    pub fn get_best_sol(&mut self) -> Solution {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
-        Solution {
-            scip_ptr: self.scip,
-            raw: sol,
-        }
+    pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
+        self.best_sol.as_ref().map(Box::new)
     }
 
-    pub fn get_vars(&self) -> Vec<Variable> {
-        self.vars
-            .values()
-            .map(|v| {
-                unsafe { ffi::SCIPcaptureVar(self.scip, v.raw) };
-                Variable {
-                    scip_ptr: self.scip,
-                    raw: v.raw,
-                }
-            })
-            .collect()
+    pub fn get_vars(&self) -> Vec<Box<&Variable>> {
+        self.vars.values().map(Box::new).collect()
     }
 
-    pub fn get_var(&mut self, var_id: VarId) -> Option<Variable> {
-        self.vars.get(&var_id).map(|v| {
-            unsafe { ffi::SCIPcaptureVar(self.scip, v.raw) };
-            Variable {
-                scip_ptr: self.scip,
-                raw: v.raw,
-            }
-        })
+    pub fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>> {
+        self.vars.get(&var_id).map(Box::new)
     }
 
     pub fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -143,7 +149,7 @@ impl Model {
     }
 
     pub fn hide_output(&mut self) -> Result<(), Retcode> {
-        self.set_int_param("display/verblevel", 0);
+        self.set_int_param("display/verblevel", 0)?;
         Ok(())
     }
 
@@ -155,7 +161,7 @@ impl Model {
         name: &str,
         var_type: VarType,
     ) -> Result<VarId, Retcode> {
-        let var = Variable::new(self.scip, lb, ub, obj, name, var_type.into())?;
+        let var = Variable::new(self.scip, lb, ub, obj, name, var_type)?;
         let var_id = var.get_index();
         self.vars.insert(var_id, var);
         Ok(var_id)
@@ -163,13 +169,17 @@ impl Model {
 
     pub fn add_cons(
         &mut self,
-        vars: &[&Variable],
+        var_ids: &[VarId],
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
         name: &str,
     ) -> Result<(), Retcode> {
-        assert_eq!(vars.len(), coefs.len());
+        assert_eq!(var_ids.len(), coefs.len());
+        let vars = var_ids
+            .iter()
+            .map(|var_id| self.vars.get(var_id).unwrap())
+            .collect::<Vec<_>>();
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicLinear(
@@ -187,10 +197,7 @@ impl Model {
             scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
-        let cons = Constraint {
-            scip_ptr: self.scip,
-            raw: scip_cons,
-        };
+        let cons = Constraint { raw: scip_cons };
         self.conss.push(cons);
         Ok(())
     }
@@ -201,6 +208,7 @@ impl Model {
             self.scip,
             name.as_ptr(),
         ) };
+        self.state = State::ProblemCreated;
         Ok(())
     }
 
@@ -260,6 +268,12 @@ impl Default for Model {
 
 impl Drop for Model {
     fn drop(&mut self) {
+        for var in self.vars.values_mut() {
+            scip_call_panic!(ffi::SCIPreleaseVar(self.scip, &mut var.raw));
+        }
+        for cons in self.conss.iter_mut() {
+            scip_call_panic!(ffi::SCIPreleaseCons(self.scip, &mut cons.raw));
+        }
         self.vars.clear();
         self.conss.clear();
         scip_call_panic!(ffi::SCIPfree(&mut self.scip));
@@ -273,9 +287,9 @@ pub enum ParamSetting {
     Off,
 }
 
-impl Into<ffi::SCIP_PARAMSETTING> for ParamSetting {
-    fn into(self) -> ffi::SCIP_PARAMSETTING {
-        match self {
+impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
+    fn from(val: ParamSetting) -> Self {
+        match val {
             ParamSetting::Default => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_DEFAULT,
             ParamSetting::Aggressive => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_AGGRESSIVE,
             ParamSetting::Fast => ffi::SCIP_ParamSetting_SCIP_PARAMSETTING_FAST,
@@ -299,9 +313,9 @@ impl From<ffi::SCIP_OBJSENSE> for ObjSense {
     }
 }
 
-impl Into<ffi::SCIP_OBJSENSE> for ObjSense {
-    fn into(self) -> ffi::SCIP_OBJSENSE {
-        match self {
+impl From<ObjSense> for ffi::SCIP_OBJSENSE {
+    fn from(val: ObjSense) -> Self {
+        match val {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
         }
@@ -313,39 +327,44 @@ mod tests {
     use super::*;
     use crate::status::Status;
 
-     #[test]
+    #[test]
     fn call_solve_without_problem() {
         assert!(Model::new().unwrap().solve().is_err());
     }
 
     #[test]
+    fn call_solve_on_empty_problem() {
+        assert!(Model::new().unwrap().solve().is_err());
+    }
+
+    #[test]
     fn solution_without_problem() {
-        let mut model = Model::new().unwrap();
+        let model = Model::new().unwrap();
         let sol = model.get_best_sol();
-        sol.get_obj_val();
+        assert!(sol.is_none());
     }
 
-    #[test]
-    fn drop_problem_before_solution() {
-        let sol = {
-            let mut model = Model::new().unwrap();
-            model.hide_output().unwrap();
-            model.include_default_plugins().unwrap();
-            model.read_prob("data/test/simple.lp").unwrap();
-            model.solve().unwrap();
-            model.get_best_sol()
-        };
-        assert_eq!(sol.get_obj_val(), 200.);
-    }
+    // #[test] does not compile anymore
+    // fn drop_problem_before_solution() {
+    //     let sol = {
+    //         let mut model = Model::new().unwrap();
+    //         model.hide_output().unwrap();
+    //         model.include_default_plugins().unwrap();
+    //         model.read_prob("data/test/simple.lp").unwrap();
+    //         model.solve().unwrap();
+    //         model.get_best_sol()
+    //     };
+    //     assert_eq!(sol.get_obj_val(), 200.);
+    // }
 
-    #[test]
-    fn drop_variable_after_problem() {
-        let mut model = Model::new().unwrap();
-        let var_id = model.add_var(0., 0., 0., "", VarType::Binary).unwrap();
-        let var = model.get_var(var_id).unwrap();
-        drop(model);
-        drop(var);
-    }
+    // #[test]  does not compile anymore
+    // fn drop_variable_after_problem() {
+    //     let mut model = Model::new().unwrap();
+    //     let var_id = model.add_var(0., 0., 0., "", VarType::Binary).unwrap();
+    //     let var = model.get_var(var_id).unwrap();
+    //     drop(model);
+    //     drop(var);
+    // }
 
     #[test]
     fn solve_from_lp_file() -> Result<(), Retcode> {
@@ -353,7 +372,7 @@ mod tests {
         model.include_default_plugins()?;
         model.read_prob("data/test/simple.lp")?;
         model.hide_output()?;
-        model.solve();
+        model.solve()?;
         let status = model.get_status();
         assert_eq!(status, Status::OPTIMAL);
 
@@ -366,7 +385,7 @@ mod tests {
         assert_eq!(conss.len(), 2);
 
         //test solution values
-        let sol = model.get_best_sol();
+        let sol = model.get_best_sol().unwrap();
         let vars = model.get_vars();
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
@@ -377,11 +396,11 @@ mod tests {
     #[test]
     fn set_time_limit() -> Result<(), Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.hide_output();
-        model.read_prob("data/test/simple.lp");
-        model.set_real_param("limits/time", 0.);
-        model.solve();
+        model.include_default_plugins()?;
+        model.hide_output()?;
+        model.read_prob("data/test/simple.lp")?;
+        model.set_real_param("limits/time", 0.)?;
+        model.solve()?;
         let status = model.get_status();
         assert_eq!(status, Status::TIMELIMIT);
         Ok(())
@@ -390,10 +409,10 @@ mod tests {
     #[test]
     fn add_variable() -> Result<(), Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.create_prob("test");
-        model.set_obj_sense(ObjSense::Maximize);
-        model.hide_output();
+        model.include_default_plugins()?;
+        model.create_prob("test")?;
+        model.set_obj_sense(ObjSense::Maximize)?;
+        model.hide_output()?;
         let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
         let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)?;
         let x1 = model.get_var(x1_id).unwrap();
@@ -412,17 +431,15 @@ mod tests {
 
     fn create_model() -> Result<Model, Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.create_prob("test");
-        model.set_obj_sense(ObjSense::Maximize);
-        model.hide_output();
+        model.include_default_plugins()?;
+        model.create_prob("test")?;
+        model.set_obj_sense(ObjSense::Maximize)?;
+        model.hide_output()?;
 
         let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
         let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer)?;
-        let x1 = model.get_var(x1_id).unwrap();
-        let x2 = model.get_var(x2_id).unwrap();
-        model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
-        model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
+        model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1")?;
+        model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2")?;
 
         Ok(model)
     }
@@ -438,7 +455,7 @@ mod tests {
         assert_eq!(conss[0].get_name(), "c1");
         assert_eq!(conss[1].get_name(), "c2");
 
-        model.solve();
+        model.solve()?;
 
         let status = model.get_status();
         assert_eq!(status, Status::OPTIMAL);
@@ -446,7 +463,7 @@ mod tests {
         let obj_val = model.get_obj_val();
         assert_eq!(obj_val, 200.);
 
-        let sol = model.get_best_sol();
+        let sol = model.get_best_sol().unwrap();
         let vars = model.get_vars();
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
