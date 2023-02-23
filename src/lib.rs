@@ -21,12 +21,10 @@
 //!   // Add variables
 //!   let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
 //!   let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer)?;
-//!   let x1 = model.get_var(x1_id).unwrap();
-//!   let x2 = model.get_var(x2_id).unwrap();
 //!
 //!   // Add constraints
-//!   model.add_cons(&[&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
-//!   model.add_cons(&[&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
+//!   model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1");
+//!   model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2");
 //!
 //!   model.solve();
 //!
@@ -36,7 +34,7 @@
 //!   let obj_val = model.get_obj_val();
 //!   println!("Objective value: {}", obj_val);
 //!
-//!   let sol = model.get_best_sol();
+//!   let sol = model.get_best_sol().expect("No solution found");
 //!   let vars = model.get_vars();
 //!
 //!   for var in vars {

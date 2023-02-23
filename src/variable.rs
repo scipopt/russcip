@@ -134,9 +134,10 @@ mod tests {
     #[test]
     fn var_data() -> Result<(), Retcode> {
         let mut model = Model::new()?;
-        model.include_default_plugins();
-        model.create_prob("test");
-        let var = Variable::new(model.scip, 0.0, 1.0, 2.0, "x", VarType::Binary)?;
+        model.include_default_plugins()?;
+        model.create_prob("test")?;
+        let var_id = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary)?;
+        let var = model.get_var(var_id).unwrap();
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);
@@ -147,8 +148,3 @@ mod tests {
     }
 }
 
-impl Drop for Variable {
-    fn drop(&mut self) {
-        unsafe { ffi::SCIPreleaseVar(self.scip_ptr, &mut self.raw) };
-    }
-}

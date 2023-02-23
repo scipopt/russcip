@@ -13,11 +13,3 @@ impl Constraint {
         }
     }
 }
-
-impl Drop for Constraint {
-    fn drop(&mut self) {
-        unsafe {
-            ffi::SCIPreleaseCons(self.scip_ptr, &mut self.raw);
-        }
-    }
-}
