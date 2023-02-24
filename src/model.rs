@@ -1,6 +1,5 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::marker::PhantomData;
 use std::mem::{self, MaybeUninit};
 
 use crate::constraint::Constraint;
@@ -253,17 +252,21 @@ impl Drop for ScipPtr {
 #[non_exhaustive]
 pub struct Model<State> {
     scip: ScipPtr,
-    pub(crate) vars: BTreeMap<VarId, Variable>,
-    pub(crate) conss: Vec<Constraint>,
-    pub(crate) best_sol: Option<Solution>,
-    _state: PhantomData<State>,
+    state: State,
 }
 
 pub struct Unsolved;
 pub struct PluginsIncluded;
-pub struct ProblemCreated;
+pub struct ProblemCreated {
+    pub(crate) vars: BTreeMap<VarId, Variable>,
+    pub(crate) conss: Vec<Constraint>,
+}
 
-pub struct Solved;
+pub struct Solved {
+    pub(crate) vars: BTreeMap<VarId, Variable>,
+    pub(crate) conss: Vec<Constraint>,
+    pub(crate) best_sol: Option<Solution>,
+}
 
 impl Model<Unsolved> {
     pub fn new() -> Self {
@@ -274,10 +277,7 @@ impl Model<Unsolved> {
         let scip_ptr = ScipPtr::new();
         Ok(Model {
             scip: scip_ptr,
-            vars: BTreeMap::new(),
-            conss: Vec::new(),
-            best_sol: None,
-            _state: PhantomData::<Unsolved>,
+            state: Unsolved {},
         })
     }
 
@@ -285,7 +285,10 @@ impl Model<Unsolved> {
         self.scip
             .include_default_plugins()
             .expect("Failed to include default plugins");
-        self.move_to_state::<PluginsIncluded>()
+        Model {
+            scip: self.scip,
+            state: PluginsIncluded {},
+        }
     }
 
     pub fn set_str_param(mut self, param: &str, value: &str) -> Result<Self, Retcode> {
@@ -337,15 +340,23 @@ impl Model<PluginsIncluded> {
         self.scip
             .create_prob(name)
             .expect("Failed to create problem in state PluginsIncluded");
-        self.move_to_state::<ProblemCreated>()
+        Model {
+            scip: mem::take(&mut self.scip),
+            state: ProblemCreated {
+                vars: BTreeMap::new(),
+                conss: Vec::new(),
+            },
+        }
     }
 
     pub fn read_prob(&mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
-        self.vars = self.scip.get_vars();
-        self.conss = self.scip.get_conss();
-        let new_model = self.move_to_state::<ProblemCreated>();
-
+        let vars = self.scip.get_vars();
+        let conss = self.scip.get_conss();
+        let new_model = Model {
+            scip: mem::take(&mut self.scip),
+            state: ProblemCreated { vars, conss },
+        };
         Ok(new_model)
     }
 }
@@ -364,7 +375,7 @@ impl Model<ProblemCreated> {
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.get_index();
-        self.vars.insert(var_id, var);
+        self.state.vars.insert(var_id, var);
         var_id
     }
 
@@ -373,7 +384,8 @@ impl Model<ProblemCreated> {
         let vars_in_cons = var_ids
             .iter()
             .map(|var_id| {
-                self.vars
+                self.state
+                    .vars
                     .get(var_id)
                     .unwrap_or_else(|| panic!("Variable with id {var_id} was not found"))
             })
@@ -382,15 +394,21 @@ impl Model<ProblemCreated> {
             .scip
             .create_cons(vars_in_cons, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        self.conss.push(cons);
+        self.state.conss.push(cons);
     }
 
     pub fn solve(&mut self) -> Model<Solved> {
         self.scip
             .solve()
             .expect("Failed to solve problem in state ProblemCreated");
-        let mut new_model = self.move_to_state::<Solved>();
-
+        let mut new_model = Model {
+            scip: mem::take(&mut self.scip),
+            state: Solved {
+                vars: mem::take(&mut self.state.vars),
+                conss: mem::take(&mut self.state.conss),
+                best_sol: None,
+            },
+        };
         new_model._set_best_sol();
         new_model
     }
@@ -398,11 +416,13 @@ impl Model<ProblemCreated> {
 
 impl Model<Solved> {
     fn _set_best_sol(&mut self) {
-        self.best_sol = Some(self.scip.get_best_sol());
+        if self.scip.get_status() == Status::Optimal {
+            self.state.best_sol = Some(self.scip.get_best_sol());
+        }
     }
 
     pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
-        self.best_sol.as_ref().map(Box::new)
+        self.state.best_sol.as_ref().map(Box::new)
     }
 
     pub fn get_obj_val(&self) -> f64 {
@@ -423,7 +443,7 @@ macro_rules! impl_ModelWithProblem {
     (for $($t:ty),+) => {
         $(impl ModelWithProblem for $t {
             fn get_vars(&self) -> Vec<Box<&Variable>> {
-            self.vars.values().map(Box::new).collect()
+            self.state.vars.values().map(Box::new).collect()
         }
 
     fn get_n_vars(&self) -> usize {
@@ -431,7 +451,7 @@ macro_rules! impl_ModelWithProblem {
     }
 
     fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>> {
-        self.vars.get(&var_id).map(Box::new)
+        self.state.vars.get(&var_id).map(Box::new)
     }
 
     fn get_n_conss(&mut self) -> usize {
@@ -439,7 +459,7 @@ macro_rules! impl_ModelWithProblem {
     }
 
     fn get_conss(&mut self) -> &Vec<Constraint> {
-        &self.conss
+        &self.state.conss
     }
 
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
@@ -454,15 +474,6 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
-    fn move_to_state<S>(&mut self) -> Model<S> {
-        Model {
-            _state: PhantomData::<S>,
-            scip: mem::take(&mut self.scip),
-            vars: mem::take(&mut self.vars),
-            conss: mem::take(&mut self.conss),
-            best_sol: mem::take(&mut self.best_sol),
-        }
-    }
     pub fn get_status(&self) -> Status {
         self.scip.get_status()
     }
@@ -526,45 +537,6 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 mod tests {
     use super::*;
     use crate::status::Status;
-
-    // #[test] call prevented from type system
-    // fn call_solve_without_problem() {
-    //     assert!(Model::new().solve().is_err());
-    // }
-
-    // #[test] call prevented from type system
-    // fn call_solve_on_empty_problem() {
-    //     assert!(Model::new().solve().is_err());
-    // }
-
-    // #[test] call prevented from type system
-    // fn solution_without_problem() {
-    //     let model = Model::new();
-    //     let sol = model.get_best_sol();
-    //     assert!(sol.is_none());
-    // }
-
-    // #[test] does not compile anymore
-    // fn drop_problem_before_solution() {
-    //     let sol = {
-    //         let mut model = Model::new().unwrap();
-    //         model.hide_output().unwrap();
-    //         model.include_default_plugins().unwrap();
-    //         model.read_prob("data/test/simple.lp").unwrap();
-    //         model.solve().unwrap();
-    //         model.get_best_sol()
-    //     };
-    //     assert_eq!(sol.get_obj_val(), 200.);
-    // }
-
-    // #[test]  does not compile anymore
-    // fn drop_variable_after_problem() {
-    //     let mut model = Model::new().unwrap();
-    //     let var_id = model.add_var(0., 0., 0., "", VarType::Binary).unwrap();
-    //     let var = model.get_var(var_id).unwrap();
-    //     drop(model);
-    //     drop(var);
-    // }
 
     #[test]
     fn solve_from_lp_file() -> Result<(), Retcode> {
