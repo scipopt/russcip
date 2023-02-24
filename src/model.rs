@@ -28,17 +28,28 @@ impl ScipPtr {
 
 impl Default for ScipPtr {
     fn default() -> Self {
-        Self(std::ptr::null_mut())
+        Self::new()
     }
 }
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        if self.0.is_null() {
-        } else {
-            // Rust Model struct keeps at most one copy of each variable and constraint pointers
-            // so we need to release them before freeing the SCIP instance
+        // Rust Model struct keeps at most one copy of each variable and constraint pointers
+        // so we need to release them before freeing the SCIP instance
 
+        // first check if we are in a stage where we have variables and constraints
+        let scip_stage = unsafe { ffi::SCIPgetStage(self.0) };
+        if scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_TRANSFORMED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITPRESOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVING
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITPRESOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITSOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
+        {
             // release variables
             let n_vars = unsafe { ffi::SCIPgetNVars(self.0) };
             let vars = unsafe { ffi::SCIPgetOrigVars(self.0) };
@@ -54,10 +65,10 @@ impl Drop for ScipPtr {
                 let mut cons = unsafe { *conss.add(i as usize) };
                 scip_call_panic!(ffi::SCIPreleaseCons(self.0, &mut cons));
             }
-
-            // free SCIP instance
-            unsafe { ffi::SCIPfree(&mut self.0) };
         }
+
+        // free SCIP instance
+        unsafe { ffi::SCIPfree(&mut self.0) };
     }
 }
 
