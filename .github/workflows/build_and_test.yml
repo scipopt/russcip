@@ -116,6 +116,7 @@ jobs:
 
       - name: Build and test
         run: |
+          brew install tbb boost bison
           export SCIPOPTDIR=${{ runner.workspace }}/scipoptsuite/
           export DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:${{ runner.workspace }}/scipoptsuite/lib
           cargo build
