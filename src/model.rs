@@ -1,6 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::mem::{self, MaybeUninit};
+use std::mem::MaybeUninit;
 
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
@@ -336,12 +336,12 @@ impl Model<Unsolved> {
 }
 
 impl Model<PluginsIncluded> {
-    pub fn create_prob(&mut self, name: &str) -> Model<ProblemCreated> {
+    pub fn create_prob(mut self, name: &str) -> Model<ProblemCreated> {
         self.scip
             .create_prob(name)
             .expect("Failed to create problem in state PluginsIncluded");
         Model {
-            scip: mem::take(&mut self.scip),
+            scip: self.scip,
             state: ProblemCreated {
                 vars: BTreeMap::new(),
                 conss: Vec::new(),
@@ -349,12 +349,12 @@ impl Model<PluginsIncluded> {
         }
     }
 
-    pub fn read_prob(&mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
+    pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
         let vars = self.scip.get_vars();
         let conss = self.scip.get_conss();
         let new_model = Model {
-            scip: mem::take(&mut self.scip),
+            scip: self.scip,
             state: ProblemCreated { vars, conss },
         };
         Ok(new_model)
@@ -397,15 +397,15 @@ impl Model<ProblemCreated> {
         self.state.conss.push(cons);
     }
 
-    pub fn solve(&mut self) -> Model<Solved> {
+    pub fn solve(mut self) -> Model<Solved> {
         self.scip
             .solve()
             .expect("Failed to solve problem in state ProblemCreated");
         let mut new_model = Model {
-            scip: mem::take(&mut self.scip),
+            scip: self.scip,
             state: Solved {
-                vars: mem::take(&mut self.state.vars),
-                conss: mem::take(&mut self.state.conss),
+                vars: self.state.vars,
+                conss: self.state.conss,
                 best_sol: None,
             },
         };
