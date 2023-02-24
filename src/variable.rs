@@ -97,7 +97,6 @@ impl From<ffi::SCIP_Vartype> for VarType {
     }
 }
 
-
 pub enum VarStatus {
     Original,
     Loose,

@@ -1,5 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
+use std::marker::PhantomData;
 use std::mem::{self, MaybeUninit};
 
 use crate::constraint::Constraint;
@@ -255,7 +256,7 @@ pub struct Model<State> {
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
     pub(crate) best_sol: Option<Solution>,
-    state: State,
+    _state: PhantomData<State>,
 }
 
 pub struct Unsolved;
@@ -276,7 +277,7 @@ impl Model<Unsolved> {
             vars: BTreeMap::new(),
             conss: Vec::new(),
             best_sol: None,
-            state: Unsolved,
+            _state: PhantomData::<Unsolved>,
         })
     }
 
@@ -284,7 +285,7 @@ impl Model<Unsolved> {
         self.scip
             .include_default_plugins()
             .expect("Failed to include default plugins");
-        self.move_to_state(PluginsIncluded)
+        self.move_to_state::<PluginsIncluded>()
     }
 
     pub fn set_str_param(mut self, param: &str, value: &str) -> Result<Self, Retcode> {
@@ -336,14 +337,15 @@ impl Model<PluginsIncluded> {
         self.scip
             .create_prob(name)
             .expect("Failed to create problem in state PluginsIncluded");
-        self.move_to_state(ProblemCreated)
+        self.move_to_state::<ProblemCreated>()
     }
 
     pub fn read_prob(&mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
         self.vars = self.scip.get_vars();
         self.conss = self.scip.get_conss();
-        let new_model = self.move_to_state(ProblemCreated);
+        let new_model = self.move_to_state::<ProblemCreated>();
+
         Ok(new_model)
     }
 }
@@ -387,7 +389,8 @@ impl Model<ProblemCreated> {
         self.scip
             .solve()
             .expect("Failed to solve problem in state ProblemCreated");
-        let mut new_model = self.move_to_state(Solved);
+        let mut new_model = self.move_to_state::<Solved>();
+
         new_model._set_best_sol();
         new_model
     }
@@ -451,9 +454,9 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
-    fn move_to_state<S>(&mut self, state: S) -> Model<S> {
+    fn move_to_state<S>(&mut self) -> Model<S> {
         Model {
-            state,
+            _state: PhantomData::<S>,
             scip: mem::take(&mut self.scip),
             vars: mem::take(&mut self.vars),
             conss: mem::take(&mut self.conss),
