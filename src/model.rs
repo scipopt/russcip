@@ -171,7 +171,20 @@ impl ScipPtr {
         name: &str,
         var_type: VarType,
     ) -> Result<Variable, Retcode> {
-        Variable::new(self.0, lb, ub, obj, name, var_type)
+        let name = CString::new(name).unwrap();
+        let mut var_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateVarBasic(
+            self.0,
+            var_ptr.as_mut_ptr(),
+            name.as_ptr(),
+            lb,
+            ub,
+            obj,
+            var_type.into(),
+        ) };
+        let var_ptr = unsafe { var_ptr.assume_init() };
+        scip_call! { ffi::SCIPaddVar(self.0, var_ptr) };
+        Ok(Variable { raw: var_ptr })
     }
 
     fn create_cons(
