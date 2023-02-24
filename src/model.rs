@@ -11,9 +11,63 @@ use crate::{ffi, scip_call_panic};
 use crate::{scip_call, scip_call_expect};
 use std::ffi::CString;
 
+
+
+struct ScipPtr(*mut ffi::SCIP);
+
+impl ScipPtr {
+    fn new() -> Self {
+        let mut scip_ptr = MaybeUninit::uninit();
+        scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
+        let scip_ptr = unsafe { scip_ptr.assume_init() };
+        ScipPtr(scip_ptr)
+    }
+
+    fn ptr(&self) -> *mut ffi::SCIP {
+        self.0
+    }
+}
+
+impl Default for ScipPtr {
+    fn default() -> Self {
+        Self(std::ptr::null_mut())
+    }
+}
+
+impl Drop for ScipPtr {
+    fn drop(&mut self) {
+        if self.0.is_null() {
+            return;
+        } else {
+            // Rust Model struct keeps at most one copy of each variable and constraint pointers
+            // so we need to release them before freeing the SCIP instance
+            
+            // release variables
+            let n_vars = unsafe { ffi::SCIPgetNVars(self.0) };
+            let vars = unsafe { ffi::SCIPgetOrigVars(self.0) };
+            for i in 0..n_vars {
+                let mut var = unsafe { *vars.add(i as usize) };
+                scip_call_panic!(ffi::SCIPreleaseVar(self.0, &mut var));
+            }
+            
+            // release constraints
+            let n_conss = unsafe { ffi::SCIPgetNConss(self.0) };
+            let conss = unsafe { ffi::SCIPgetOrigConss(self.0) };
+            for i in 0..n_conss {
+                let mut cons = unsafe { *conss.add(i as usize) };
+                scip_call_panic!(ffi::SCIPreleaseCons(self.0, &mut cons));
+            }
+            
+            // free SCIP instance
+            unsafe { ffi::SCIPfree(&mut self.0) };
+        }
+    }
+}
+
+
 #[non_exhaustive]
 pub struct Model<State> {
-    pub(crate) scip: *mut ffi::SCIP,
+    scip: ScipPtr,
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
     pub(crate) best_sol: Option<Solution>,
@@ -32,9 +86,7 @@ impl Model<Unsolved> {
     }
 
     pub fn try_new() -> Result<Self, Retcode> {
-        let mut scip_ptr = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
-        let scip_ptr = unsafe { scip_ptr.assume_init() };
+        let scip_ptr = ScipPtr::new();
         Ok(Model {
             scip: scip_ptr,
             vars: BTreeMap::new(),
@@ -44,36 +96,31 @@ impl Model<Unsolved> {
         })
     }
 
-    pub fn include_default_plugins(self) -> Model<PluginsIncluded> {
+    pub fn include_default_plugins(&mut self) -> Model<PluginsIncluded> {
         scip_call_expect!(
-            ffi::SCIPincludeDefaultPlugins(self.scip),
+            ffi::SCIPincludeDefaultPlugins(self.scip.ptr()),
             "Failed to include default plugins"
         );
-        Model {
-            state: PluginsIncluded,
-            scip: self.scip,
-            vars: self.vars,
-            conss: self.conss,
-            best_sol: self.best_sol,
-        }
+        
+        self.move_to_state(PluginsIncluded)
     }
 
     pub fn set_str_param(self, param: &str, value: &str) -> Result<Self, Retcode> {
         let param = CString::new(param).unwrap();
         let value = CString::new(value).unwrap();
-        scip_call! { ffi::SCIPsetStringParam(self.scip, param.as_ptr(), value.as_ptr()) };
+        scip_call! { ffi::SCIPsetStringParam(self.scip.ptr(), param.as_ptr(), value.as_ptr()) };
         Ok(self)
     }
 
     pub fn set_int_param(self, param: &str, value: i32) -> Result<Self, Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetIntParam(self.scip, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetIntParam(self.scip.ptr(), param.as_ptr(), value) };
         Ok(self)
     }
 
     pub fn set_real_param(self, param: &str, value: f64) -> Result<Self, Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetRealParam(self.scip, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetRealParam(self.scip.ptr(), param.as_ptr(), value) };
         Ok(self)
     }
 
@@ -83,47 +130,35 @@ impl Model<Unsolved> {
     }
 
     pub fn set_presolving(self, presolving: ParamSetting) -> Result<Self, Retcode> {
-        scip_call! { ffi::SCIPsetPresolving(self.scip, presolving.into(), true.into()) };
+        scip_call! { ffi::SCIPsetPresolving(self.scip.ptr(), presolving.into(), true.into()) };
         Ok(self)
     }
 
     pub fn set_separating(self, separating: ParamSetting) -> Result<Self, Retcode> {
-        scip_call! { ffi::SCIPsetSeparating(self.scip, separating.into(), true.into()) };
+        scip_call! { ffi::SCIPsetSeparating(self.scip.ptr(), separating.into(), true.into()) };
         Ok(self)
     }
 
     pub fn set_heuristics(self, heuristics: ParamSetting) -> Result<Self, Retcode> {
-        scip_call! { ffi::SCIPsetHeuristics(self.scip, heuristics.into(), true.into()) };
+        scip_call! { ffi::SCIPsetHeuristics(self.scip.ptr(), heuristics.into(), true.into()) };
         Ok(self)
     }
 }
 
 impl Model<PluginsIncluded> {
-    pub fn create_prob(self, name: &str) -> Model<ProblemCreated> {
+    pub fn create_prob(&mut self, name: &str) -> Model<ProblemCreated> {
         let name = CString::new(name).unwrap();
         scip_call_expect!(
-            ffi::SCIPcreateProbBasic(self.scip, name.as_ptr()),
+            ffi::SCIPcreateProbBasic(self.scip.ptr(), name.as_ptr()),
             "Unexpected fail to create problem from state PluginsIncluded"
         );
-        Model {
-            state: ProblemCreated,
-            scip: self.scip,
-            vars: self.vars,
-            conss: self.conss,
-            best_sol: self.best_sol,
-        }
+        self.move_to_state(ProblemCreated)
     }
 
-    pub fn read_prob(self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
+    pub fn read_prob(&mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         let filename = CString::new(filename).unwrap();
-        scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
-        let mut new_model = Model {
-            state: ProblemCreated,
-            scip: self.scip,
-            vars: self.vars,
-            conss: self.conss,
-            best_sol: self.best_sol,
-        };
+        scip_call! { ffi::SCIPreadProb(self.scip.ptr(), filename.as_ptr(), std::ptr::null_mut()) };
+        let mut new_model = self.move_to_state(ProblemCreated);
         new_model._set_vars();
         new_model._set_conss();
         Ok(new_model)
@@ -133,7 +168,7 @@ impl Model<PluginsIncluded> {
 impl Model<ProblemCreated> {
     pub fn set_obj_sense(self, sense: ObjSense) -> Self {
         scip_call_expect!(
-            ffi::SCIPsetObjsense(self.scip, sense.into()),
+            ffi::SCIPsetObjsense(self.scip.ptr(), sense.into()),
             "Unexpected fail to set objective sense from state ProblemCreated"
         );
         self
@@ -141,11 +176,11 @@ impl Model<ProblemCreated> {
 
     fn _set_vars(&mut self) {
         let n_vars = self.get_n_vars();
-        let scip_vars = unsafe { ffi::SCIPgetVars(self.scip) };
+        let scip_vars = unsafe { ffi::SCIPgetVars(self.scip.ptr()) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
             unsafe {
-                ffi::SCIPcaptureVar(self.scip, scip_var);
+                ffi::SCIPcaptureVar(self.scip.ptr(), scip_var);
             }
             let var = Variable { raw: scip_var };
             self.vars.insert(var.get_index(), var);
@@ -154,11 +189,11 @@ impl Model<ProblemCreated> {
 
     fn _set_conss(&mut self) {
         let n_conss = self.get_n_conss();
-        let scip_conss = unsafe { ffi::SCIPgetConss(self.scip) };
+        let scip_conss = unsafe { ffi::SCIPgetConss(self.scip.ptr()) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
             unsafe {
-                ffi::SCIPcaptureCons(self.scip, scip_cons);
+                ffi::SCIPcaptureCons(self.scip.ptr(), scip_cons);
             }
             let cons = Constraint { raw: scip_cons };
             self.conss.push(cons);
@@ -166,7 +201,7 @@ impl Model<ProblemCreated> {
     }
 
     pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> VarId {
-        let var = Variable::new(self.scip, lb, ub, obj, name, var_type)
+        let var = Variable::new(self.scip.ptr(), lb, ub, obj, name, var_type)
             .expect("Unexpected fail to create variable from state ProblemCreated");
         let var_id = var.get_index();
         self.vars.insert(var_id, var);
@@ -193,7 +228,7 @@ impl Model<ProblemCreated> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicLinear(
-            self.scip,
+            self.scip.ptr(),
             scip_cons.as_mut_ptr(),
             c_name.as_ptr(),
             0,
@@ -204,26 +239,20 @@ impl Model<ProblemCreated> {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.scip, scip_cons, var.raw, coefs[i]) };
+            scip_call! { ffi::SCIPaddCoefLinear(self.scip.ptr(), scip_cons, var.raw, coefs[i]) };
         }
-        scip_call! { ffi::SCIPaddCons(self.scip, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.scip.ptr(), scip_cons) };
         let cons = Constraint { raw: scip_cons };
         self.conss.push(cons);
         Ok(())
     }
 
-    pub fn solve(self) -> Model<Solved> {
+    pub fn solve(&mut self) -> Model<Solved> {
         scip_call_expect!(
-            ffi::SCIPsolve(self.scip),
+            ffi::SCIPsolve(self.scip.ptr()),
             "Unexpected fail to call solve from state ProblemCreated."
         );
-        let mut new_model = Model {
-            scip: self.scip,
-            state: Solved,
-            vars: self.vars,
-            conss: self.conss,
-            best_sol: None,
-        };
+        let mut new_model = self.move_to_state(Solved);
         new_model._set_best_sol();
         new_model
     }
@@ -231,9 +260,9 @@ impl Model<ProblemCreated> {
 
 impl Model<Solved> {
     fn _set_best_sol(&mut self) {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
+        let sol = unsafe { ffi::SCIPgetBestSol(self.scip.ptr()) };
         let sol = Solution {
-            scip_ptr: self.scip,
+            scip_ptr: self.scip.ptr(),
             raw: sol,
         };
         self.best_sol = Some(sol);
@@ -244,7 +273,7 @@ impl Model<Solved> {
     }
 
     pub fn get_obj_val(&self) -> f64 {
-        unsafe { ffi::SCIPgetPrimalbound(self.scip) }
+        unsafe { ffi::SCIPgetPrimalbound(self.scip.ptr()) }
     }
 }
 
@@ -268,11 +297,11 @@ macro_rules! impl_ModelWithProblem {
     }
 
     fn get_n_vars(&self) -> usize {
-        unsafe { ffi::SCIPgetNVars(self.scip) as usize }
+        unsafe { ffi::SCIPgetNVars(self.scip.ptr()) as usize }
     }
 
     fn get_n_conss(&mut self) -> usize {
-        unsafe { ffi::SCIPgetNConss(self.scip) as usize }
+        unsafe { ffi::SCIPgetNConss(self.scip.ptr()) as usize }
     }
 
     fn get_conss(&mut self) -> &Vec<Constraint> {
@@ -286,20 +315,29 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
+    fn move_to_state<S>(&mut self, state: S) -> Model<S> {
+        Model {
+            state,
+            scip: mem::take(&mut self.scip),
+            vars: mem::take(&mut self.vars),
+            conss: mem::take(&mut self.conss),
+            best_sol: mem::take(&mut self.best_sol),
+        }
+    }
     pub fn get_status(&self) -> Status {
-        let status = unsafe { ffi::SCIPgetStatus(self.scip) };
+        let status = unsafe { ffi::SCIPgetStatus(self.scip.ptr()) };
         Status::from_c_scip_status(status).unwrap()
     }
 
     pub fn print_version(&mut self) {
-        unsafe { ffi::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
+        unsafe { ffi::SCIPprintVersion(self.scip.ptr(), std::ptr::null_mut()) };
     }
 
     pub fn write(&mut self, path: &str, ext: &str) -> Result<(), Retcode> {
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
         scip_call! { ffi::SCIPwriteOrigProblem(
-            self.scip,
+            self.scip.ptr(),
             c_path.as_ptr(),
             c_ext.as_ptr(),
             true.into(),
@@ -315,20 +353,6 @@ impl Default for Model<ProblemCreated> {
             .create_prob("problem")
     }
 }
-
-// impl<T> Drop for Model<T> {
-//     fn drop(&mut self) {
-//         for var in self.vars.values_mut() {
-//             scip_call_panic!(ffi::SCIPreleaseVar(self.scip, &mut var.raw));
-//         }
-//         for cons in self.conss.iter_mut() {
-//             scip_call_panic!(ffi::SCIPreleaseCons(self.scip, &mut cons.raw));
-//         }
-//         self.vars.clear();
-//         self.conss.clear();
-//         scip_call_panic!(ffi::SCIPfree(&mut self.scip));
-//     }
-// }
 
 pub enum ParamSetting {
     Default,
@@ -445,7 +469,7 @@ mod tests {
 
     #[test]
     fn set_time_limit() -> Result<(), Retcode> {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()?
             .set_real_param("limits/time", 0.)?
             .include_default_plugins()
@@ -505,7 +529,7 @@ mod tests {
         assert_eq!(conss[0].get_name(), "c1");
         assert_eq!(conss[1].get_name(), "c2");
 
-        let mut solved_model = model.solve();
+        let solved_model = model.solve();
 
         let status = solved_model.get_status();
         assert_eq!(status, Status::OPTIMAL);
@@ -518,6 +542,7 @@ mod tests {
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
+        println!("print solution");
         Ok(())
     }
 }
