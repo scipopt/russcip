@@ -18,7 +18,7 @@ After which `russcip` would be able to find the installation in the current Cond
 
 *russcip* is tested against SCIP 8.0.3 but it might work for other versions depending on which functionality you use. 
 
-## Install
+## Installation
 By running
 ```bash
 cargo add russcip

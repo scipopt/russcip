@@ -9,7 +9,7 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub fn new(
+    pub(crate) fn new(
         scip_ptr: *mut ffi::SCIP,
         lb: f64,
         ub: f64,
