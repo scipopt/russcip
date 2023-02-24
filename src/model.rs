@@ -1,6 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::mem::{self, take, MaybeUninit};
+use std::mem::{self, MaybeUninit};
 
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
@@ -35,7 +35,6 @@ impl Default for ScipPtr {
 impl Drop for ScipPtr {
     fn drop(&mut self) {
         if self.0.is_null() {
-            return;
         } else {
             // Rust Model struct keeps at most one copy of each variable and constraint pointers
             // so we need to release them before freeing the SCIP instance
@@ -219,7 +218,7 @@ impl Model<ProblemCreated> {
             .map(|var_id| {
                 self.vars
                     .get(var_id)
-                    .expect(&format!("Variable with id {var_id} was not found"))
+                    .unwrap_or_else(|| panic!("Variable with id {var_id} was not found"))
             })
             .collect::<Vec<_>>();
         let c_name = CString::new(name).unwrap();
