@@ -42,7 +42,7 @@ use crate::russcip::model::ModelWithProblem;
 fn main() -> Result<(), Retcode> {
     // Create model
     let mut model = Model::new()
-    .hide_output()?
+    .hide_output()
     .include_default_plugins()
     .create_prob("test")
     .set_obj_sense(ObjSense::Maximize);
