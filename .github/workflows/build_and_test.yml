@@ -29,7 +29,7 @@ jobs:
           cargo test
           
   Linux-conda-test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: true
     steps:
@@ -54,7 +54,8 @@ jobs:
 
       - name: Test
         run: |
-          cargo test
+          rustup toolchain install nightly  
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
 
   # TODO: fix windows workflow 
   # Windows-test:
@@ -85,21 +86,21 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # - name: Cache dependencies (SCIPOptSuite)
-      #   id: cache-scip
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: |
-      #       ${{ runner.workspace }}/scipoptsuite
-      #       ~/Library/Caches/Homebrew/tbb--*
-      #         /usr/local/opt/tbb*
-      #       ~/Library/Caches/Homebrew/downloads/*--tbb-*
-      #       ~/Library/Caches/Homebrew/boost--*
-      #         /usr/local/opt/boost*
-      #       ~/Library/Caches/Homebrew/downloads/*--boost-*
-      #     key: ${{ runner.os }}-scipopt-${{ env.version }}-${{ hashFiles('**/lockfiles') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-scipopt-${{ env.version }}-
+      - name: Cache dependencies (SCIPOptSuite)
+        id: cache-scip
+        uses: actions/cache@v2
+        with:
+          path: |
+            ${{ runner.workspace }}/scipoptsuite
+            ~/Library/Caches/Homebrew/tbb--*
+              /usr/local/opt/tbb*
+            ~/Library/Caches/Homebrew/downloads/*--tbb-*
+            ~/Library/Caches/Homebrew/boost--*
+              /usr/local/opt/boost*
+            ~/Library/Caches/Homebrew/downloads/*--boost-*
+          key: ${{ runner.os }}-scipopt-${{ env.version }}-${{ hashFiles('**/lockfiles') }}
+          restore-keys: |
+            ${{ runner.os }}-scipopt-${{ env.version }}-
 
       - name: Install dependencies (SCIPOptSuite)
         if: steps.cache-scip.outputs.cache-hit != 'true'
