@@ -11,8 +11,6 @@ use crate::{ffi, scip_call_panic};
 use crate::{scip_call, scip_call_expect};
 use std::ffi::CString;
 
-
-
 struct ScipPtr(*mut ffi::SCIP);
 
 impl ScipPtr {
@@ -41,7 +39,7 @@ impl Drop for ScipPtr {
         } else {
             // Rust Model struct keeps at most one copy of each variable and constraint pointers
             // so we need to release them before freeing the SCIP instance
-            
+
             // release variables
             let n_vars = unsafe { ffi::SCIPgetNVars(self.0) };
             let vars = unsafe { ffi::SCIPgetOrigVars(self.0) };
@@ -49,7 +47,7 @@ impl Drop for ScipPtr {
                 let mut var = unsafe { *vars.add(i as usize) };
                 scip_call_panic!(ffi::SCIPreleaseVar(self.0, &mut var));
             }
-            
+
             // release constraints
             let n_conss = unsafe { ffi::SCIPgetNConss(self.0) };
             let conss = unsafe { ffi::SCIPgetOrigConss(self.0) };
@@ -57,13 +55,12 @@ impl Drop for ScipPtr {
                 let mut cons = unsafe { *conss.add(i as usize) };
                 scip_call_panic!(ffi::SCIPreleaseCons(self.0, &mut cons));
             }
-            
+
             // free SCIP instance
             unsafe { ffi::SCIPfree(&mut self.0) };
         }
     }
 }
-
 
 #[non_exhaustive]
 pub struct Model<State> {
@@ -101,7 +98,7 @@ impl Model<Unsolved> {
             ffi::SCIPincludeDefaultPlugins(self.scip.ptr()),
             "Failed to include default plugins"
         );
-        
+
         self.move_to_state(PluginsIncluded)
     }
 
