@@ -54,10 +54,6 @@ fn lib_scip_in_dir(path: &str) -> bool {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    if std::env::var("DOCS_RS").is_ok() {
-        return Ok(()); // Don't build on docs.rs
-    }
-
     let env_vars = vec![
         "SCIPOPTDIR",
         "CONDA_PREFIX",
@@ -84,8 +80,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     
     if !found_scip {
         println!("cargo:warning=SCIP was not found in SCIPOPTDIR or in Conda environemnt, looking for SCIP in system libraries");
-        let scip_header_file = "scip-wrapper.h";
-        let scipdefplugins_header_file = "scipdefplugins-wrapper.h";
+
+        let headers_dir = PathBuf::from("headers/");
+        let scip_header_file = PathBuf::from(&headers_dir)
+        .join("scip")
+        .join("scip.h")
+        .to_str()
+        .unwrap()
+        .to_owned();
+    let scipdefplugins_header_file = PathBuf::from(&headers_dir)
+        .join("scip")
+        .join("scipdefplugins.h")
+        .to_str()
+        .unwrap()
+        .to_owned();
         builder = bindgen::Builder::default()
             .header(scip_header_file)
             .header(scipdefplugins_header_file)
