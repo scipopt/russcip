@@ -74,18 +74,6 @@ pub enum VarType {
     ImplInt,
 }
 
-impl Into<VarType> for ffi::SCIP_Vartype {
-    fn into(self) -> VarType {
-        match self {
-            ffi::SCIP_Vartype_SCIP_VARTYPE_CONTINUOUS => VarType::Continuous,
-            ffi::SCIP_Vartype_SCIP_VARTYPE_INTEGER => VarType::Integer,
-            ffi::SCIP_Vartype_SCIP_VARTYPE_BINARY => VarType::Binary,
-            ffi::SCIP_Vartype_SCIP_VARTYPE_IMPLINT => VarType::ImplInt,
-            _ => panic!("Unknown VarType {:?}", self),
-        }
-    }
-}
-
 impl From<VarType> for ffi::SCIP_Vartype {
     fn from(var_type: VarType) -> Self {
         match var_type {
@@ -97,6 +85,19 @@ impl From<VarType> for ffi::SCIP_Vartype {
     }
 }
 
+impl From<ffi::SCIP_Vartype> for VarType {
+    fn from(var_type: ffi::SCIP_Vartype) -> Self {
+        match var_type {
+            ffi::SCIP_Vartype_SCIP_VARTYPE_CONTINUOUS => VarType::Continuous,
+            ffi::SCIP_Vartype_SCIP_VARTYPE_INTEGER => VarType::Integer,
+            ffi::SCIP_Vartype_SCIP_VARTYPE_BINARY => VarType::Binary,
+            ffi::SCIP_Vartype_SCIP_VARTYPE_IMPLINT => VarType::ImplInt,
+            _ => panic!("Unknown VarType {:?}", var_type),
+        }
+    }
+}
+
+
 pub enum VarStatus {
     Original,
     Loose,
@@ -107,9 +108,9 @@ pub enum VarStatus {
     NegatedVar,
 }
 
-impl Into<VarStatus> for ffi::SCIP_Varstatus {
-    fn into(self) -> VarStatus {
-        match self {
+impl From<u32> for VarStatus {
+    fn from(status: u32) -> Self {
+        match status {
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_ORIGINAL => VarStatus::Original,
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_LOOSE => VarStatus::Loose,
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_COLUMN => VarStatus::Column,
@@ -117,7 +118,7 @@ impl Into<VarStatus> for ffi::SCIP_Varstatus {
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_AGGREGATED => VarStatus::Aggregated,
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_MULTAGGR => VarStatus::MultiAggregated,
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_NEGATED => VarStatus::NegatedVar,
-            _ => panic!("Unhandled SCIP variable status {:?}", self),
+            _ => panic!("Unhandled SCIP variable status {:?}", status),
         }
     }
 }

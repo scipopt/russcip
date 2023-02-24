@@ -151,7 +151,7 @@ impl ScipPtr {
 
     fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.0) };
-        
+
         Solution {
             scip_ptr: self.0,
             raw: sol,
