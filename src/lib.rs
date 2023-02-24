@@ -76,14 +76,13 @@ macro_rules! scip_call_panic {
     };
 }
 
-
 #[macro_export]
 macro_rules! scip_call_expect {
     ($res:expr, $msg:expr) => {
         let res = unsafe { $res };
         let retcode = $crate::retcode::Retcode::from(res);
         if retcode != $crate::retcode::Retcode::Okay {
-            panic!($msg, "SCIP call failed with retcode {:?}: {}", retcode);
+            panic!("{} - SCIP call failed with retcode {:?}", $msg, retcode);
         }
     };
 }

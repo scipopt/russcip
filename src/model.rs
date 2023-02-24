@@ -1,40 +1,33 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::marker::PhantomData;
-use std::mem::MaybeUninit;
+use std::mem::{self, take, MaybeUninit};
 
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
-use crate::{scip_call, scip_call_expect};
 use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
+use crate::{scip_call, scip_call_expect};
 use std::ffi::CString;
 
 #[non_exhaustive]
 pub struct Model<State> {
     pub(crate) scip: *mut ffi::SCIP,
-    state: State
-}
-
-pub struct Unsolved; 
-pub struct PluginsIncluded;
-
-pub struct ProblemCreated {
-    pub(crate) vars: BTreeMap<VarId, Variable>,
-    pub(crate) conss: Vec<Constraint>
-}
-
-pub struct Solved  {
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
     pub(crate) best_sol: Option<Solution>,
+    state: State,
 }
 
+pub struct Unsolved;
+pub struct PluginsIncluded;
+pub struct ProblemCreated;
+
+pub struct Solved;
 
 impl Model<Unsolved> {
-    pub fn new() -> Self { 
+    pub fn new() -> Self {
         Self::try_new().expect("Failed to create SCIP instance")
     }
 
@@ -44,46 +37,106 @@ impl Model<Unsolved> {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         Ok(Model {
             scip: scip_ptr,
-            state: Unsolved
+            vars: BTreeMap::new(),
+            conss: Vec::new(),
+            best_sol: None,
+            state: Unsolved,
         })
     }
 
-    pub fn include_default_plugins(&mut self) -> Model<PluginsIncluded> {
-        scip_call_expect!(ffi::SCIPincludeDefaultPlugins(self.scip), "Failed to include default plugins");
-        Model { 
+    pub fn include_default_plugins(self) -> Model<PluginsIncluded> {
+        scip_call_expect!(
+            ffi::SCIPincludeDefaultPlugins(self.scip),
+            "Failed to include default plugins"
+        );
+        Model {
             state: PluginsIncluded,
-            scip: self.scip
+            scip: self.scip,
+            vars: self.vars,
+            conss: self.conss,
+            best_sol: self.best_sol,
         }
+    }
+
+    pub fn set_str_param(self, param: &str, value: &str) -> Result<Self, Retcode> {
+        let param = CString::new(param).unwrap();
+        let value = CString::new(value).unwrap();
+        scip_call! { ffi::SCIPsetStringParam(self.scip, param.as_ptr(), value.as_ptr()) };
+        Ok(self)
+    }
+
+    pub fn set_int_param(self, param: &str, value: i32) -> Result<Self, Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetIntParam(self.scip, param.as_ptr(), value) };
+        Ok(self)
+    }
+
+    pub fn set_real_param(self, param: &str, value: f64) -> Result<Self, Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetRealParam(self.scip, param.as_ptr(), value) };
+        Ok(self)
+    }
+
+    pub fn hide_output(self) -> Result<Self, Retcode> {
+        let muted_model = self.set_int_param("display/verblevel", 0)?;
+        Ok(muted_model)
+    }
+
+    pub fn set_presolving(self, presolving: ParamSetting) -> Result<Self, Retcode> {
+        scip_call! { ffi::SCIPsetPresolving(self.scip, presolving.into(), true.into()) };
+        Ok(self)
+    }
+
+    pub fn set_separating(self, separating: ParamSetting) -> Result<Self, Retcode> {
+        scip_call! { ffi::SCIPsetSeparating(self.scip, separating.into(), true.into()) };
+        Ok(self)
+    }
+
+    pub fn set_heuristics(self, heuristics: ParamSetting) -> Result<Self, Retcode> {
+        scip_call! { ffi::SCIPsetHeuristics(self.scip, heuristics.into(), true.into()) };
+        Ok(self)
     }
 }
 
 impl Model<PluginsIncluded> {
-    pub fn create_prob(&mut self, name: &str) -> Model<ProblemCreated> {
+    pub fn create_prob(self, name: &str) -> Model<ProblemCreated> {
         let name = CString::new(name).unwrap();
-        scip_call_expect!(ffi::SCIPcreateProbBasic(self.scip, name.as_ptr()), "Failed to create problem");
+        scip_call_expect!(
+            ffi::SCIPcreateProbBasic(self.scip, name.as_ptr()),
+            "Unexpected fail to create problem from state PluginsIncluded"
+        );
         Model {
-            state: ProblemCreated {
-                vars: BTreeMap::new(),
-                conss: Vec::new()
-            },
-            scip: self.scip
+            state: ProblemCreated,
+            scip: self.scip,
+            vars: self.vars,
+            conss: self.conss,
+            best_sol: self.best_sol,
         }
+    }
+
+    pub fn read_prob(self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
+        let filename = CString::new(filename).unwrap();
+        scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
+        let mut new_model = Model {
+            state: ProblemCreated,
+            scip: self.scip,
+            vars: self.vars,
+            conss: self.conss,
+            best_sol: self.best_sol,
+        };
+        new_model._set_vars();
+        new_model._set_conss();
+        Ok(new_model)
     }
 }
 
-
 impl Model<ProblemCreated> {
-    
-}
-
-
-impl<T> Model<T>  {
-    pub fn read_prob(&mut self, filename: &str) -> Result<(), Retcode> {
-        let filename = CString::new(filename).unwrap();
-        scip_call! { ffi::SCIPreadProb(self.scip, filename.as_ptr(), std::ptr::null_mut()) };
-        self._set_vars();
-        self._set_conss();
-        Ok(())
+    pub fn set_obj_sense(self, sense: ObjSense) -> Self {
+        scip_call_expect!(
+            ffi::SCIPsetObjsense(self.scip, sense.into()),
+            "Unexpected fail to set objective sense from state ProblemCreated"
+        );
+        self
     }
 
     fn _set_vars(&mut self) {
@@ -112,88 +165,12 @@ impl<T> Model<T>  {
         }
     }
 
-    fn _set_best_sol(&mut self) {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
-        let sol = Solution {
-            scip_ptr: self.scip,
-            raw: sol,
-        };
-        self.best_sol = Some(sol);
-    }
-
-    pub fn solve(&mut self) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsolve(self.scip) };
-        if self.get_status() == Status::OPTIMAL {
-            self._set_best_sol();
-        }
-        Ok(())
-    }
-
-    pub fn get_status(&mut self) -> Status {
-        let status = unsafe { ffi::SCIPgetStatus(self.scip) };
-        Status::from_c_scip_status(status).unwrap()
-    }
-
-    pub fn get_obj_val(&mut self) -> f64 {
-        unsafe { ffi::SCIPgetPrimalbound(self.scip) }
-    }
-
-    pub fn get_n_vars(&self) -> usize {
-        unsafe { ffi::SCIPgetNVars(self.scip) as usize }
-    }
-
-    pub fn print_version(&mut self) {
-        unsafe { ffi::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
-    }
-
-    pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
-        self.best_sol.as_ref().map(Box::new)
-    }
-
-    pub fn get_vars(&self) -> Vec<Box<&Variable>> {
-        self.vars.values().map(Box::new).collect()
-    }
-
-    pub fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>> {
-        self.vars.get(&var_id).map(Box::new)
-    }
-
-    pub fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
-        let param = CString::new(param).unwrap();
-        let value = CString::new(value).unwrap();
-        scip_call! { ffi::SCIPsetStringParam(self.scip, param.as_ptr(), value.as_ptr()) };
-        Ok(())
-    }
-
-    pub fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
-        let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetIntParam(self.scip, param.as_ptr(), value) };
-        Ok(())
-    }
-
-    pub fn set_real_param(&mut self, param: &str, value: f64) -> Result<(), Retcode> {
-        let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetRealParam(self.scip, param.as_ptr(), value) };
-        Ok(())
-    }
-
-    pub fn hide_output(&mut self) -> Result<(), Retcode> {
-        self.set_int_param("display/verblevel", 0)?;
-        Ok(())
-    }
-
-    pub fn add_var(
-        &mut self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Result<VarId, Retcode> {
-        let var = Variable::new(self.scip, lb, ub, obj, name, var_type)?;
+    pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> VarId {
+        let var = Variable::new(self.scip, lb, ub, obj, name, var_type)
+            .expect("Unexpected fail to create variable from state ProblemCreated");
         let var_id = var.get_index();
         self.vars.insert(var_id, var);
-        Ok(var_id)
+        var_id
     }
 
     pub fn add_cons(
@@ -207,7 +184,11 @@ impl<T> Model<T>  {
         assert_eq!(var_ids.len(), coefs.len());
         let vars = var_ids
             .iter()
-            .map(|var_id| self.vars.get(var_id).unwrap())
+            .map(|var_id| {
+                self.vars
+                    .get(var_id)
+                    .expect(&format!("Variable with id {var_id} was not found"))
+            })
             .collect::<Vec<_>>();
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
@@ -231,32 +212,87 @@ impl<T> Model<T>  {
         Ok(())
     }
 
-    pub fn set_obj_sense(&mut self, sense: ObjSense) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetObjsense(self.scip, sense.into()) };
-        Ok(())
+    pub fn solve(self) -> Model<Solved> {
+        scip_call_expect!(
+            ffi::SCIPsolve(self.scip),
+            "Unexpected fail to call solve from state ProblemCreated."
+        );
+        let mut new_model = Model {
+            scip: self.scip,
+            state: Solved,
+            vars: self.vars,
+            conss: self.conss,
+            best_sol: None,
+        };
+        new_model._set_best_sol();
+        new_model
+    }
+}
+
+impl Model<Solved> {
+    fn _set_best_sol(&mut self) {
+        let sol = unsafe { ffi::SCIPgetBestSol(self.scip) };
+        let sol = Solution {
+            scip_ptr: self.scip,
+            raw: sol,
+        };
+        self.best_sol = Some(sol);
     }
 
-    pub fn get_n_conss(&mut self) -> usize {
+    pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
+        self.best_sol.as_ref().map(Box::new)
+    }
+
+    pub fn get_obj_val(&mut self) -> f64 {
+        unsafe { ffi::SCIPgetPrimalbound(self.scip) }
+    }
+}
+
+pub trait ModelWithProblem {
+    fn get_vars(&self) -> Vec<Box<&Variable>>;
+    fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>>;
+    fn get_n_vars(&self) -> usize;
+    fn get_n_conss(&mut self) -> usize;
+    fn get_conss(&mut self) -> &Vec<Constraint>;
+}
+
+macro_rules! impl_ModelWithProblem {
+    (for $($t:ty),+) => {
+        $(impl ModelWithProblem for $t {
+            fn get_vars(&self) -> Vec<Box<&Variable>> {
+            self.vars.values().map(Box::new).collect()
+        }
+
+     fn get_var(&self, var_id: VarId) -> Option<Box<&Variable>> {
+        self.vars.get(&var_id).map(Box::new)
+    }
+
+    fn get_n_vars(&self) -> usize {
+        unsafe { ffi::SCIPgetNVars(self.scip) as usize }
+    }
+
+    fn get_n_conss(&mut self) -> usize {
         unsafe { ffi::SCIPgetNConss(self.scip) as usize }
     }
 
-    pub fn get_conss(&mut self) -> &Vec<Constraint> {
+    fn get_conss(&mut self) -> &Vec<Constraint> {
         &self.conss
     }
 
-    pub fn set_presolving(&mut self, presolving: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetPresolving(self.scip, presolving.into(), true.into()) };
-        Ok(())
+        })*
+    }
+}
+
+impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
+
+impl<T> Model<T> {
+    pub fn get_status(&mut self) -> Status {
+        let status = unsafe { ffi::SCIPgetStatus(self.scip) };
+        Status::from_c_scip_status(status).unwrap()
     }
 
-    pub fn set_separating(&mut self, separating: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetSeparating(self.scip, separating.into(), true.into()) };
-        Ok(())
-    }
-
-    pub fn set_heuristics(&mut self, heuristics: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetHeuristics(self.scip, heuristics.into(), true.into()) };
-        Ok(())
+    pub fn print_version(&mut self) {
+        unsafe { ffi::SCIPprintVersion(self.scip, std::ptr::null_mut()) };
     }
 
     pub fn write(&mut self, path: &str, ext: &str) -> Result<(), Retcode> {
@@ -272,32 +308,27 @@ impl<T> Model<T>  {
     }
 }
 
-impl Default for Model<Unsolved> {
+impl Default for Model<ProblemCreated> {
     fn default() -> Self {
-        let mut model = Model::new().expect("Failed to create SCIP model");
-        model
+        Model::new()
             .include_default_plugins()
-            .expect("Failed to include default plugins");
-        model
             .create_prob("problem")
-            .expect("Failed to create problem");
-        model
     }
 }
 
-impl<T> Drop for Model<T> {
-    fn drop(&mut self) {
-        for var in self.vars.values_mut() {
-            scip_call_panic!(ffi::SCIPreleaseVar(self.scip, &mut var.raw));
-        }
-        for cons in self.conss.iter_mut() {
-            scip_call_panic!(ffi::SCIPreleaseCons(self.scip, &mut cons.raw));
-        }
-        self.vars.clear();
-        self.conss.clear();
-        scip_call_panic!(ffi::SCIPfree(&mut self.scip));
-    }
-}
+// impl<T> Drop for Model<T> {
+//     fn drop(&mut self) {
+//         for var in self.vars.values_mut() {
+//             scip_call_panic!(ffi::SCIPreleaseVar(self.scip, &mut var.raw));
+//         }
+//         for cons in self.conss.iter_mut() {
+//             scip_call_panic!(ffi::SCIPreleaseCons(self.scip, &mut cons.raw));
+//         }
+//         self.vars.clear();
+//         self.conss.clear();
+//         scip_call_panic!(ffi::SCIPfree(&mut self.scip));
+//     }
+// }
 
 pub enum ParamSetting {
     Default,
@@ -346,22 +377,22 @@ mod tests {
     use super::*;
     use crate::status::Status;
 
-    #[test]
-    fn call_solve_without_problem() {
-        assert!(Model::new().unwrap().solve().is_err());
-    }
+    // #[test] call prevented from type system
+    // fn call_solve_without_problem() {
+    //     assert!(Model::new().solve().is_err());
+    // }
 
-    #[test]
-    fn call_solve_on_empty_problem() {
-        assert!(Model::new().unwrap().solve().is_err());
-    }
+    // #[test] call prevented from type system
+    // fn call_solve_on_empty_problem() {
+    //     assert!(Model::new().solve().is_err());
+    // }
 
-    #[test]
-    fn solution_without_problem() {
-        let model = Model::new().unwrap();
-        let sol = model.get_best_sol();
-        assert!(sol.is_none());
-    }
+    // #[test] call prevented from type system
+    // fn solution_without_problem() {
+    //     let model = Model::new();
+    //     let sol = model.get_best_sol();
+    //     assert!(sol.is_none());
+    // }
 
     // #[test] does not compile anymore
     // fn drop_problem_before_solution() {
@@ -387,11 +418,11 @@ mod tests {
 
     #[test]
     fn solve_from_lp_file() -> Result<(), Retcode> {
-        let mut model = Model::new()?;
-        model.include_default_plugins()?;
-        model.read_prob("data/test/simple.lp")?;
-        model.hide_output()?;
-        model.solve()?;
+        let mut model = Model::new()
+            .hide_output()?
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")?
+            .solve();
         let status = model.get_status();
         assert_eq!(status, Status::OPTIMAL);
 
@@ -414,12 +445,12 @@ mod tests {
 
     #[test]
     fn set_time_limit() -> Result<(), Retcode> {
-        let mut model = Model::new()?;
-        model.include_default_plugins()?;
-        model.hide_output()?;
-        model.read_prob("data/test/simple.lp")?;
-        model.set_real_param("limits/time", 0.)?;
-        model.solve()?;
+        let mut model = Model::new()
+            .hide_output()?
+            .set_real_param("limits/time", 0.)?
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")?
+            .solve();
         let status = model.get_status();
         assert_eq!(status, Status::TIMELIMIT);
         Ok(())
@@ -427,13 +458,13 @@ mod tests {
 
     #[test]
     fn add_variable() -> Result<(), Retcode> {
-        let mut model = Model::new()?;
-        model.include_default_plugins()?;
-        model.create_prob("test")?;
-        model.set_obj_sense(ObjSense::Maximize)?;
-        model.hide_output()?;
-        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
-        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)?;
+        let mut model = Model::new()
+            .hide_output()?
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
         let x1 = model.get_var(x1_id).unwrap();
         let x2 = model.get_var(x2_id).unwrap();
         assert_eq!(model.get_n_vars(), 2);
@@ -449,14 +480,14 @@ mod tests {
     }
 
     fn create_model() -> Result<Model<ProblemCreated>, Retcode> {
-        let mut model = Model::new()?;
-        model.include_default_plugins()?;
-        model.create_prob("test")?;
-        model.set_obj_sense(ObjSense::Maximize)?;
-        model.hide_output()?;
+        let mut model = Model::new()
+            .hide_output()?
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
 
-        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
-        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer)?;
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1")?;
         model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2")?;
 
@@ -474,16 +505,16 @@ mod tests {
         assert_eq!(conss[0].get_name(), "c1");
         assert_eq!(conss[1].get_name(), "c2");
 
-        model.solve()?;
+        let mut solved_model = model.solve();
 
-        let status = model.get_status();
+        let status = solved_model.get_status();
         assert_eq!(status, Status::OPTIMAL);
 
-        let obj_val = model.get_obj_val();
+        let obj_val = solved_model.get_obj_val();
         assert_eq!(obj_val, 200.);
 
-        let sol = model.get_best_sol().unwrap();
-        let vars = model.get_vars();
+        let sol = solved_model.get_best_sol().unwrap();
+        let vars = solved_model.get_vars();
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
