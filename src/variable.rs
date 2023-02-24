@@ -1,6 +1,5 @@
-use crate::{ffi, retcode::Retcode, scip_call};
+use crate::ffi;
 use core::panic;
-use std::{ffi::CString, mem::MaybeUninit};
 
 pub type VarId = usize;
 #[derive(Debug)]
@@ -9,30 +8,6 @@ pub struct Variable {
 }
 
 impl Variable {
-    pub(crate) fn new(
-        scip_ptr: *mut ffi::SCIP,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Result<Self, Retcode> {
-        let name = CString::new(name).unwrap();
-        let mut var_ptr = MaybeUninit::uninit();
-        scip_call! { ffi::SCIPcreateVarBasic(
-            scip_ptr,
-            var_ptr.as_mut_ptr(),
-            name.as_ptr(),
-            lb,
-            ub,
-            obj,
-            var_type.into(),
-        ) };
-        let var_ptr = unsafe { var_ptr.assume_init() };
-        scip_call! { ffi::SCIPaddVar(scip_ptr, var_ptr) };
-        Ok(Variable { raw: var_ptr })
-    }
-
     pub fn get_index(&self) -> usize {
         let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
         if id < 0 {
