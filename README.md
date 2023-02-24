@@ -37,33 +37,34 @@ use russcip::model::ObjSense;
 use russcip::status::Status;
 use russcip::variable::VarType;
 use russcip::retcode::Retcode;
+use crate::russcip::model::ModelWithProblem;
 
 fn main() -> Result<(), Retcode> {
     // Create model
-    let mut model = Model::new()?;
-    model.include_default_plugins()?;
-    model.create_prob("test")?;
-    model.set_obj_sense(ObjSense::Maximize)?;
-    model.hide_output()?;
+    let mut model = Model::new()
+    .hide_output()?
+    .include_default_plugins()
+    .create_prob("test")
+    .set_obj_sense(ObjSense::Maximize);
 
     // Add variables
-    let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)?;
-    let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer)?;
+    let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+    let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 
     // Add constraints
-    model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1")?;
-    model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2")?;
+    model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1");
+    model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2");
 
-    model.solve()?;
+    let solved_model = model.solve();
 
-    let status = model.get_status();
+    let status = solved_model.get_status();
     println!("Solved with status {:?}", status);
 
-    let obj_val = model.get_obj_val();
+    let obj_val = solved_model.get_obj_val();
     println!("Objective value: {}", obj_val);
 
-    let sol = model.get_best_sol().unwrap();
-    let vars = model.get_vars();
+    let sol = solved_model.get_best_sol().unwrap();
+    let vars = solved_model.get_vars();
 
     for var in vars {
         println!("{} = {}", &var.get_name(), sol.get_var_val(&var));

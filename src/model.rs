@@ -243,7 +243,7 @@ impl Model<Solved> {
         self.best_sol.as_ref().map(Box::new)
     }
 
-    pub fn get_obj_val(&mut self) -> f64 {
+    pub fn get_obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetPrimalbound(self.scip) }
     }
 }
@@ -286,7 +286,7 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
-    pub fn get_status(&mut self) -> Status {
+    pub fn get_status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.scip) };
         Status::from_c_scip_status(status).unwrap()
     }
