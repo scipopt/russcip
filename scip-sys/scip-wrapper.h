@@ -1,2 +1,0 @@
-#include <scip/scip.h>
-    
