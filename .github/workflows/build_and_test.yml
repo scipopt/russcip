@@ -93,10 +93,10 @@ jobs:
           path: |
             ${{ runner.workspace }}/scipoptsuite
             ~/Library/Caches/Homebrew/tbb--*
-              /usr/local/opt/tbb*
+            /usr/local/opt/tbb*
             ~/Library/Caches/Homebrew/downloads/*--tbb-*
             ~/Library/Caches/Homebrew/boost--*
-              /usr/local/opt/boost*
+            /usr/local/opt/boost*
             ~/Library/Caches/Homebrew/downloads/*--boost-*
           key: ${{ runner.os }}-scipopt-${{ env.version }}-${{ hashFiles('**/lockfiles') }}
           restore-keys: |
