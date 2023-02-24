@@ -1,9 +1,9 @@
 extern crate bindgen;
 
+use glob::glob;
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
-use glob::glob;
 
 fn _build_from_scip_dir(path: String) -> bindgen::Builder {
     let lib_dir = PathBuf::from(&path).join("lib");
@@ -23,7 +23,6 @@ fn _build_from_scip_dir(path: String) -> bindgen::Builder {
     }
     println!("cargo:rustc-link-search={}", lib_dir_path);
     println!("cargo:rustc-link-arg=-Wl,-rpath,{}", lib_dir_path);
-
 
     let include_dir = PathBuf::from(&path).join("include");
     let include_dir_path = include_dir.to_str().unwrap();
@@ -54,10 +53,7 @@ fn lib_scip_in_dir(path: &str) -> bool {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let env_vars = vec![
-        "SCIPOPTDIR",
-        "CONDA_PREFIX",
-    ];
+    let env_vars = vec!["SCIPOPTDIR", "CONDA_PREFIX"];
     let mut builder = bindgen::Builder::default();
     let mut found_scip = false;
     for env_var_name in env_vars {
@@ -72,32 +68,33 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 println!("cargo:warning=SCIP was not found in {}", scip_dir);
             }
-            
         } else {
             println!("cargo:warning={} is not set", env_var_name);
         }
     }
-    
+
     if !found_scip {
         println!("cargo:warning=SCIP was not found in SCIPOPTDIR or in Conda environemnt, looking for SCIP in system libraries");
 
-        let headers_dir = PathBuf::from("headers/");
+        let headers_dir_path = "headers/";
+        let headers_dir = PathBuf::from(headers_dir_path);
         let scip_header_file = PathBuf::from(&headers_dir)
-        .join("scip")
-        .join("scip.h")
-        .to_str()
-        .unwrap()
-        .to_owned();
-    let scipdefplugins_header_file = PathBuf::from(&headers_dir)
-        .join("scip")
-        .join("scipdefplugins.h")
-        .to_str()
-        .unwrap()
-        .to_owned();
+            .join("scip")
+            .join("scip.h")
+            .to_str()
+            .unwrap()
+            .to_owned();
+        let scipdefplugins_header_file = PathBuf::from(&headers_dir)
+            .join("scip")
+            .join("scipdefplugins.h")
+            .to_str()
+            .unwrap()
+            .to_owned();
         builder = bindgen::Builder::default()
             .header(scip_header_file)
             .header(scipdefplugins_header_file)
             .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+            .clang_arg(format!("-I{}", headers_dir_path));
     }
 
     println!("cargo:rustc-link-lib=scip");
