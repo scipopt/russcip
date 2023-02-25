@@ -10,7 +10,7 @@
 //! use russcip::variable::VarType;
 //! use crate::russcip::model::ModelWithProblem;
 //!
-//! fn main() -> Result<(), russcip::retcode::Retcode> {
+//! fn main() {
 //!   // Create model
 //!   let mut model = Model::new()
 //!   .hide_output()
@@ -40,7 +40,6 @@
 //!   for var in vars {
 //!       println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
 //!   }
-//!   Ok(())
 //! }
 
 extern crate doc_comment;

@@ -39,7 +39,7 @@ use russcip::variable::VarType;
 use russcip::retcode::Retcode;
 use crate::russcip::model::ModelWithProblem;
 
-fn main() -> Result<(), Retcode> {
+fn main() {
     // Create model
     let mut model = Model::new()
     .hide_output()
@@ -69,8 +69,6 @@ fn main() -> Result<(), Retcode> {
     for var in vars {
         println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
     }
-
-    Ok(())
 }
 
 ```
