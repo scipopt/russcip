@@ -319,13 +319,6 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
-    pub fn hide_output(mut self) -> Self {
-        self.scip
-            .set_int_param("display/verblevel", 0)
-            .expect("Failed to set display/verblevel to 0");
-        self
-    }
-
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
         self.scip
             .set_presolving(presolving)
@@ -494,6 +487,13 @@ impl<T> Model<T> {
     pub fn print_version(&self) {
         self.scip.print_version()
     }
+
+    pub fn hide_output(mut self) -> Self {
+        self.scip
+            .set_int_param("display/verblevel", 0)
+            .expect("Failed to set display/verblevel to 0");
+        self
+    }
 }
 
 impl Default for Model<ProblemCreated> {
@@ -654,5 +654,23 @@ mod tests {
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
         println!("print solution");
+    }
+
+    #[test]
+    fn unbounded_model() {
+        let mut model = Model::default()
+            .set_obj_sense(ObjSense::Maximize)
+            .hide_output();
+
+        model.add_var(0., f64::INFINITY, 1., "x1", VarType::Integer);
+        model.add_var(0., f64::INFINITY, 1., "x2", VarType::Integer);
+
+        let solved_model = model.solve();
+
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Unbounded);
+
+        let sol = solved_model.get_best_sol();
+        assert!(sol.is_none());
     }
 }
