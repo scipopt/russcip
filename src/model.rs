@@ -673,4 +673,23 @@ mod tests {
         let sol = solved_model.get_best_sol();
         assert!(sol.is_none());
     }
+
+    #[test]
+    fn infeasible_model() {
+        let mut model = Model::default()
+            .set_obj_sense(ObjSense::Maximize)
+            .hide_output();
+
+        let var_id = model.add_var(-1., -2., 1., "x1", VarType::Integer);
+
+        model.add_cons(&[var_id], &[1.], -f64::INFINITY, 0., "c1");
+
+        let solved_model = model.solve();
+
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Infeasible);
+
+        let sol = solved_model.get_best_sol();
+        assert!(sol.is_none());
+    }
 }
