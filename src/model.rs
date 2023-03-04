@@ -319,13 +319,6 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
-    pub fn hide_output(mut self) -> Self {
-        self.scip
-            .set_int_param("display/verblevel", 0)
-            .expect("Failed to set display/verblevel to 0");
-        self
-    }
-
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
         self.scip
             .set_presolving(presolving)
@@ -494,6 +487,13 @@ impl<T> Model<T> {
     pub fn print_version(&self) {
         self.scip.print_version()
     }
+
+    pub fn hide_output(mut self) -> Self {
+        self.scip
+            .set_int_param("display/verblevel", 0)
+            .expect("Failed to set display/verblevel to 0");
+        self
+    }
 }
 
 impl Default for Model<ProblemCreated> {
@@ -552,11 +552,12 @@ mod tests {
     use crate::status::Status;
 
     #[test]
-    fn solve_from_lp_file() -> Result<(), Retcode> {
+    fn solve_from_lp_file() {
         let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
-            .read_prob("data/test/simple.lp")?
+            .read_prob("data/test/simple.lp")
+            .unwrap()
             .solve();
         let status = model.get_status();
         assert_eq!(status, Status::Optimal);
@@ -575,24 +576,24 @@ mod tests {
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
-        Ok(())
     }
 
     #[test]
-    fn set_time_limit() -> Result<(), Retcode> {
+    fn set_time_limit() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/time", 0.)?
+            .set_real_param("limits/time", 0.)
+            .unwrap()
             .include_default_plugins()
-            .read_prob("data/test/simple.lp")?
+            .read_prob("data/test/simple.lp")
+            .unwrap()
             .solve();
         let status = model.get_status();
         assert_eq!(status, Status::TimeLimit);
-        Ok(())
     }
 
     #[test]
-    fn add_variable() -> Result<(), Retcode> {
+    fn add_variable() {
         let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
@@ -611,7 +612,6 @@ mod tests {
         assert!(x2.get_name() == "x2");
         assert!(x1.get_obj() == 3.);
         assert!(x2.get_obj() == 4.);
-        Ok(())
     }
 
     fn create_model() -> Model<ProblemCreated> {
@@ -630,7 +630,7 @@ mod tests {
     }
 
     #[test]
-    fn build_model_with_functions() -> Result<(), Retcode> {
+    fn build_model_with_functions() {
         let mut model = create_model();
         assert_eq!(model.get_vars().len(), 2);
         assert_eq!(model.get_n_conss(), 2);
@@ -653,7 +653,42 @@ mod tests {
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
-        println!("print solution");
-        Ok(())
+    }
+
+    #[test]
+    fn unbounded_model() {
+        let mut model = Model::default()
+            .set_obj_sense(ObjSense::Maximize)
+            .hide_output();
+
+        model.add_var(0., f64::INFINITY, 1., "x1", VarType::Integer);
+        model.add_var(0., f64::INFINITY, 1., "x2", VarType::Integer);
+
+        let solved_model = model.solve();
+
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Unbounded);
+
+        let sol = solved_model.get_best_sol();
+        assert!(sol.is_none());
+    }
+
+    #[test]
+    fn infeasible_model() {
+        let mut model = Model::default()
+            .set_obj_sense(ObjSense::Maximize)
+            .hide_output();
+
+        let var_id = model.add_var(0., 1., 1., "x1", VarType::Integer);
+
+        model.add_cons(&[var_id], &[1.], -f64::INFINITY, -1., "c1");
+
+        let solved_model = model.solve();
+
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Infeasible);
+
+        let sol = solved_model.get_best_sol();
+        assert!(sol.is_none());
     }
 }
