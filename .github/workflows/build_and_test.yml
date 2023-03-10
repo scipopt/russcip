@@ -44,8 +44,6 @@ jobs:
         run: |
           conda install -y --prefix $CONDA/envs/test --channel conda-forge scip
           echo "LD_LIBRARY_PATH=$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
-          echo "DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
-          echo "PATH=$CONDA/envs/test/bin:$PATH" >> "${GITHUB_ENV}"
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
 
       - name: Build
