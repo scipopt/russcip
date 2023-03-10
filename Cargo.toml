@@ -3,7 +3,7 @@ name = "russcip"
 authors = ["Mohammad Ghannam <mohammad.m.ghannam@gmail.com>"]
 description = "Rust interface for SCIP."
 license = "Apache-2.0"
-repository = "https://github.com/mmghannam/russcip"
+repository = "https://github.com/scipopt/russcip"
 version = "0.1.13"
 edition = "2021"
 
