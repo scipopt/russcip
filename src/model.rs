@@ -241,7 +241,7 @@ impl Drop for ScipPtr {
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
         {
             // release variables
-            let n_vars = unsafe { ffi::SCIPgetNVars(self.0) };
+            let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.0) };
             let vars = unsafe { ffi::SCIPgetOrigVars(self.0) };
             for i in 0..n_vars {
                 let mut var = unsafe { *vars.add(i as usize) };
@@ -249,7 +249,7 @@ impl Drop for ScipPtr {
             }
 
             // release constraints
-            let n_conss = unsafe { ffi::SCIPgetNConss(self.0) };
+            let n_conss = unsafe { ffi::SCIPgetNOrigConss(self.0) };
             let conss = unsafe { ffi::SCIPgetOrigConss(self.0) };
             for i in 0..n_conss {
                 let mut cons = unsafe { *conss.add(i as usize) };
