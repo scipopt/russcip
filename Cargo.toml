@@ -8,5 +8,5 @@ version = "0.1.13"
 edition = "2021"
 
 [dependencies]
-scip-sys = { path = "scip-sys", version = "0.1.3" }
+scip-sys =  "0.1.4"
 doc-comment = "0.3.3"
