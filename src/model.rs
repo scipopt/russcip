@@ -1,7 +1,10 @@
 use core::panic;
 use std::collections::BTreeMap;
+use std::ffi::c_void;
+use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 
+use crate::branching::BranchRule;
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -9,10 +12,8 @@ use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
-use std::ffi::CString;
 
 #[non_exhaustive]
-
 struct ScipPtr(*mut ffi::SCIP);
 
 impl ScipPtr {
@@ -214,6 +215,63 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
+
+    fn include_branch_rule(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut BranchRule,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn branchexeclp(
+            scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+            _: u32,
+            _: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            todo!()
+        }
+
+        extern "C" fn branchinit(
+            scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            let rule = unsafe { &mut *(data_ptr as *mut BranchRule) };
+            let x = rule.execute(vec![]);
+            assert_eq!(x, Retcode::Okay);
+        }
+
+        let rule_ptr  = rule as *mut BranchRule;
+        let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
+
+        scip_call!(ffi::SCIPincludeBranchrule(
+            self.0,
+            name.as_ptr() as *const i8,
+            desc.as_ptr() as *const i8,
+            priority,
+            maxdepth,
+            maxbounddist,
+            None,
+            None,
+            Some(branchinit),
+            None,
+            None,
+            None,
+            Some(branchexeclp),
+            None,
+            None,
+            branchrule_faker,
+        ));
+
+        Ok(())
+    }
 }
 
 impl Default for ScipPtr {
@@ -269,7 +327,9 @@ pub struct Model<State> {
 }
 
 pub struct Unsolved;
+
 pub struct PluginsIncluded;
+
 pub struct ProblemCreated {
     pub(crate) vars: BTreeMap<VarId, Variable>,
     pub(crate) conss: Vec<Constraint>,
@@ -337,6 +397,21 @@ impl Model<Unsolved> {
         self.scip
             .set_heuristics(heuristics)
             .expect("Failed to set heuristics with valid value");
+        self
+    }
+
+    pub fn include_branch_rule(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        mut rule: BranchRule,
+    ) -> Self {
+        self.scip
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, &mut rule)
+            .expect("Failed to include branch rule at state Unsolved");
         self
     }
 }
@@ -503,6 +578,7 @@ impl Default for Model<ProblemCreated> {
             .create_prob("problem")
     }
 }
+
 #[derive(Debug)]
 pub enum ParamSetting {
     Default,
@@ -521,6 +597,7 @@ impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
         }
     }
 }
+
 #[derive(Debug)]
 pub enum ObjSense {
     Minimize,
@@ -548,8 +625,9 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::status::Status;
+
+    use super::*;
 
     #[test]
     fn solve_from_lp_file() {
