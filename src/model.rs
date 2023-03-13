@@ -234,20 +234,13 @@ impl ScipPtr {
             _: u32,
             _: *mut ffi::SCIP_RESULT,
         ) -> ffi::SCIP_Retcode {
-            todo!()
-        }
-
-        extern "C" fn branchinit(
-            scip: *mut ffi::SCIP,
-            branchrule: *mut ffi::SCIP_BRANCHRULE,
-        ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule = unsafe { Box::from_raw( data_ptr as *mut &mut dyn BranchRule ) };
-            let x = rule.execute(vec![]);
+            let rule = unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) };
+            rule.execute(vec![]).into()
         }
 
-        let rule_ptr  = Box::into_raw(Box::new(rule));
+        let rule_ptr = Box::into_raw(Box::new(rule));
         let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
 
         scip_call!(ffi::SCIPincludeBranchrule(
@@ -259,7 +252,7 @@ impl ScipPtr {
             maxbounddist,
             None,
             None,
-            Some(branchinit),
+            None,
             None,
             None,
             None,
