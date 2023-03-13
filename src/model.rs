@@ -223,7 +223,7 @@ impl ScipPtr {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: &mut BranchRule,
+        rule: &mut dyn BranchRule,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -243,12 +243,11 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule = unsafe { &mut *(data_ptr as *mut BranchRule) };
+            let rule = unsafe { Box::from_raw( data_ptr as *mut &mut dyn BranchRule ) };
             let x = rule.execute(vec![]);
-            assert_eq!(x, Retcode::Okay);
         }
 
-        let rule_ptr  = rule as *mut BranchRule;
+        let rule_ptr  = Box::into_raw(Box::new(rule));
         let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
 
         scip_call!(ffi::SCIPincludeBranchrule(
@@ -407,10 +406,10 @@ impl Model<Unsolved> {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        mut rule: BranchRule,
+        rule: &mut dyn BranchRule,
     ) -> Self {
         self.scip
-            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, &mut rule)
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state Unsolved");
         self
     }
