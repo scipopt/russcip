@@ -4,7 +4,7 @@ use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::mem::MaybeUninit;
 
-use crate::branching::BranchRule;
+use crate::branching::{BranchingResult, BranchRule};
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -232,12 +232,13 @@ impl ScipPtr {
             scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
             _: u32,
-            _: *mut ffi::SCIP_RESULT,
+            res: *mut ffi::SCIP_RESULT,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
             let rule = unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) };
-            rule.execute(vec![]).into()
+            unsafe { *res = rule.execute(vec![]).into()  } ; // TODO: continue here causes segfault now
+            Retcode::Okay.into()
         }
 
         let rule_ptr = Box::into_raw(Box::new(rule));

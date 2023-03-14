@@ -53,6 +53,7 @@ pub mod retcode;
 pub mod solution;
 pub mod status;
 pub mod variable;
+pub mod result;
 
 #[macro_export]
 macro_rules! scip_call {
