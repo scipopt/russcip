@@ -1,5 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 
 use crate::constraint::Constraint;
@@ -9,7 +10,6 @@ use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
-use std::ffi::CString;
 
 #[non_exhaustive]
 
@@ -21,6 +21,11 @@ impl ScipPtr {
         scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr(scip_ptr)
+    }
+
+    #[cfg(feature = "raw")]
+    pub fn inner(&self) -> *mut ffi::SCIP {
+        self.0
     }
 
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -480,6 +485,11 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
+    #[cfg(feature = "raw")]
+    pub fn scip_ptr(&self) -> ScipPtr {
+        self.scip
+    }
+
     pub fn get_status(&self) -> Status {
         self.scip.get_status()
     }
@@ -548,8 +558,9 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::status::Status;
+
+    use super::*;
 
     #[test]
     fn solve_from_lp_file() {
