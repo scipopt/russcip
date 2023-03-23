@@ -145,8 +145,16 @@ impl ScipPtr {
     }
 
     fn solve(&mut self) -> Result<(), Retcode> {
-        scip_call!(ffi::SCIPsolve(self.0));
+        if self.tpi_get_num_threads() > 1 {
+            scip_call!(ffi::SCIPsolveConcurrent(self.0));
+        } else {
+            scip_call!(ffi::SCIPsolve(self.0));
+        }
         Ok(())
+    }
+
+    fn tpi_get_num_threads(&self) -> usize {
+        unsafe { ffi::SCIPtpiGetNumThreads() as usize }
     }
 
     fn get_n_sols(&self) -> usize {
