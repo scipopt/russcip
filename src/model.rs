@@ -678,7 +678,7 @@ mod tests {
         assert_eq!(status, Status::Unbounded);
 
         let sol = solved_model.get_best_sol();
-        assert!(sol.is_none());
+        assert!(sol.is_some());
     }
 
     #[test]
