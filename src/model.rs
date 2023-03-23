@@ -218,20 +218,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
-
-    fn has_vars_and_constraints(&self) -> bool {
-        let scip_stage = unsafe { ffi::SCIPgetStage(self.0) };
-        scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_TRANSFORMED
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITPRESOLVE
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVING
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITPRESOLVE
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVED
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITSOLVE
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVED
-            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
-    }
 }
 
 impl Default for ScipPtr {
@@ -246,7 +232,17 @@ impl Drop for ScipPtr {
         // so we need to release them before freeing the SCIP instance
 
         // first check if we are in a stage where we have variables and constraints
-        if self.has_vars_and_constraints()
+        let scip_stage = unsafe { ffi::SCIPgetStage(self.0) };
+        if scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_TRANSFORMED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITPRESOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVING
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITPRESOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PRESOLVED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITSOLVE
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVED
+            || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
         {
             // release variables
             let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.0) };
@@ -430,17 +426,6 @@ impl Model<ProblemCreated> {
 
 impl Model<Solved> {
     fn _set_best_sol(&mut self) {
-        // a best solution can exist even if the status is not optimal, for example if the 
-        // time limit is reached. In this case, the best solution is the best solution explored,
-        // assuming any viable solutions had been explored.
-
-        // to check if any viable solutions had been explored and to fetch the best solution,
-        // the problem needs to be in a stage where it has variables and constraints.
-        if !self.scip.has_vars_and_constraints() {
-            return;
-        }
-
-        // if at least one viable solution had been explored, get the best such solution.
         if self.scip.get_n_sols() > 0 {
             self.state.best_sol = Some(self.scip.get_best_sol());
         }
@@ -448,6 +433,10 @@ impl Model<Solved> {
 
     pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
         self.state.best_sol.as_ref().map(Box::new)
+    }
+
+    pub fn get_n_sols(&self) -> usize {
+        self.scip.get_n_sols()
     }
 
     pub fn get_obj_val(&self) -> f64 {
