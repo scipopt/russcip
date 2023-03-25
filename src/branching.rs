@@ -1,12 +1,13 @@
+use core::panic;
+
 use crate::ffi;
 use crate::retcode::Retcode;
 
 pub trait BranchRule {
-    fn execute(&self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
-        BranchingResult::DidNotRun
-    }
+    fn execute(&self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum BranchingResult {
     DidNotRun,
     Branched,
@@ -28,20 +29,25 @@ pub struct BranchingCandidate {
 
 #[cfg(test)]
 mod tests {
+    use super::BranchingResult;
     use crate::branching::BranchRule;
-    use crate::model::{Model, ParamSetting};
+    use crate::model::Model;
 
     struct SimpleBranchingRule;
-    impl BranchRule for SimpleBranchingRule {}
+    impl BranchRule for SimpleBranchingRule {
+        fn execute(&self, _candidates: Vec<super::BranchingCandidate>) -> BranchingResult {
+            panic!("Not implemented")
+        }
+    }
 
     #[test]
+    #[should_panic]
     fn test_branching() {
         let mut br = SimpleBranchingRule {};
 
         // create model from miplib instance gen-ip054
         let model = Model::new()
-            // .hide_output()
-            .set_heuristics(ParamSetting::Off)
+            .hide_output()
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
