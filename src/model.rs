@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 
-use crate::branching::BranchRule;
+use crate::branching::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -221,6 +221,52 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
+        let mut lpcands = MaybeUninit::uninit();
+        let mut lpcandssol = MaybeUninit::uninit();
+        // let mut lpcandsfrac = MaybeUninit::uninit();
+        let mut nlpcands = MaybeUninit::uninit();
+        // let mut npriolpcands = MaybeUninit::uninit();
+        let mut nfracimplvars = MaybeUninit::uninit();
+        unsafe {
+            ffi::SCIPgetLPBranchCands(
+                scip,
+                lpcands.as_mut_ptr(),
+                lpcandssol.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nlpcands.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nfracimplvars.as_mut_ptr(),
+            );
+        }
+        let lpcands = unsafe { lpcands.assume_init() };
+        let lpcandssol = unsafe { lpcandssol.assume_init() };
+        // let lpcandsfrac = unsafe { lpcandsfrac.assume_init() };
+        let nlpcands = unsafe { nlpcands.assume_init() };
+        // let npriolpcands = unsafe { npriolpcands.assume_init() };
+        let mut cands = Vec::with_capacity(nlpcands as usize);
+        for i in 0..nlpcands {
+            let var_ptr = unsafe { *lpcands.add(i as usize) };
+            let sol = unsafe { *lpcandssol.add(i as usize) };
+            let frac = sol.fract();
+            cands.push(BranchingCandidate {
+                var_ptr,
+                lp_sol_val: sol,
+                frac,
+            });
+        }
+        cands
+    }
+
+    fn branch_var_val(
+        scip: *mut ffi::SCIP,
+        var: *mut ffi::SCIP_VAR,
+        val: f64,
+    ) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPbranchVarVal(scip, var, val, std::ptr::null_mut(), std::ptr::null_mut(),std::ptr::null_mut()) };
+        Ok(())
+    }
+
     fn include_branch_rule(
         &self,
         name: &str,
@@ -234,7 +280,7 @@ impl ScipPtr {
         let c_desc = CString::new(desc).unwrap();
 
         extern "C" fn branchexeclp(
-            _: *mut ffi::SCIP,
+            scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
             _: u32,
             res: *mut ffi::SCIP_RESULT,
@@ -242,7 +288,17 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
             let rule_ptr = data_ptr as *mut &mut dyn BranchRule;
-            unsafe { *res = (*rule_ptr).execute(vec![]).into() };
+            let cands = ScipPtr::get_lp_branching_cands(scip);
+            let branching_res = unsafe { (*rule_ptr).execute(cands) };
+
+            match branching_res.clone() {
+                BranchingResult::BranchOn(cand) => {
+                    ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
+                }
+                BranchingResult::DidNotRun | BranchingResult::CustomBranching => {}
+            };
+
+            unsafe { *res = branching_res.into() };
             Retcode::Okay.into()
         }
 

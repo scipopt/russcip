@@ -4,36 +4,28 @@ pub trait BranchRule {
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum BranchingResult {
     DidNotRun,
-    Branched,
+    BranchOn(BranchingCandidate),
+    CustomBranching,
 }
 
 impl From<BranchingResult> for u32 {
     fn from(val: BranchingResult) -> Self {
         match val {
             BranchingResult::DidNotRun => ffi::SCIP_Result_SCIP_DIDNOTRUN,
-            BranchingResult::Branched => ffi::SCIP_Result_SCIP_BRANCHED,
+            BranchingResult::BranchOn(_) => ffi::SCIP_Result_SCIP_BRANCHED,
+            BranchingResult::CustomBranching => ffi::SCIP_Result_SCIP_BRANCHED,
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BranchingCandidate {
-    pub var_id: usize,
+    pub(crate) var_ptr: *mut ffi::SCIP_VAR,
     pub lp_sol_val: f64,
     pub frac: f64,
-}
-
-impl BranchingCandidate {
-    pub fn new(var_id: usize, lp_sol_val: f64) -> Self {
-        let frac = lp_sol_val.fract();
-        Self {
-            var_id,
-            lp_sol_val,
-            frac,
-        }
-    }
 }
 
 #[cfg(test)]
@@ -66,19 +58,19 @@ mod tests {
     }
 
     struct TestBranchingRule {
-        pub called: bool,
+        pub chosen: Option<BranchingCandidate>,
     }
 
     impl BranchRule for TestBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            self.called = true;
+        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+            self.chosen = Some(candidates[0].clone());
             BranchingResult::DidNotRun
         }
     }
 
     #[test]
     fn test_branching_rule() {
-        let mut br = TestBranchingRule { called: false };
+        let mut br = TestBranchingRule { chosen: None };
 
         // create model from miplib instance gen-ip054
         let model = Model::new()
@@ -93,6 +85,9 @@ mod tests {
         // solve model
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::NodeLimit);
-        assert!(br.called);
+        assert!(br.chosen.is_some());
+        let candidate = br.chosen.unwrap();
+        assert!(candidate.lp_sol_val.fract() > 0.);
+        assert!(candidate.frac > 0. && candidate.frac < 1.);
     }
 }
