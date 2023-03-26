@@ -1,10 +1,9 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::ffi::c_void;
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 
-use crate::branching::{BranchRule, BranchingResult};
+use crate::branching::BranchRule;
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -34,6 +33,12 @@ impl ScipPtr {
     fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.0, param.as_ptr(), value) };
+        Ok(())
+    }
+
+    fn set_longint_param(&mut self, param: &str, value: i64) -> Result<(), Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetLongintParam(self.0, param.as_ptr(), value) };
         Ok(())
     }
 
@@ -229,7 +234,7 @@ impl ScipPtr {
         let c_desc = CString::new(desc).unwrap();
 
         extern "C" fn branchexeclp(
-            scip: *mut ffi::SCIP,
+            _: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
             _: u32,
             res: *mut ffi::SCIP_RESULT,
@@ -246,8 +251,8 @@ impl ScipPtr {
 
         scip_call!(ffi::SCIPincludeBranchrule(
             self.0,
-            name.as_ptr() as *const i8,
-            desc.as_ptr() as *const i8,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
             priority,
             maxdepth,
             maxbounddist,
@@ -364,6 +369,11 @@ impl Model<Unsolved> {
 
     pub fn set_int_param(mut self, param: &str, value: i32) -> Result<Self, Retcode> {
         self.scip.set_int_param(param, value)?;
+        Ok(self)
+    }
+
+    pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
+        self.scip.set_longint_param(param, value)?;
         Ok(self)
     }
 
