@@ -23,11 +23,6 @@ impl ScipPtr {
         ScipPtr(scip_ptr)
     }
 
-    #[cfg(feature = "raw")]
-    pub fn inner(&self) -> *mut ffi::SCIP {
-        self.0
-    }
-
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         let value = CString::new(value).unwrap();
@@ -486,8 +481,8 @@ impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
     #[cfg(feature = "raw")]
-    pub fn scip_ptr(&self) -> ScipPtr {
-        self.scip
+    pub unsafe fn scip_ptr(&self) -> *mut ffi::SCIP {
+        self.scip.0
     }
 
     pub fn get_status(&self) -> Status {
@@ -701,5 +696,23 @@ mod tests {
 
         let sol = solved_model.get_best_sol();
         assert!(sol.is_none());
+    }
+
+    #[cfg(feature = "raw")]
+    #[test]
+    fn scip_ptr() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1");
+        model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2");
+
+        let scip_ptr = unsafe { model.scip_ptr() };
+        assert!(!scip_ptr.is_null());
     }
 }
