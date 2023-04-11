@@ -149,6 +149,10 @@ impl ScipPtr {
         Ok(())
     }
 
+    fn get_n_sols(&self) -> usize {
+        unsafe { ffi::SCIPgetNSols(self.0) as usize }
+    }
+
     fn get_best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.0) };
 
@@ -422,13 +426,17 @@ impl Model<ProblemCreated> {
 
 impl Model<Solved> {
     fn _set_best_sol(&mut self) {
-        if self.scip.get_status() == Status::Optimal {
+        if self.scip.get_n_sols() > 0 {
             self.state.best_sol = Some(self.scip.get_best_sol());
         }
     }
 
     pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
         self.state.best_sol.as_ref().map(Box::new)
+    }
+
+    pub fn get_n_sols(&self) -> usize {
+        self.scip.get_n_sols()
     }
 
     pub fn get_obj_val(&self) -> f64 {
@@ -676,7 +684,7 @@ mod tests {
         assert_eq!(status, Status::Unbounded);
 
         let sol = solved_model.get_best_sol();
-        assert!(sol.is_none());
+        assert!(sol.is_some());
     }
 
     #[test]
