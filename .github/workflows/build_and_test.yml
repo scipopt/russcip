@@ -53,7 +53,7 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly  
-          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
 
   # TODO: fix windows workflow 
   # Windows-test:

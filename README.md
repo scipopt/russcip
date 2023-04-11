@@ -73,6 +73,15 @@ fn main() {
 
 ```
 
+## The `raw` feature
+You can enable this feature by specifying the feature in your `Cargo.toml`
+```toml
+[dependencies]
+russcip = { features = ["raw"] }
+```
+This enables access to the `scip_ptr` unsafe function in the `Model` struct, which gives you access to the underlying SCIP raw pointer. This is can be used in combination with the `ffi` module to call SCIP functions that are not wrapped yet in the safe interface. 
+
+
 ## About SCIP
 
 SCIP is currently one of the fastest non-commercial solvers for mixed integer programming (MIP) and mixed integer nonlinear programming (MINLP). It is also a framework for constraint integer programming and branch-cut-and-price. It allows for total control of the solution process and the access of detailed information down to the guts of the solver.

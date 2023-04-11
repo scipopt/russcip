@@ -8,6 +8,12 @@ pub struct Variable {
 }
 
 impl Variable {
+
+    #[cfg(feature = "raw")]
+    pub fn inner(&self) -> *mut ffi::SCIP_VAR {
+        self.raw
+    }
+
     pub fn get_index(&self) -> usize {
         let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
         if id < 0 {

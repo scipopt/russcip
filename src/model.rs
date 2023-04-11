@@ -1,5 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 
 use crate::constraint::Constraint;
@@ -9,7 +10,6 @@ use crate::solution::Solution;
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
-use std::ffi::CString;
 
 #[non_exhaustive]
 
@@ -488,6 +488,11 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
 
 impl<T> Model<T> {
+    #[cfg(feature = "raw")]
+    pub unsafe fn scip_ptr(&self) -> *mut ffi::SCIP {
+        self.scip.0
+    }
+
     pub fn get_status(&self) -> Status {
         self.scip.get_status()
     }
@@ -556,8 +561,9 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::status::Status;
+
+    use super::*;
 
     #[test]
     fn solve_from_lp_file() {
@@ -698,5 +704,23 @@ mod tests {
 
         let sol = solved_model.get_best_sol();
         assert!(sol.is_none());
+    }
+
+    #[cfg(feature = "raw")]
+    #[test]
+    fn scip_ptr() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1");
+        model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2");
+
+        let scip_ptr = unsafe { model.scip_ptr() };
+        assert!(!scip_ptr.is_null());
     }
 }
