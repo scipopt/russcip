@@ -75,7 +75,7 @@ fn main() {
 
 ## The `raw` feature
 You can enable this feature by specifying the feature in your `Cargo.toml`
-```
+```toml
 [dependencies]
 russcip = { features = ["raw"] }
 ```
