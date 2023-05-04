@@ -26,7 +26,7 @@ cargo add russcip
 or to get the most recent version, add the following to your `Cargo.toml`
 ```toml
 [dependencies]
-russcip = { git = "https://github.com/mmghannam/russcip" }
+russcip = { git = "https://github.com/scipopt/russcip" }
 ```
 
 ## Example
