@@ -219,6 +219,11 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
+
+    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
+        Ok(())
+    }
 }
 
 impl Default for ScipPtr {
@@ -414,6 +419,18 @@ impl Model<ProblemCreated> {
         let cons = Rc::new(cons);
         self.state.conss.push(cons.clone());
         cons
+    }
+
+    pub fn add_cons_coef(
+        &mut self,
+        cons: Rc<Constraint>,
+        var: Rc<Variable>,
+        coef: f64,
+    ) -> Result<(), Retcode> {
+        self.scip
+            .add_cons_coef(cons, var, coef)
+            .expect("Failed to add constraint coefficient in state ProblemCreated");
+        Ok(())
     }
 
     pub fn solve(mut self) -> Model<Solved> {
@@ -766,5 +783,31 @@ mod tests {
 
         let scip_ptr = unsafe { model.scip_ptr() };
         assert!(!scip_ptr.is_null());
+    }
+
+    #[test]
+    fn add_cons_coef() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let cons = model.add_cons(
+            vec![],
+            &[],
+            -f64::INFINITY,
+            10.,
+            "c1",
+        );
+
+        model.add_cons_coef(cons.clone(), x1.clone(), 0.); // x1 is unconstrained
+        model.add_cons_coef(cons.clone(), x2.clone(), 10.); // x2 can't be be used
+
+        let solved_model = model.solve();
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Unbounded);
     }
 }
