@@ -507,6 +507,13 @@ impl<T> Model<T> {
             .expect("Failed to set display/verblevel to 0");
         self
     }
+
+    pub fn set_time_limit(mut self, time_limit: usize) -> Self {
+        self.scip
+            .set_real_param("limits/time", time_limit as f64)
+            .expect("Failed to set time limit");
+        self
+    }
 }
 
 impl Default for Model<ProblemCreated> {
@@ -596,8 +603,7 @@ mod tests {
     fn set_time_limit() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/time", 0.)
-            .unwrap()
+            .set_time_limit(0)
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
