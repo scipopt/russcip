@@ -426,11 +426,10 @@ impl Model<ProblemCreated> {
         cons: Rc<Constraint>,
         var: Rc<Variable>,
         coef: f64,
-    ) -> Result<(), Retcode> {
+    ) {
         self.scip
             .add_cons_coef(cons, var, coef)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
-        Ok(())
     }
 
     pub fn solve(mut self) -> Model<Solved> {

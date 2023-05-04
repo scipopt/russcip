@@ -106,7 +106,7 @@ impl From<u32> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Model, ModelWithProblem};
+    use crate::model::{Model};
     use crate::retcode::Retcode;
 
     #[test]
