@@ -129,7 +129,7 @@ impl ScipPtr {
         vars
     }
 
-    fn get_conss(&mut self) -> Vec<Constraint> {
+    fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.get_n_conss();
         let mut conss = Vec::with_capacity(n_conss);
@@ -139,7 +139,7 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureCons(self.0, scip_cons);
             }
-            let cons = Constraint { raw: scip_cons };
+            let cons = Rc::new(Constraint { raw: scip_cons });
             conss.push(cons);
         }
         conss
@@ -277,12 +277,12 @@ pub struct Unsolved;
 pub struct PluginsIncluded;
 pub struct ProblemCreated {
     pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Constraint>,
+    pub(crate) conss: Vec<Rc<Constraint>>,
 }
 
 pub struct Solved {
     pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Constraint>,
+    pub(crate) conss: Vec<Rc<Constraint>>,
     pub(crate) best_sol: Option<Solution>,
 }
 
@@ -380,7 +380,14 @@ impl Model<ProblemCreated> {
         self
     }
 
-    pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> Rc<Variable> {
+    pub fn add_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Rc<Variable> {
         let var = self
             .scip
             .create_var(lb, ub, obj, name, var_type)
@@ -391,13 +398,22 @@ impl Model<ProblemCreated> {
         var
     }
 
-    pub fn add_cons(&mut self, vars: Vec<Rc<Variable>>, coefs: &[f64], lhs: f64, rhs: f64, name: &str) {
+    pub fn add_cons(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        self.state.conss.push(cons);
+        let cons = Rc::new(cons);
+        self.state.conss.push(cons.clone());
+        cons
     }
 
     pub fn solve(mut self) -> Model<Solved> {
@@ -442,7 +458,7 @@ pub trait ModelWithProblem {
     fn get_var(&self, var_id: VarId) -> Option<Rc<Variable>>;
     fn get_n_vars(&self) -> usize;
     fn get_n_conss(&mut self) -> usize;
-    fn get_conss(&mut self) -> &Vec<Constraint>;
+    fn get_conss(&mut self) -> Vec<Rc<Constraint>>;
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
 }
 
@@ -466,8 +482,8 @@ macro_rules! impl_ModelWithProblem {
         self.scip.get_n_conss()
     }
 
-    fn get_conss(&mut self) -> &Vec<Constraint> {
-        &self.state.conss
+    fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
+        self.state.conss.iter().map(Rc::clone).collect()
     }
 
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
@@ -613,8 +629,12 @@ mod tests {
             .include_default_plugins()
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
-        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer).get_index();
-        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous).get_index();
+        let x1_id = model
+            .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
+            .get_index();
+        let x2_id = model
+            .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)
+            .get_index();
         let x1 = model.get_var(x1_id).unwrap();
         let x2 = model.get_var(x2_id).unwrap();
         assert_eq!(model.get_n_vars(), 2);
@@ -637,8 +657,20 @@ mod tests {
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-        model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-        model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
+        model.add_cons(
+            vec![x1.clone(), x2.clone()],
+            &[2., 1.],
+            -f64::INFINITY,
+            100.,
+            "c1",
+        );
+        model.add_cons(
+            vec![x1.clone(), x2.clone()],
+            &[1., 2.],
+            -f64::INFINITY,
+            80.,
+            "c2",
+        );
 
         model
     }
@@ -717,8 +749,20 @@ mod tests {
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-        model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-        model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
+        model.add_cons(
+            vec![x1.clone(), x2.clone()],
+            &[2., 1.],
+            -f64::INFINITY,
+            100.,
+            "c1",
+        );
+        model.add_cons(
+            vec![x1.clone(), x2.clone()],
+            &[1., 2.],
+            -f64::INFINITY,
+            80.,
+            "c2",
+        );
 
         let scip_ptr = unsafe { model.scip_ptr() };
         assert!(!scip_ptr.is_null());
