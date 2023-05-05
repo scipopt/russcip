@@ -113,7 +113,7 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_vars(&mut self) -> BTreeMap<usize, Rc<Variable>> {
+    fn get_vars(&self) -> BTreeMap<usize, Rc<Variable>> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.get_n_vars();
         let mut vars = BTreeMap::new();
@@ -129,7 +129,7 @@ impl ScipPtr {
         vars
     }
 
-    fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
+    fn get_conss(&self) -> Vec<Rc<Constraint>> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.get_n_conss();
         let mut conss = Vec::with_capacity(n_conss);
