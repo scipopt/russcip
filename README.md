@@ -26,7 +26,7 @@ cargo add russcip
 or to get the most recent version, add the following to your `Cargo.toml`
 ```toml
 [dependencies]
-russcip = { git = "https://github.com/mmghannam/russcip" }
+russcip = { git = "https://github.com/scipopt/russcip" }
 ```
 
 ## Example
@@ -48,12 +48,12 @@ fn main() {
     .set_obj_sense(ObjSense::Maximize);
 
     // Add variables
-    let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-    let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+    let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+    let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 
     // Add constraints
-    model.add_cons(&[x1_id, x2_id], &[2., 1.], -f64::INFINITY, 100., "c1");
-    model.add_cons(&[x1_id, x2_id], &[1., 2.], -f64::INFINITY, 80., "c2");
+    model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
+    model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
 
     let solved_model = model.solve();
 
@@ -72,6 +72,15 @@ fn main() {
 }
 
 ```
+
+## The `raw` feature
+You can enable this feature by specifying the feature in your `Cargo.toml`
+```toml
+[dependencies]
+russcip = { features = ["raw"] }
+```
+This enables access to the `scip_ptr` unsafe function in the `Model` struct, which gives you access to the underlying SCIP raw pointer. This is can be used in combination with the `ffi` module to call SCIP functions that are not wrapped yet in the safe interface. 
+
 
 ## About SCIP
 

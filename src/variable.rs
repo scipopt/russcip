@@ -8,6 +8,12 @@ pub struct Variable {
 }
 
 impl Variable {
+
+    #[cfg(feature = "raw")]
+    pub fn inner(&self) -> *mut ffi::SCIP_VAR {
+        self.raw
+    }
+
     pub fn get_index(&self) -> usize {
         let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
         if id < 0 {
@@ -100,14 +106,13 @@ impl From<u32> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Model, ModelWithProblem};
+    use crate::model::{Model};
     use crate::retcode::Retcode;
 
     #[test]
     fn var_data() -> Result<(), Retcode> {
         let mut model = Model::new().include_default_plugins().create_prob("test");
-        let var_id = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary);
-        let var = model.get_var(var_id).unwrap();
+        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary);
         assert_eq!(var.get_index(), 0);
         assert_eq!(var.get_lb(), 0.0);
         assert_eq!(var.get_ub(), 1.0);

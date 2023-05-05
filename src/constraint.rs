@@ -5,6 +5,11 @@ pub struct Constraint {
 }
 
 impl Constraint {
+    #[cfg(feature = "raw")]
+    pub fn inner(&self) -> *mut ffi::SCIP_CONS {
+        self.raw
+    }
+
     pub fn get_name(&self) -> String {
         unsafe {
             let name = ffi::SCIPconsGetName(self.raw);
