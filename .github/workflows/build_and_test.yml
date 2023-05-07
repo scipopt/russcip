@@ -26,35 +26,12 @@ jobs:
       - name: Install tarpaulin
         run: cargo install cargo-tarpaulin
       - name: Run tests
-        run: cargo tarpaulin --out Xml
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v2
+        run: cargo tarpaulin --verbose --all --out Xml
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
         with:
-          name: coverage-report
-          path: target/debug/coverage.xml
-  add-badge:
-    name: Add Test Coverage Badge
-    runs-on: ubuntu-latest
-    needs: test-with-coverage
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Download coverage report
-        uses: actions/download-artifact@v2
-        with:
-          name: coverage-report
-          path: target/debug/coverage.xml
-      - name: Install badge generator
-        run: npm install -g badge-maker
-      - name: Generate badge
-        run: badge-maker "test coverage" $(tarpaulin --input Xml --output-dir . --output coverage.json && cat coverage.json | jq -r '.totals.line_coverage') -c green > coverage.svg
-      - name: Commit badge to repository
-        uses: EndBug/add-and-commit@v7
-        with:
-          add: coverage.svg
-          message: "Add test coverage badge"
-          signoff: true
-          
+          fail_ci_if_error: true
+
   Linux-conda-test:
     runs-on: ubuntu-latest
     strategy:
