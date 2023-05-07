@@ -12,7 +12,7 @@ on:
       - main
 
 jobs:
-  Linux-test:
+  test-with-coverage:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: true
