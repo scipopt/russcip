@@ -24,14 +24,14 @@ jobs:
           sudo apt-get update && sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
 
       - name: Install tarpaulin
-          run: cargo install cargo-tarpaulin
-            - name: Run tests
-              run: cargo tarpaulin --out Xml
-            - name: Upload coverage report
-              uses: actions/upload-artifact@v2
-              with:
-                name: coverage-report
-                path: target/debug/coverage.xml
+        run: cargo install cargo-tarpaulin
+      - name: Run tests
+        run: cargo tarpaulin --out Xml
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v2
+        with:
+          name: coverage-report
+          path: target/debug/coverage.xml
   add-badge:
     name: Add Test Coverage Badge
     runs-on: ubuntu-latest
