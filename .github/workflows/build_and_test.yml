@@ -35,6 +35,7 @@ jobs:
   add-badge:
     name: Add Test Coverage Badge
     runs-on: ubuntu-latest
+    needs: test-with-coverage
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
