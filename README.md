@@ -1,6 +1,6 @@
 # russcip
 [![tests](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
-[![coverage](https://img.shields.io/codecov/c/github/scipopt/russcip)]()
+[![coverage](https://img.shields.io/codecov/c/github/scipopt/russcip)](https://app.codecov.io/gh/scipopt/russcip/)
 [![][img_crates]][crates] [![][img_doc]][doc] 
 
 
