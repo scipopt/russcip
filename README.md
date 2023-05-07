@@ -1,6 +1,9 @@
 # russcip
 [![tests](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
+![coverage](coverage.svg)
 [![][img_crates]][crates] [![][img_doc]][doc]
+
+
 
 [img_crates]: https://img.shields.io/crates/v/russcip.svg
 [crates]: https://crates.io/crates/russcip
