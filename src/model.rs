@@ -1,17 +1,18 @@
 use core::panic;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
+use crate::{ffi, scip_call_panic};
+use crate::branchrule::{BranchingCandidate, BranchingResult, BranchRule};
 use crate::constraint::Constraint;
+use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
 use crate::status::Status;
-use crate::variable::{VarId, VarType, Variable};
-use crate::{ffi, scip_call_panic};
+use crate::variable::{Variable, VarId, VarType};
 
 #[non_exhaustive]
 struct ScipPtr(*mut ffi::SCIP);
@@ -344,6 +345,84 @@ impl ScipPtr {
         Ok(())
     }
 
+    fn include_pricer(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        delay: bool,
+        pricer: &mut dyn Pricer,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+
+        unsafe extern "C" fn pricerredcost(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            lowerbound: *mut f64,
+            stopearly: *mut ::std::os::raw::c_uint,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
+            assert!(!data_ptr.is_null());
+            let rule_ptr = data_ptr as *mut &mut dyn Pricer;
+
+            let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
+            let pricing_res = unsafe { (*rule_ptr).generate_columns(HashMap::new(), false) };
+            pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+            if pricing_res.state == PricerResultState::StopEarly {
+                unsafe { *stopearly = 1 };
+            }
+
+            if pricing_res.state == PricerResultState::StopEarly || pricing_res.state == PricerResultState::FoundColumns {
+                let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
+                assert!(n_vars_before < n_vars_after);
+            }
+
+            unsafe { *result = pricing_res.state.into() };
+            Retcode::Okay.into()
+        }
+
+        unsafe extern "C" fn pricerfree(
+            _scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn Pricer) });
+            Retcode::Okay.into()
+        }
+
+        let pricer_ptr = Box::into_raw(Box::new(pricer));
+        let pricer_faker = pricer_ptr as *mut ffi::SCIP_PricerData;
+
+        scip_call!(
+          ffi::SCIPincludePricer(
+            self.0,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            priority,
+            delay.into(),
+            None,
+            Some(pricerfree),
+            None,
+            None,
+            None,
+            None,
+            Some(pricerredcost),
+            None,
+            pricer_faker,
+          )
+        );
+
+        unsafe {
+            ffi::SCIPactivatePricer(self.0, ffi::SCIPfindPricer(self.0, c_name.as_ptr()));
+        }
+
+        Ok(())
+    }
+
     fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
         Ok(())
@@ -588,6 +667,20 @@ impl Model<ProblemCreated> {
         self.scip
             .add_cons_coef(cons, var, coef)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn include_pricer(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        delay: bool,
+        pricer: &mut dyn Pricer,
+    ) -> Self {
+        self.scip
+            .include_pricer(name, desc, priority, delay, pricer)
+            .expect("Failed to include pricer at state Unsolved");
+        self
     }
 
     pub fn solve(mut self) -> Model<Solved> {
