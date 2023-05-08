@@ -117,8 +117,7 @@ mod tests {
 
         // solve model
         let solved = model.solve();
-
-        //TODO test number of nodes == 1
+        assert_eq!(solved.get_n_nodes(), 1);
     }
 
 }
