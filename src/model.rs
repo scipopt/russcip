@@ -356,21 +356,23 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
-
-        unsafe extern "C" fn pricerredcost(
+        fn call_pricer(
             scip: *mut ffi::SCIP,
             pricer: *mut ffi::SCIP_PRICER,
             lowerbound: *mut f64,
             stopearly: *mut ::std::os::raw::c_uint,
             result: *mut ffi::SCIP_RESULT,
+            farkas: bool,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
             let rule_ptr = data_ptr as *mut &mut dyn Pricer;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
-            let pricing_res = unsafe { (*rule_ptr).generate_columns(HashMap::new(), false) };
+            let pricing_res = unsafe { (*rule_ptr).generate_columns(farkas) };
+
             pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+
             if pricing_res.state == PricerResultState::StopEarly {
                 unsafe { *stopearly = 1 };
             }
@@ -382,6 +384,25 @@ impl ScipPtr {
 
             unsafe { *result = pricing_res.state.into() };
             Retcode::Okay.into()
+        }
+
+        unsafe extern "C" fn pricerredcost(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            lowerbound: *mut f64,
+            stopearly: *mut ::std::os::raw::c_uint,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            call_pricer(scip, pricer, lowerbound, stopearly, result, false)
+        }
+
+
+        unsafe extern "C" fn pricerfakas(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            call_pricer(scip, pricer, std::ptr::null_mut(), std::ptr::null_mut(), result, true)
         }
 
         unsafe extern "C" fn pricerfree(
@@ -411,7 +432,7 @@ impl ScipPtr {
             None,
             None,
             Some(pricerredcost),
-            None,
+            Some(pricerfakas),
             pricer_faker,
           )
         );

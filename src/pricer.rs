@@ -7,12 +7,9 @@ pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
-    /// duals: HashMap<VarId, f64>
-    /// A map of variable ids to dual values.
-    ///
     /// farkas: bool
     /// If true, the pricer should generate columns to repair feasibility of LP.
-    fn generate_columns(&mut self, duals: HashMap<VarId, f64>, farkas: bool) -> PricerResult;
+    fn generate_columns(&mut self, farkas: bool) -> PricerResult;
 }
 
 #[derive(Debug, PartialEq)]
@@ -46,7 +43,7 @@ mod tests {
     struct PanickingPricer;
 
     impl Pricer for PanickingPricer {
-        fn generate_columns(&mut self, _duals: HashMap<VarId, f64>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
             panic!("Not implemented")
         }
     }
@@ -71,7 +68,7 @@ mod tests {
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
-        fn generate_columns(&mut self, _duals: HashMap<VarId, f64>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::FoundColumns,
                 lower_bound: None,
