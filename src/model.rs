@@ -366,15 +366,20 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut &mut dyn Pricer;
+            let pricer_ptr = data_ptr as *mut &mut dyn Pricer;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
-            let pricing_res = unsafe { (*rule_ptr).generate_columns(farkas) };
+            let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
 
-            pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+            if !farkas {
+                pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+                if pricing_res.state == PricerResultState::StopEarly {
+                    unsafe { *stopearly = 1 };
+                }
+            }
 
-            if pricing_res.state == PricerResultState::StopEarly {
-                unsafe { *stopearly = 1 };
+            if farkas && pricing_res.state == PricerResultState::StopEarly {
+                panic!("Farkas pricing should never stop early as LP would remain infeasible");
             }
 
             if pricing_res.state == PricerResultState::StopEarly || pricing_res.state == PricerResultState::FoundColumns {
