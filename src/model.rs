@@ -336,6 +336,18 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
         Ok(())
     }
+
+    fn get_n_nodes(&self) -> usize {
+        unsafe { ffi::SCIPgetNNodes(self.0) as usize }
+    }
+
+    fn get_solving_time(&self) -> f64 {
+        unsafe { ffi::SCIPgetSolvingTime(self.0) }
+    }
+
+    fn get_n_lp_iterations(&self) -> usize {
+        unsafe { ffi::SCIPgetNLPIterations(self.0) as usize }
+    }
 }
 
 impl Default for ScipPtr {
@@ -601,6 +613,18 @@ impl Model<Solved> {
     pub fn get_obj_val(&self) -> f64 {
         self.scip.get_obj_val()
     }
+
+    pub fn get_n_nodes(&self) -> usize {
+        self.scip.get_n_nodes()
+    }
+
+    pub fn get_solving_time(&self) -> f64 {
+        self.scip.get_solving_time()
+    }
+
+    pub fn get_n_lp_iterations(&self) -> usize {
+        self.scip.get_n_lp_iterations()
+    }
 }
 
 pub trait ModelWithProblem {
@@ -772,6 +796,9 @@ mod tests {
             .solve();
         let status = model.get_status();
         assert_eq!(status, Status::TimeLimit);
+        assert!(model.get_solving_time() < 0.5);
+        assert_eq!(model.get_n_nodes(), 0);
+        assert_eq!(model.get_n_lp_iterations(), 0);
     }
 
     #[test]
