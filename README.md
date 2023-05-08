@@ -1,11 +1,17 @@
 # russcip
 [![tests](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml/badge.svg)](https://github.com/mmghannam/russcip/actions/workflows/build_and_test.yml)
-[![][img_crates]][crates] [![][img_doc]][doc]
+[![coverage](https://img.shields.io/codecov/c/github/scipopt/russcip)](https://app.codecov.io/gh/scipopt/russcip/)
+[![][img_crates]][crates] [![][img_doc]][doc] 
+
+
+
+
 
 [img_crates]: https://img.shields.io/crates/v/russcip.svg
 [crates]: https://crates.io/crates/russcip
 [img_doc]: https://img.shields.io/badge/rust-documentation-blue.svg
 [doc]: https://docs.rs/russcip/
+[img_coverage]: https://img.shields.io/codecov/c/github/scipopt/russcip
 
 A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). This crate also exposes access to the SCIP's C-API through the `ffi` module. 
 The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
