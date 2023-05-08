@@ -4,7 +4,7 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-use crate::branching::{BranchRule, BranchingCandidate, BranchingResult};
+use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
