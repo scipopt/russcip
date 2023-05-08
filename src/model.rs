@@ -315,7 +315,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
              let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            *data_ptr = std::ptr::null_mut();
+            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
             Retcode::Okay.into()
         }
 
