@@ -44,7 +44,7 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_branching() {
+    fn panicking_branchrule() {
         let mut br = PanickingBranchingRule {};
 
         // create model from miplib instance gen-ip054
