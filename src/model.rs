@@ -300,7 +300,7 @@ impl ScipPtr {
                 BranchingResult::BranchOn(cand) => {
                     ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
                 }
-                BranchingResult::DidNotRun | BranchingResult::CustomBranching => {}
+                BranchingResult::DidNotRun | BranchingResult::CustomBranching  | BranchingResult::CutOff => {}
             };
 
             unsafe { *res = branching_res.into() };
