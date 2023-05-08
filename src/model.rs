@@ -284,6 +284,8 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
+        // TODO: Add rest of branching rule plugin callbacks
+
         extern "C" fn branchexeclp(
             scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
@@ -307,6 +309,16 @@ impl ScipPtr {
             Retcode::Okay.into()
         }
 
+        extern "C" fn branchfree(
+            _scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+        ) -> ffi::SCIP_Retcode {
+             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            *data_ptr = std::ptr::null_mut();
+            Retcode::Okay.into()
+        }
+
         let rule_ptr = Box::into_raw(Box::new(rule));
         let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
 
@@ -318,7 +330,7 @@ impl ScipPtr {
             maxdepth,
             maxbounddist,
             None,
-            None,
+            Some(branchfree),
             None,
             None,
             None,
