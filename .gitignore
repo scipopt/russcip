@@ -1,6 +1,5 @@
 /target
 .idea
 Cargo.lock
-*.mps
 example
 scip-sys/target

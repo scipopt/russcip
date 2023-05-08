@@ -4,6 +4,7 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
+use crate::branching::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -13,7 +14,6 @@ use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
 
 #[non_exhaustive]
-
 struct ScipPtr(*mut ffi::SCIP);
 
 impl ScipPtr {
@@ -34,6 +34,12 @@ impl ScipPtr {
     fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.0, param.as_ptr(), value) };
+        Ok(())
+    }
+
+    fn set_longint_param(&mut self, param: &str, value: i64) -> Result<(), Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetLongintParam(self.0, param.as_ptr(), value) };
         Ok(())
     }
 
@@ -220,6 +226,124 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
+        let mut lpcands = MaybeUninit::uninit();
+        let mut lpcandssol = MaybeUninit::uninit();
+        // let mut lpcandsfrac = MaybeUninit::uninit();
+        let mut nlpcands = MaybeUninit::uninit();
+        // let mut npriolpcands = MaybeUninit::uninit();
+        let mut nfracimplvars = MaybeUninit::uninit();
+        unsafe {
+            ffi::SCIPgetLPBranchCands(
+                scip,
+                lpcands.as_mut_ptr(),
+                lpcandssol.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nlpcands.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nfracimplvars.as_mut_ptr(),
+            );
+        }
+        let lpcands = unsafe { lpcands.assume_init() };
+        let lpcandssol = unsafe { lpcandssol.assume_init() };
+        // let lpcandsfrac = unsafe { lpcandsfrac.assume_init() };
+        let nlpcands = unsafe { nlpcands.assume_init() };
+        // let npriolpcands = unsafe { npriolpcands.assume_init() };
+        let mut cands = Vec::with_capacity(nlpcands as usize);
+        for i in 0..nlpcands {
+            let var_ptr = unsafe { *lpcands.add(i as usize) };
+            let sol = unsafe { *lpcandssol.add(i as usize) };
+            let frac = sol.fract();
+            cands.push(BranchingCandidate {
+                var_ptr,
+                lp_sol_val: sol,
+                frac,
+            });
+        }
+        cands
+    }
+
+    fn branch_var_val(
+        scip: *mut ffi::SCIP,
+        var: *mut ffi::SCIP_VAR,
+        val: f64,
+    ) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPbranchVarVal(scip, var, val, std::ptr::null_mut(), std::ptr::null_mut(),std::ptr::null_mut()) };
+        Ok(())
+    }
+
+    fn include_branch_rule(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        // TODO: Add rest of branching rule plugin callbacks
+
+        extern "C" fn branchexeclp(
+            scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+            _: u32,
+            res: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            let rule_ptr = data_ptr as *mut &mut dyn BranchRule;
+            let cands = ScipPtr::get_lp_branching_cands(scip);
+            let branching_res = unsafe { (*rule_ptr).execute(cands) };
+
+            match branching_res.clone() {
+                BranchingResult::BranchOn(cand) => {
+                    ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
+                }
+                BranchingResult::DidNotRun | BranchingResult::CustomBranching  | BranchingResult::CutOff => {}
+            };
+
+            unsafe { *res = branching_res.into() };
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn branchfree(
+            _scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+        ) -> ffi::SCIP_Retcode {
+             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
+            Retcode::Okay.into()
+        }
+
+        let rule_ptr = Box::into_raw(Box::new(rule));
+        let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
+
+        scip_call!(ffi::SCIPincludeBranchrule(
+            self.0,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            priority,
+            maxdepth,
+            maxbounddist,
+            None,
+            Some(branchfree),
+            None,
+            None,
+            None,
+            None,
+            Some(branchexeclp),
+            None,
+            None,
+            branchrule_faker,
+        ));
+
+        Ok(())
+    }
+
     fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
         Ok(())
@@ -291,7 +415,9 @@ pub struct Model<State> {
 }
 
 pub struct Unsolved;
+
 pub struct PluginsIncluded;
+
 pub struct ProblemCreated {
     pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
     pub(crate) conss: Vec<Rc<Constraint>>,
@@ -336,6 +462,11 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
+    pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
+        self.scip.set_longint_param(param, value)?;
+        Ok(self)
+    }
+
     pub fn set_real_param(mut self, param: &str, value: f64) -> Result<Self, Retcode> {
         self.scip.set_real_param(param, value)?;
         Ok(self)
@@ -359,6 +490,21 @@ impl Model<Unsolved> {
         self.scip
             .set_heuristics(heuristics)
             .expect("Failed to set heuristics with valid value");
+        self
+    }
+
+    pub fn include_branch_rule(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Self {
+        self.scip
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
+            .expect("Failed to include branch rule at state Unsolved");
         self
     }
 }
@@ -573,6 +719,7 @@ impl Default for Model<ProblemCreated> {
             .create_prob("problem")
     }
 }
+
 #[derive(Debug)]
 pub enum ParamSetting {
     Default,
@@ -591,6 +738,7 @@ impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
         }
     }
 }
+
 #[derive(Debug)]
 pub enum ObjSense {
     Minimize,
