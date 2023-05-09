@@ -4,16 +4,17 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-use crate::constraint::Constraint;
+use crate::{ffi, scip_call_panic};
+use crate::branchrule::{BranchingCandidate, BranchingResult, BranchRule};
+use crate::constraint::{Constraint};
+use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
 use crate::status::Status;
-use crate::variable::{VarId, VarType, Variable};
-use crate::{ffi, scip_call_panic};
+use crate::variable::{Variable, VarId, VarType};
 
 #[non_exhaustive]
-
 struct ScipPtr(*mut ffi::SCIP);
 
 impl ScipPtr {
@@ -34,6 +35,12 @@ impl ScipPtr {
     fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.0, param.as_ptr(), value) };
+        Ok(())
+    }
+
+    fn set_longint_param(&mut self, param: &str, value: i64) -> Result<(), Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetLongintParam(self.0, param.as_ptr(), value) };
         Ok(())
     }
 
@@ -220,15 +227,269 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    /// Create set partitioning constraint
+    fn create_cons_set_part(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicSetpart(
+            self.0,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            0,
+            std::ptr::null_mut(),
+        ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        for (i, var) in vars.iter().enumerate() {
+            scip_call! { ffi::SCIPaddCoefSetppc(self.0, scip_cons, var.raw) };
+        }
+        scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
+        Ok(Constraint { raw: scip_cons  })
+    }
+
+    /// Add coefficient to set packing/partitioning/covering constraint
+    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPaddCoefSetppc(self.0, cons.raw, var.raw) };
+        Ok(())
+    }
+
+    fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
+        let mut lpcands = MaybeUninit::uninit();
+        let mut lpcandssol = MaybeUninit::uninit();
+        // let mut lpcandsfrac = MaybeUninit::uninit();
+        let mut nlpcands = MaybeUninit::uninit();
+        // let mut npriolpcands = MaybeUninit::uninit();
+        let mut nfracimplvars = MaybeUninit::uninit();
+        unsafe {
+            ffi::SCIPgetLPBranchCands(
+                scip,
+                lpcands.as_mut_ptr(),
+                lpcandssol.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nlpcands.as_mut_ptr(),
+                std::ptr::null_mut(),
+                nfracimplvars.as_mut_ptr(),
+            );
+        }
+        let lpcands = unsafe { lpcands.assume_init() };
+        let lpcandssol = unsafe { lpcandssol.assume_init() };
+        // let lpcandsfrac = unsafe { lpcandsfrac.assume_init() };
+        let nlpcands = unsafe { nlpcands.assume_init() };
+        // let npriolpcands = unsafe { npriolpcands.assume_init() };
+        let mut cands = Vec::with_capacity(nlpcands as usize);
+        for i in 0..nlpcands {
+            let var_ptr = unsafe { *lpcands.add(i as usize) };
+            let sol = unsafe { *lpcandssol.add(i as usize) };
+            let frac = sol.fract();
+            cands.push(BranchingCandidate {
+                var_ptr,
+                lp_sol_val: sol,
+                frac,
+            });
+        }
+        cands
+    }
+
+    fn branch_var_val(
+        scip: *mut ffi::SCIP,
+        var: *mut ffi::SCIP_VAR,
+        val: f64,
+    ) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPbranchVarVal(scip, var, val, std::ptr::null_mut(), std::ptr::null_mut(),std::ptr::null_mut()) };
+        Ok(())
+    }
+
+    fn include_branch_rule(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        // TODO: Add rest of branching rule plugin callbacks
+
+        extern "C" fn branchexeclp(
+            scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+            _: u32,
+            res: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            let rule_ptr = data_ptr as *mut &mut dyn BranchRule;
+            let cands = ScipPtr::get_lp_branching_cands(scip);
+            let branching_res = unsafe { (*rule_ptr).execute(cands) };
+
+            if let BranchingResult::BranchOn(cand) = branching_res.clone() {
+                ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
+            };
+
+            unsafe { *res = branching_res.into() };
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn branchfree(
+            _scip: *mut ffi::SCIP,
+            branchrule: *mut ffi::SCIP_BRANCHRULE,
+        ) -> ffi::SCIP_Retcode {
+             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
+            Retcode::Okay.into()
+        }
+
+        let rule_ptr = Box::into_raw(Box::new(rule));
+        let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
+
+        scip_call!(ffi::SCIPincludeBranchrule(
+            self.0,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            priority,
+            maxdepth,
+            maxbounddist,
+            None,
+            Some(branchfree),
+            None,
+            None,
+            None,
+            None,
+            Some(branchexeclp),
+            None,
+            None,
+            branchrule_faker,
+        ));
+
+        Ok(())
+    }
+
+    fn include_pricer(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        delay: bool,
+        pricer: &mut dyn Pricer,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        fn call_pricer(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            lowerbound: *mut f64,
+            stopearly: *mut ::std::os::raw::c_uint,
+            result: *mut ffi::SCIP_RESULT,
+            farkas: bool,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
+            assert!(!data_ptr.is_null());
+            let pricer_ptr = data_ptr as *mut &mut dyn Pricer;
+
+            let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
+            let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
+
+            if !farkas {
+                pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+                if pricing_res.state == PricerResultState::StopEarly {
+                    unsafe { *stopearly = 1 };
+                }
+            }
+
+            if farkas && pricing_res.state == PricerResultState::StopEarly {
+                panic!("Farkas pricing should never stop early as LP would remain infeasible");
+            }
+
+            if pricing_res.state == PricerResultState::StopEarly || pricing_res.state == PricerResultState::FoundColumns {
+                let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
+                assert!(n_vars_before < n_vars_after);
+            }
+
+            unsafe { *result = pricing_res.state.into() };
+            Retcode::Okay.into()
+        }
+
+        unsafe extern "C" fn pricerredcost(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            lowerbound: *mut f64,
+            stopearly: *mut ::std::os::raw::c_uint,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            call_pricer(scip, pricer, lowerbound, stopearly, result, false)
+        }
+
+
+        unsafe extern "C" fn pricerfakas(
+            scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_Retcode {
+            call_pricer(scip, pricer, std::ptr::null_mut(), std::ptr::null_mut(), result, true)
+        }
+
+        unsafe extern "C" fn pricerfree(
+            _scip: *mut ffi::SCIP,
+            pricer: *mut ffi::SCIP_PRICER,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn Pricer) });
+            Retcode::Okay.into()
+        }
+
+        let pricer_ptr = Box::into_raw(Box::new(pricer));
+        let pricer_faker = pricer_ptr as *mut ffi::SCIP_PricerData;
+
+        scip_call!(
+          ffi::SCIPincludePricer(
+            self.0,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            priority,
+            delay.into(),
+            None,
+            Some(pricerfree),
+            None,
+            None,
+            None,
+            None,
+            Some(pricerredcost),
+            Some(pricerfakas),
+            pricer_faker,
+          )
+        );
+
+        unsafe {
+            ffi::SCIPactivatePricer(self.0, ffi::SCIPfindPricer(self.0, c_name.as_ptr()));
+        }
+
+        Ok(())
+    }
+
     fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
         Ok(())
     }
-}
 
-impl Default for ScipPtr {
-    fn default() -> Self {
-        Self::new()
+    fn get_n_nodes(&self) -> usize {
+        unsafe { ffi::SCIPgetNNodes(self.0) as usize }
+    }
+
+    fn get_solving_time(&self) -> f64 {
+        unsafe { ffi::SCIPgetSolvingTime(self.0) }
+    }
+
+    fn get_n_lp_iterations(&self) -> usize {
+        unsafe { ffi::SCIPgetNLPIterations(self.0) as usize }
     }
 }
 
@@ -279,7 +540,9 @@ pub struct Model<State> {
 }
 
 pub struct Unsolved;
+
 pub struct PluginsIncluded;
+
 pub struct ProblemCreated {
     pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
     pub(crate) conss: Vec<Rc<Constraint>>,
@@ -324,6 +587,11 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
+    pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
+        self.scip.set_longint_param(param, value)?;
+        Ok(self)
+    }
+
     pub fn set_real_param(mut self, param: &str, value: f64) -> Result<Self, Retcode> {
         self.scip.set_real_param(param, value)?;
         Ok(self)
@@ -347,6 +615,21 @@ impl Model<Unsolved> {
         self.scip
             .set_heuristics(heuristics)
             .expect("Failed to set heuristics with valid value");
+        self
+    }
+
+    pub fn include_branch_rule(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Self {
+        self.scip
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
+            .expect("Failed to include branch rule at state Unsolved");
         self
     }
 }
@@ -421,6 +704,20 @@ impl Model<ProblemCreated> {
         cons
     }
 
+    pub fn add_cons_set_part(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Rc<Constraint> {
+        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        let cons = self.scip
+            .create_cons_set_part(vars, name)
+            .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons  = Rc::new(cons);
+        self.state.conss.push(cons.clone());
+        cons
+    }
+
     pub fn add_cons_coef(
         &mut self,
         cons: Rc<Constraint>,
@@ -430,6 +727,27 @@ impl Model<ProblemCreated> {
         self.scip
             .add_cons_coef(cons, var, coef)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+        assert_eq!(var.get_type(), VarType::Binary);
+        self.scip
+            .add_cons_coef_setppc(cons, var)
+            .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn include_pricer(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        delay: bool,
+        pricer: &mut dyn Pricer,
+    ) -> Self {
+        self.scip
+            .include_pricer(name, desc, priority, delay, pricer)
+            .expect("Failed to include pricer at state Unsolved");
+        self
     }
 
     pub fn solve(mut self) -> Model<Solved> {
@@ -466,6 +784,18 @@ impl Model<Solved> {
 
     pub fn get_obj_val(&self) -> f64 {
         self.scip.get_obj_val()
+    }
+
+    pub fn get_n_nodes(&self) -> usize {
+        self.scip.get_n_nodes()
+    }
+
+    pub fn get_solving_time(&self) -> f64 {
+        self.scip.get_solving_time()
+    }
+
+    pub fn get_n_lp_iterations(&self) -> usize {
+        self.scip.get_n_lp_iterations()
     }
 }
 
@@ -549,6 +879,7 @@ impl Default for Model<ProblemCreated> {
             .create_prob("problem")
     }
 }
+
 #[derive(Debug)]
 pub enum ParamSetting {
     Default,
@@ -567,6 +898,7 @@ impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
         }
     }
 }
+
 #[derive(Debug)]
 pub enum ObjSense {
     Minimize,
@@ -623,6 +955,8 @@ mod tests {
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
+
+        assert_eq!(sol.get_obj_val(), model.get_obj_val());
     }
 
     #[test]
@@ -636,6 +970,9 @@ mod tests {
             .solve();
         let status = model.get_status();
         assert_eq!(status, Status::TimeLimit);
+        assert!(model.get_solving_time() < 0.5);
+        assert_eq!(model.get_n_nodes(), 0);
+        assert_eq!(model.get_n_lp_iterations(), 0);
     }
 
     #[test]
@@ -750,6 +1087,7 @@ mod tests {
         let status = solved_model.get_status();
         assert_eq!(status, Status::Infeasible);
 
+        assert_eq!(solved_model.get_n_sols(), 0);
         let sol = solved_model.get_best_sol();
         assert!(sol.is_none());
     }
@@ -808,5 +1146,32 @@ mod tests {
         let solved_model = model.solve();
         let status = solved_model.get_status();
         assert_eq!(status, Status::Unbounded);
+    }
+
+    #[test]
+    fn set_partitioning_infeasible() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let cons1 = model.add_cons_set_part(
+            vec![],
+            "c",
+        );
+        model.add_cons_coef_setppc(cons1.clone(), x1.clone());
+
+        let cons2 = model.add_cons_set_part(
+            vec![x2.clone()],
+            "c",
+        );
+
+        let solved_model = model.solve();
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.get_obj_val(), 7.);
     }
 }
