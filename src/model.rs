@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use crate::{ffi, scip_call_panic};
 use crate::branchrule::{BranchingCandidate, BranchingResult, BranchRule};
-use crate::constraint::Constraint;
+use crate::constraint::{Constraint};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -225,6 +225,35 @@ impl ScipPtr {
         }
         scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
         Ok(Constraint { raw: scip_cons })
+    }
+
+    /// Create set partitioning constraint
+    fn create_cons_set_part(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicSetpart(
+            self.0,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            0,
+            std::ptr::null_mut(),
+        ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        for (i, var) in vars.iter().enumerate() {
+            scip_call! { ffi::SCIPaddCoefSetppc(self.0, scip_cons, var.raw) };
+        }
+        scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
+        Ok(Constraint { raw: scip_cons  })
+    }
+
+    /// Add coefficient to set packing/partitioning/covering constraint
+    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPaddCoefSetppc(self.0, cons.raw, var.raw) };
+        Ok(())
     }
 
     fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
@@ -675,6 +704,20 @@ impl Model<ProblemCreated> {
         cons
     }
 
+    pub fn add_cons_set_part(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Rc<Constraint> {
+        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        let cons = self.scip
+            .create_cons_set_part(vars, name)
+            .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons  = Rc::new(cons);
+        self.state.conss.push(cons.clone());
+        cons
+    }
+
     pub fn add_cons_coef(
         &mut self,
         cons: Rc<Constraint>,
@@ -683,6 +726,13 @@ impl Model<ProblemCreated> {
     ) {
         self.scip
             .add_cons_coef(cons, var, coef)
+            .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+        assert_eq!(var.get_type(), VarType::Binary);
+        self.scip
+            .add_cons_coef_setppc(cons, var)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
     }
 
@@ -1096,5 +1146,32 @@ mod tests {
         let solved_model = model.solve();
         let status = solved_model.get_status();
         assert_eq!(status, Status::Unbounded);
+    }
+
+    #[test]
+    fn set_partitioning_infeasible() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let cons1 = model.add_cons_set_part(
+            vec![],
+            "c",
+        );
+        model.add_cons_coef_setppc(cons1.clone(), x1.clone());
+
+        let cons2 = model.add_cons_set_part(
+            vec![x2.clone()],
+            "c",
+        );
+
+        let solved_model = model.solve();
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.get_obj_val(), 7.);
     }
 }
