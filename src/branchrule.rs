@@ -59,7 +59,6 @@ mod tests {
     fn panicking_branchrule() {
         let mut br = PanickingBranchingRule {};
 
-        // create model from miplib instance gen-ip054
         let model = Model::new()
             .hide_output()
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)
@@ -67,7 +66,6 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        // solve model
         model.solve();
     }
 
@@ -86,7 +84,6 @@ mod tests {
     fn choosing_first_branching_rule() {
         let mut br = FirstChoosingBranchingRule { chosen: None };
 
-        // create model from miplib instance gen-ip054
         let model = Model::new()
             .set_longint_param("limits/nodes", 2) // only call brancher once
             .unwrap()
@@ -96,7 +93,6 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        // solve model
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::NodeLimit);
         assert!(br.chosen.is_some());
@@ -127,9 +123,32 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        // solve model
         let solved = model.solve();
         assert_eq!(solved.get_n_nodes(), 1);
+    }
+
+    struct FirstBranchingRule;
+
+    impl BranchRule for FirstBranchingRule {
+        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+            BranchingResult::BranchOn(candidates[0].clone())
+        }
+    }
+
+    #[test]
+    fn first_branching_rule() {
+        let mut br = FirstBranchingRule {};
+
+        let model = Model::new()
+            .hide_output()
+            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .set_longint_param("limits/nodes", 2) .unwrap()// only call brancher once
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+
+        let solved = model.solve();
+        assert!(solved.get_n_nodes() > 1);
     }
 
 }

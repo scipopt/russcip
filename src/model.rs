@@ -464,12 +464,6 @@ impl ScipPtr {
     }
 }
 
-impl Default for ScipPtr {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Drop for ScipPtr {
     fn drop(&mut self) {
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
@@ -911,6 +905,8 @@ mod tests {
         assert_eq!(vars.len(), 2);
         assert_eq!(sol.get_var_val(&vars[0]), 40.);
         assert_eq!(sol.get_var_val(&vars[1]), 20.);
+
+        assert_eq!(sol.get_obj_val(), model.get_obj_val());
     }
 
     #[test]
@@ -1041,6 +1037,7 @@ mod tests {
         let status = solved_model.get_status();
         assert_eq!(status, Status::Infeasible);
 
+        assert_eq!(solved_model.get_n_sols(), 0);
         let sol = solved_model.get_best_sol();
         assert!(sol.is_none());
     }
