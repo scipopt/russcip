@@ -7,9 +7,18 @@ pub trait BranchRule {
 #[derive(Debug, Clone)]
 pub enum BranchingResult {
     DidNotRun,
+    /// Initiate branching on the given candidate
     BranchOn(BranchingCandidate),
+    /// Current node is detected to be infeasible and can be cut off
     CutOff,
+    /// A custom branching scheme is implemented
     CustomBranching,
+    /// A cutting plane is added
+    Separated,
+    /// Reduced the domain of a variable such that the current LP solution becomes infeasible
+    ReduceDom,
+    /// A constraint was added
+    ConsAdded,
 }
 
 impl From<BranchingResult> for u32 {
@@ -19,6 +28,9 @@ impl From<BranchingResult> for u32 {
             BranchingResult::BranchOn(_) => ffi::SCIP_Result_SCIP_BRANCHED,
             BranchingResult::CutOff => ffi::SCIP_Result_SCIP_CUTOFF,
             BranchingResult::CustomBranching => ffi::SCIP_Result_SCIP_BRANCHED,
+            BranchingResult::Separated => ffi::SCIP_Result_SCIP_SEPARATED,
+            BranchingResult::ReduceDom => ffi::SCIP_Result_SCIP_REDUCEDDOM,
+            BranchingResult::ConsAdded => ffi::SCIP_Result_SCIP_CONSADDED,
         }
     }
 }

@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
 use crate::ffi;
-use crate::variable::VarId;
 
 pub trait Pricer {
     /// Generates negative reduced cost columns.
