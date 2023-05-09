@@ -1152,7 +1152,7 @@ mod tests {
     }
 
     #[test]
-    fn set_partitioning_infeasible() {
+    fn set_partitioning() {
         let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
