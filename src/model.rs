@@ -1,5 +1,5 @@
 use core::panic;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
@@ -299,11 +299,8 @@ impl ScipPtr {
             let cands = ScipPtr::get_lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
-            match branching_res.clone() {
-                BranchingResult::BranchOn(cand) => {
-                    ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
-                }
-                BranchingResult::DidNotRun | BranchingResult::CustomBranching  | BranchingResult::CutOff => {}
+            if let BranchingResult::BranchOn(cand) = branching_res.clone() {
+                ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
             };
 
             unsafe { *res = branching_res.into() };
