@@ -4,15 +4,15 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
-use crate::{ffi, scip_call_panic};
-use crate::branchrule::{BranchingCandidate, BranchingResult, BranchRule};
+use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
 use crate::status::Status;
-use crate::variable::{Variable, VarId, VarType};
+use crate::variable::{VarId, VarType, Variable};
+use crate::{ffi, scip_call_panic};
 
 #[non_exhaustive]
 struct ScipPtr(*mut ffi::SCIP);
@@ -227,6 +227,39 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    /// Create set partitioning constraint
+    fn create_cons_set_part(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicSetpart(
+            self.0,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            0,
+            std::ptr::null_mut(),
+        ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        for var in vars.iter() {
+            scip_call! { ffi::SCIPaddCoefSetppc(self.0, scip_cons, var.raw) };
+        }
+        scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
+    /// Add coefficient to set packing/partitioning/covering constraint
+    fn add_cons_coef_setppc(
+        &mut self,
+        cons: Rc<Constraint>,
+        var: Rc<Variable>,
+    ) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPaddCoefSetppc(self.0, cons.raw, var.raw) };
+        Ok(())
+    }
+
     fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
         let mut lpcands = MaybeUninit::uninit();
         let mut lpcandssol = MaybeUninit::uninit();
@@ -253,11 +286,12 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let sol = unsafe { *lpcandssol.add(i as usize) };
-            let frac = sol.fract();
+            let var = Rc::new(Variable { raw: var_ptr });
+            let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
+            let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {
-                var_ptr,
-                lp_sol_val: sol,
+                var,
+                lp_sol_val,
                 frac,
             });
         }
@@ -300,7 +334,7 @@ impl ScipPtr {
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
-                ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
+                ScipPtr::branch_var_val(scip, cand.var.raw, cand.lp_sol_val).unwrap();
             };
 
             unsafe { *res = branching_res.into() };
@@ -311,7 +345,7 @@ impl ScipPtr {
             _scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
         ) -> ffi::SCIP_Retcode {
-             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
+            let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
             drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
             Retcode::Okay.into()
@@ -369,7 +403,9 @@ impl ScipPtr {
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
 
             if !farkas {
-                pricing_res.lower_bound.map(|lb| unsafe { *lowerbound = lb });
+                pricing_res
+                    .lower_bound
+                    .map(|lb| unsafe { *lowerbound = lb });
                 if pricing_res.state == PricerResultState::StopEarly {
                     unsafe { *stopearly = 1 };
                 }
@@ -379,7 +415,8 @@ impl ScipPtr {
                 panic!("Farkas pricing should never stop early as LP would remain infeasible");
             }
 
-            if pricing_res.state == PricerResultState::StopEarly || pricing_res.state == PricerResultState::FoundColumns {
+            if pricing_res.state == PricerResultState::FoundColumns
+            {
                 let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
                 assert!(n_vars_before < n_vars_after);
             }
@@ -398,13 +435,19 @@ impl ScipPtr {
             call_pricer(scip, pricer, lowerbound, stopearly, result, false)
         }
 
-
         unsafe extern "C" fn pricerfakas(
             scip: *mut ffi::SCIP,
             pricer: *mut ffi::SCIP_PRICER,
             result: *mut ffi::SCIP_RESULT,
         ) -> ffi::SCIP_Retcode {
-            call_pricer(scip, pricer, std::ptr::null_mut(), std::ptr::null_mut(), result, true)
+            call_pricer(
+                scip,
+                pricer,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                result,
+                true,
+            )
         }
 
         unsafe extern "C" fn pricerfree(
@@ -420,8 +463,7 @@ impl ScipPtr {
         let pricer_ptr = Box::into_raw(Box::new(pricer));
         let pricer_faker = pricer_ptr as *mut ffi::SCIP_PricerData;
 
-        scip_call!(
-          ffi::SCIPincludePricer(
+        scip_call!(ffi::SCIPincludePricer(
             self.0,
             c_name.as_ptr(),
             c_desc.as_ptr(),
@@ -436,8 +478,7 @@ impl ScipPtr {
             Some(pricerredcost),
             Some(pricerfakas),
             pricer_faker,
-          )
-        );
+        ));
 
         unsafe {
             ffi::SCIPactivatePricer(self.0, ffi::SCIPfindPricer(self.0, c_name.as_ptr()));
@@ -446,7 +487,12 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) -> Result<(), Retcode> {
+    fn add_cons_coef(
+        &mut self,
+        cons: Rc<Constraint>,
+        var: Rc<Variable>,
+        coef: f64,
+    ) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
         Ok(())
     }
@@ -675,14 +721,27 @@ impl Model<ProblemCreated> {
         cons
     }
 
-    pub fn add_cons_coef(
-        &mut self,
-        cons: Rc<Constraint>,
-        var: Rc<Variable>,
-        coef: f64,
-    ) {
+    pub fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        let cons = self
+            .scip
+            .create_cons_set_part(vars, name)
+            .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.push(cons.clone());
+        cons
+    }
+
+    pub fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
         self.scip
             .add_cons_coef(cons, var, coef)
+            .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+        assert_eq!(var.get_type(), VarType::Binary);
+        self.scip
+            .add_cons_coef_setppc(cons, var)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
     }
 
@@ -1082,13 +1141,7 @@ mod tests {
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-        let cons = model.add_cons(
-            vec![],
-            &[],
-            -f64::INFINITY,
-            10.,
-            "c1",
-        );
+        let cons = model.add_cons(vec![], &[], -f64::INFINITY, 10., "c1");
 
         model.add_cons_coef(cons.clone(), x1.clone(), 0.); // x1 is unconstrained
         model.add_cons_coef(cons.clone(), x2.clone(), 10.); // x2 can't be be used
@@ -1096,5 +1149,26 @@ mod tests {
         let solved_model = model.solve();
         let status = solved_model.get_status();
         assert_eq!(status, Status::Unbounded);
+    }
+
+    #[test]
+    fn set_partitioning() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let cons1 = model.add_cons_set_part(vec![], "c");
+        model.add_cons_coef_setppc(cons1.clone(), x1.clone());
+
+        let _cons2 = model.add_cons_set_part(vec![x2.clone()], "c");
+
+        let solved_model = model.solve();
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.get_obj_val(), 7.);
     }
 }

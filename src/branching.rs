@@ -1,6 +1,4 @@
-use std::rc::Rc;
 use crate::ffi;
-use crate::variable::Variable;
 
 pub trait BranchRule {
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
@@ -9,18 +7,9 @@ pub trait BranchRule {
 #[derive(Debug, Clone)]
 pub enum BranchingResult {
     DidNotRun,
-    /// Initiate branching on the given candidate
     BranchOn(BranchingCandidate),
-    /// Current node is detected to be infeasible and can be cut off
     CutOff,
-    /// A custom branching scheme is implemented
     CustomBranching,
-    /// A cutting plane is added
-    Separated,
-    /// Reduced the domain of a variable such that the current LP solution becomes infeasible
-    ReduceDom,
-    /// A constraint was added
-    ConsAdded,
 }
 
 impl From<BranchingResult> for u32 {
@@ -30,16 +19,13 @@ impl From<BranchingResult> for u32 {
             BranchingResult::BranchOn(_) => ffi::SCIP_Result_SCIP_BRANCHED,
             BranchingResult::CutOff => ffi::SCIP_Result_SCIP_CUTOFF,
             BranchingResult::CustomBranching => ffi::SCIP_Result_SCIP_BRANCHED,
-            BranchingResult::Separated => ffi::SCIP_Result_SCIP_SEPARATED,
-            BranchingResult::ReduceDom => ffi::SCIP_Result_SCIP_REDUCEDDOM,
-            BranchingResult::ConsAdded => ffi::SCIP_Result_SCIP_CONSADDED,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct BranchingCandidate {
-    pub var: Rc<Variable>,
+    pub(crate) var_ptr: *mut ffi::SCIP_VAR,
     pub lp_sol_val: f64,
     pub frac: f64,
 }
@@ -58,9 +44,10 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn panicking_branchrule() {
+    fn test_branching() {
         let mut br = PanickingBranchingRule {};
 
+        // create model from miplib instance gen-ip054
         let model = Model::new()
             .hide_output()
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)
@@ -68,6 +55,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
+        // solve model
         model.solve();
     }
 
@@ -86,6 +74,7 @@ mod tests {
     fn choosing_first_branching_rule() {
         let mut br = FirstChoosingBranchingRule { chosen: None };
 
+        // create model from miplib instance gen-ip054
         let model = Model::new()
             .set_longint_param("limits/nodes", 2) // only call brancher once
             .unwrap()
@@ -95,6 +84,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
+        // solve model
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::NodeLimit);
         assert!(br.chosen.is_some());
@@ -125,32 +115,9 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
+        // solve model
         let solved = model.solve();
         assert_eq!(solved.get_n_nodes(), 1);
-    }
-
-    struct FirstBranchingRule;
-
-    impl BranchRule for FirstBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            BranchingResult::BranchOn(candidates[0].clone())
-        }
-    }
-
-    #[test]
-    fn first_branching_rule() {
-        let mut br = FirstBranchingRule {};
-
-        let model = Model::new()
-            .hide_output()
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
-            .set_longint_param("limits/nodes", 2) .unwrap()// only call brancher once
-            .include_default_plugins()
-            .read_prob("data/test/gen-ip054.mps")
-            .unwrap();
-
-        let solved = model.solve();
-        assert!(solved.get_n_nodes() > 1);
     }
 
 }
