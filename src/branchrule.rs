@@ -1,4 +1,6 @@
+use std::rc::Rc;
 use crate::ffi;
+use crate::variable::Variable;
 
 pub trait BranchRule {
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
@@ -37,7 +39,7 @@ impl From<BranchingResult> for u32 {
 
 #[derive(Debug, Clone)]
 pub struct BranchingCandidate {
-    pub(crate) var_ptr: *mut ffi::SCIP_VAR,
+    pub var: Rc<Variable>,
     pub lp_sol_val: f64,
     pub frac: f64,
 }

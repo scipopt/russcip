@@ -286,11 +286,12 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let sol = unsafe { *lpcandssol.add(i as usize) };
-            let frac = sol.fract();
+            let var = Rc::new(Variable { raw: var_ptr });
+            let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
+            let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {
-                var_ptr,
-                lp_sol_val: sol,
+                var,
+                lp_sol_val,
                 frac,
             });
         }
@@ -333,7 +334,7 @@ impl ScipPtr {
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
-                ScipPtr::branch_var_val(scip, cand.var_ptr, cand.lp_sol_val).unwrap();
+                ScipPtr::branch_var_val(scip, cand.var.raw, cand.lp_sol_val).unwrap();
             };
 
             unsafe { *res = branching_res.into() };
