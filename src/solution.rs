@@ -21,7 +21,7 @@ impl Solution {
 impl fmt::Debug for Solution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let obj_val = self.get_obj_val();
-        writeln!(f, "Solution with obj val: {}", obj_val)?;
+        writeln!(f, "Solution with obj val: {obj_val}")?;
         let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr) };
         let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr) };
         for i in 0..n_vars {
@@ -31,7 +31,7 @@ impl fmt::Debug for Solution {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
                 // from CString
                 let name = unsafe { std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap() };
-                writeln!(f, "Var {}={}", name, val)?;
+                writeln!(f, "Var {name}={val}")?;
             }
         }
         Ok(())

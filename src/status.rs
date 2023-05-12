@@ -39,7 +39,7 @@ impl From<u32> for Status {
             ffi::SCIP_Status_SCIP_STATUS_UNBOUNDED => Status::Unbounded,
             ffi::SCIP_Status_SCIP_STATUS_INFORUNBD => Status::Inforunbd,
             ffi::SCIP_Status_SCIP_STATUS_TERMINATE => Status::Terminate,
-            _ => panic!("Unknown SCIP status {:?}", val),
+            _ => panic!("Unknown SCIP status {val:?}"),
         }
     }
 }

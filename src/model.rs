@@ -1061,7 +1061,7 @@ mod tests {
             "c1",
         );
         model.add_cons(
-            vec![x1.clone(), x2.clone()],
+            vec![x1, x2],
             &[1., 2.],
             -f64::INFINITY,
             80.,
@@ -1177,8 +1177,8 @@ mod tests {
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         let cons = model.add_cons(vec![], &[], -f64::INFINITY, 10., "c1");
 
-        model.add_cons_coef(cons.clone(), x1.clone(), 0.); // x1 is unconstrained
-        model.add_cons_coef(cons.clone(), x2.clone(), 10.); // x2 can't be be used
+        model.add_cons_coef(cons.clone(), x1, 0.); // x1 is unconstrained
+        model.add_cons_coef(cons, x2, 10.); // x2 can't be be used
 
         let solved_model = model.solve();
         let status = solved_model.get_status();
@@ -1196,9 +1196,9 @@ mod tests {
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1.clone(), x1.clone());
+        model.add_cons_coef_setppc(cons1, x1);
 
-        let _cons2 = model.add_cons_set_part(vec![x2.clone()], "c");
+        let _cons2 = model.add_cons_set_part(vec![x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.get_status();
