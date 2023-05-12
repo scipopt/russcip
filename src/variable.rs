@@ -8,7 +8,6 @@ pub struct Variable {
 }
 
 impl Variable {
-
     #[cfg(feature = "raw")]
     pub fn inner(&self) -> *mut ffi::SCIP_VAR {
         self.raw
@@ -106,7 +105,7 @@ impl From<u32> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Model};
+    use crate::model::Model;
     use crate::retcode::Retcode;
 
     #[test]

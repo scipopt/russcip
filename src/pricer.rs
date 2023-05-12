@@ -30,7 +30,9 @@ impl From<PricerResultState> for u32 {
     fn from(val: PricerResultState) -> Self {
         match val {
             PricerResultState::DidNotRun => ffi::SCIP_Result_SCIP_DIDNOTRUN,
-            PricerResultState::FoundColumns | PricerResultState::StopEarly | PricerResultState::NoColumns => ffi::SCIP_Result_SCIP_SUCCESS,
+            PricerResultState::FoundColumns
+            | PricerResultState::StopEarly
+            | PricerResultState::NoColumns => ffi::SCIP_Result_SCIP_SUCCESS,
         }
     }
 }
@@ -63,7 +65,6 @@ mod tests {
         // solve model
         model.solve();
     }
-
 
     struct LyingPricer;
 
@@ -118,7 +119,6 @@ mod tests {
         model.solve();
     }
 
-
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
@@ -129,7 +129,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn optimal_pricer() {

@@ -47,9 +47,9 @@ doc_comment::doctest!("../README.md");
 
 pub use scip_sys as ffi;
 pub mod branchrule;
-pub mod pricer;
 pub mod constraint;
 pub mod model;
+pub mod pricer;
 pub mod retcode;
 pub mod solution;
 pub mod status;
