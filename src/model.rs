@@ -2,6 +2,7 @@ use core::panic;
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
@@ -415,8 +416,7 @@ impl ScipPtr {
                 panic!("Farkas pricing should never stop early as LP would remain infeasible");
             }
 
-            if pricing_res.state == PricerResultState::FoundColumns
-            {
+            if pricing_res.state == PricerResultState::FoundColumns {
                 let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
                 assert!(n_vars_before < n_vars_after);
             }
@@ -634,21 +634,6 @@ impl Model<Unsolved> {
             .expect("Failed to set heuristics with valid value");
         self
     }
-
-    pub fn include_branch_rule(
-        self,
-        name: &str,
-        desc: &str,
-        priority: i32,
-        maxdepth: i32,
-        maxbounddist: f64,
-        rule: &mut dyn BranchRule,
-    ) -> Self {
-        self.scip
-            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
-            .expect("Failed to include branch rule at state Unsolved");
-        self
-    }
 }
 
 impl Model<PluginsIncluded> {
@@ -743,6 +728,21 @@ impl Model<ProblemCreated> {
         self.scip
             .add_cons_coef_setppc(cons, var)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
+    }
+
+    pub fn include_branch_rule(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Self {
+        self.scip
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
+            .expect("Failed to include branch rule at state Unsolved");
+        self
     }
 
     pub fn include_pricer(
@@ -930,6 +930,39 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
         }
+    }
+}
+
+/// A wrapper for a mutable reference to a model instance.
+/// This should only be used if access to the model is required when implementing SCIP plugins,
+/// e.g variable pricers, branching rules.
+pub struct ModelRef<T> {
+    inner: *mut T,
+}
+
+impl<T> ModelRef<T> {
+    pub fn new(inner: &mut T) -> Self {
+        ModelRef {
+            inner: inner as *mut T,
+        }
+    }
+
+    pub fn clone(&mut self) -> Self {
+        ModelRef { inner: self.inner }
+    }
+}
+
+impl<T> Deref for ModelRef<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.inner }
+    }
+}
+
+impl<T> DerefMut for ModelRef<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.inner }
     }
 }
 

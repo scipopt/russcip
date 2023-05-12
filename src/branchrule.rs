@@ -1,6 +1,6 @@
-use std::rc::Rc;
 use crate::ffi;
 use crate::variable::Variable;
+use std::rc::Rc;
 
 pub trait BranchRule {
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
@@ -47,6 +47,7 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::{ModelRef, ModelWithProblem, ProblemCreated};
     use crate::{model::Model, status::Status};
 
     struct PanickingBranchingRule;
@@ -63,12 +64,11 @@ mod tests {
 
         let model = Model::new()
             .hide_output()
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
-            .unwrap();
-
-        model.solve();
+            .unwrap()
+            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .solve();
     }
 
     struct FirstChoosingBranchingRule {
@@ -90,10 +90,10 @@ mod tests {
             .set_longint_param("limits/nodes", 2) // only call brancher once
             .unwrap()
             .hide_output()
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
-            .unwrap();
+            .unwrap()
+            .include_branch_rule("", "", 100000, 1000, 1., &mut br);
 
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::NodeLimit);
@@ -102,8 +102,6 @@ mod tests {
         assert!(candidate.lp_sol_val.fract() > 0.);
         assert!(candidate.frac > 0. && candidate.frac < 1.);
     }
-
-
 
     struct CuttingOffBranchingRule;
 
@@ -120,37 +118,42 @@ mod tests {
         // create model from miplib instance gen-ip054
         let model = Model::new()
             .hide_output()
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
-            .unwrap();
-
-        let solved = model.solve();
-        assert_eq!(solved.get_n_nodes(), 1);
+            .unwrap()
+            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .solve();
+        assert_eq!(model.get_n_nodes(), 1);
     }
 
-    struct FirstBranchingRule;
+    struct FirstBranchingRule {
+        model: ModelRef<Model<ProblemCreated>>,
+    }
 
     impl BranchRule for FirstBranchingRule {
         fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+            assert!(self.model.get_n_vars() >= candidates.len());
             BranchingResult::BranchOn(candidates[0].clone())
         }
     }
 
     #[test]
     fn first_branching_rule() {
-        let mut br = FirstBranchingRule {};
-
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
-            .set_longint_param("limits/nodes", 2) .unwrap()// only call brancher once
+            .set_longint_param("limits/nodes", 2)
+            .unwrap() // only call brancher once
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let solved = model.solve();
+        let mut br = FirstBranchingRule {
+            model: ModelRef::new(&mut model),
+        };
+        let mut solved = model
+            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .solve();
+
         assert!(solved.get_n_nodes() > 1);
     }
-
 }
