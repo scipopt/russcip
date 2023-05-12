@@ -119,6 +119,7 @@ mod tests {
         model.solve();
     }
 
+
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
@@ -129,6 +130,7 @@ mod tests {
             }
         }
     }
+
 
     #[test]
     fn optimal_pricer() {

@@ -7,6 +7,7 @@
 ### Changed
 ### Removed
 
+
 ## 0.2.1
 ### Added
 - Solving stats methods for number of nodes, time, and number of lp iterations. 
