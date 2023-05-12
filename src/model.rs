@@ -416,7 +416,8 @@ impl ScipPtr {
                 panic!("Farkas pricing should never stop early as LP would remain infeasible");
             }
 
-            if pricing_res.state == PricerResultState::FoundColumns {
+            if pricing_res.state == PricerResultState::FoundColumns
+            {
                 let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
                 assert!(n_vars_before < n_vars_after);
             }
@@ -744,6 +745,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to include branch rule at state Unsolved");
         self
     }
+
 
     pub fn include_pricer(
         self,

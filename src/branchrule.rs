@@ -1,6 +1,6 @@
+use std::rc::Rc;
 use crate::ffi;
 use crate::variable::Variable;
-use std::rc::Rc;
 
 pub trait BranchRule {
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;

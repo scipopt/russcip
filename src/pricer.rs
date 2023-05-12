@@ -39,8 +39,8 @@ impl From<PricerResultState> for u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::status::Status;
+    use super::*;
 
     struct PanickingPricer;
 
