@@ -62,7 +62,7 @@ mod tests {
     fn panicking_branchrule() {
         let mut br = PanickingBranchingRule {};
 
-        let model = Model::new()
+        Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
@@ -150,7 +150,7 @@ mod tests {
         let mut br = FirstBranchingRule {
             model: ModelRef::new(&mut model),
         };
-        let mut solved = model
+        let solved = model
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)
             .solve();
 

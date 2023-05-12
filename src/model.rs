@@ -731,6 +731,21 @@ impl Model<ProblemCreated> {
             .expect("Failed to add constraint coefficient in state ProblemCreated");
     }
 
+    pub fn include_branch_rule(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        maxdepth: i32,
+        maxbounddist: f64,
+        rule: &mut dyn BranchRule,
+    ) -> Self {
+        self.scip
+            .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
+            .expect("Failed to include branch rule at state Unsolved");
+        self
+    }
+
     pub fn include_pricer(
         self,
         name: &str,
