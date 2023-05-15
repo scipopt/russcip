@@ -1091,9 +1091,13 @@ impl Default for Model<ProblemCreated> {
 /// An enum representing the possible settings for a SCIP parameter.
 #[derive(Debug)]
 pub enum ParamSetting {
+    /// Use default values.
     Default,
+    /// Set to aggressive settings.
     Aggressive,
+    /// Set to fast settings.
     Fast,
+    /// Turn off.
     Off,
 }
 
@@ -1112,7 +1116,9 @@ impl From<ParamSetting> for ffi::SCIP_PARAMSETTING {
 /// An enum representing the objective sense of a SCIP optimization model.
 #[derive(Debug)]
 pub enum ObjSense {
+    /// The problem is a minimization problem.
     Minimize,
+    /// The problem is a maximization problem.
     Maximize,
 }
 

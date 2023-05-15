@@ -11,6 +11,7 @@ pub trait BranchRule {
 /// The result of a branching rule execution.
 #[derive(Debug, Clone)]
 pub enum BranchingResult {
+    /// The branching rule did not run
     DidNotRun,
     /// Initiate branching on the given candidate
     BranchOn(BranchingCandidate),
@@ -40,7 +41,7 @@ impl From<BranchingResult> for u32 {
     }
 }
 
-// A candidate for branching.
+/// A candidate for branching.
 #[derive(Debug, Clone)]
 pub struct BranchingCandidate {
     /// The variable to branch on.

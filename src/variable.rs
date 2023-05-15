@@ -56,12 +56,16 @@ impl Variable {
     }
 }
 
-/// An enum representing the type of a SCIP variable.
+/// The type of a variable in an optimization problem.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarType {
+    /// The variable is a continuous variable.
     Continuous,
+    /// The variable is an integer variable.
     Integer,
+    /// The variable is a binary variable.
     Binary,
+    /// The variable is an implicit integer variable.
     ImplInt,
 }
 
@@ -90,12 +94,19 @@ impl From<ffi::SCIP_Vartype> for VarType {
 
 /// An enum representing the status of a SCIP variable.
 pub enum VarStatus {
+    /// The variable is an original variable in the problem.
     Original,
+    /// The variable is a loose variable in the problem.
     Loose,
+    /// The variable is a column variable in the problem.
     Column,
+    /// The variable is a fixed variable in the problem.
     Fixed,
+    /// The variable is an aggregated variable in the problem.
     Aggregated,
+    /// The variable is a multi-aggregated variable in the problem.
     MultiAggregated,
+    /// The variable is a negated variable in the problem.
     NegatedVar,
 }
 

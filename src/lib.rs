@@ -42,17 +42,36 @@
 //!   }
 //! }
 
+#![deny(missing_docs)]
+
 extern crate doc_comment;
 doc_comment::doctest!("../README.md");
 
+/// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
+
+/// Contains the `BranchRule` trait and several implementations of it.
 pub mod branchrule;
+
+/// Contains the `Constraint` struct, which represents a constraint in an optimization problem.
 pub mod constraint;
+
+/// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;
+
+/// Contains the `Pricer` trait and several implementations of it.
 pub mod pricer;
+
+/// Contains the `Retcode` enum, which represents the return codes of SCIP functions.
 pub mod retcode;
+
+/// Contains the `Solution` struct, which represents a solution to an optimization problem.
 pub mod solution;
+
+/// Contains the `Status` enum, which represents the status of an optimization problem.
 pub mod status;
+
+/// Contains the `Variable` struct, which represents a variable in an optimization problem.
 pub mod variable;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
