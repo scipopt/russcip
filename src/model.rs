@@ -848,20 +848,20 @@ impl Model<ProblemCreated> {
     ///
     /// # Arguments
     ///
-    /// * `name` - The name of the branch rule.
-    /// * `desc` - The description of the branch rule.
-    /// * `priority` - The priority of the branch rule.
-    /// * `maxdepth` - The maximum depth of the branch rule.
-    /// * `maxbounddist` - The maximum bound distance of the branch rule.
-    /// * `rule` - The implementation of the branch rule.
+    /// * `name` - The name of the branching rule. This should be a unique identifier.
+    /// * `desc` - A brief description of the branching rule. This is used for informational purposes.
+    /// * `priority` - The priority of the branching rule. When SCIP decides which branching rule to call, it considers their priorities. A higher value indicates a higher priority.
+    /// * `maxdepth` - The maximum depth level up to which this branching rule should be used. If this is -1, the branching rule can be used at any depth.
+    /// * `maxbounddist` - The maximum relative distance from the current node's dual bound to primal bound compared to the best node's dual bound for applying the branching rule. A value of 0.0 means the rule can only be applied on the current best node, while 1.0 means it can be applied on all nodes.
+    /// * `rule` - The branching rule to be included. This should be a mutable reference to an object that implements the `BranchRule` trait, and represents the branching rule data.
     ///
     /// # Returns
     ///
-    /// The same `Model` instance.
+    /// This function returns the `Model` instance for which the branching rule was included. This allows for method chaining.
     ///
     /// # Panics
     ///
-    /// This method panics if the branch rule cannot be included in the current state.
+    /// This method will panic if the inclusion of the branching rule fails. This can happen if another branching rule with the same name already exists.
     pub fn include_branch_rule(
         self,
         name: &str,
@@ -873,27 +873,27 @@ impl Model<ProblemCreated> {
     ) -> Self {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
-            .expect("Failed to include branch rule at state Unsolved");
+            .expect("Failed to include branch rule at state ProblemCreated");
         self
     }
 
-    /// Includes a new pricer in the model with the given name, description, priority, delay flag, and implementation.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - The name of the pricer.
-    /// * `desc` - The description of the pricer.
-    /// * `priority` - The priority of the pricer.
-    /// * `delay` - The delay flag of the pricer.
-    /// * `pricer` - The implementation of the pricer.
-    ///
-    /// # Returns
-    ///
-    /// The same `Model` instance.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the pricer cannot be included in the current state.
+/// Includes a new pricer in the SCIP data structure.
+///
+/// # Arguments
+///
+/// * `name` - The name of the variable pricer. This should be a unique identifier.
+/// * `desc` - A brief description of the variable pricer.
+/// * `priority` - The priority of the variable pricer. When SCIP decides which pricer to call, it considers their priorities. A higher value indicates a higher priority.
+/// * `delay` - A boolean indicating whether the pricer should be delayed. If true, the pricer is only called when no other pricers or already existing problem variables with negative reduced costs are found. If this is set to false, the pricer may produce columns that already exist in the problem.
+/// * `pricer` - The pricer to be included. This should be a mutable reference to an object that implements the `Pricer` trait.
+///
+/// # Returns
+///
+/// This function returns the `Model` instance for which the pricer was included. This allows for method chaining.
+///
+/// # Panics
+///
+/// This method will panic if the inclusion of the pricer fails. This can happen if another pricer with the same name already exists.
     pub fn include_pricer(
         self,
         name: &str,
@@ -904,7 +904,7 @@ impl Model<ProblemCreated> {
     ) -> Self {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)
-            .expect("Failed to include pricer at state Unsolved");
+            .expect("Failed to include pricer at state ProblemCreated");
         self
     }
 
