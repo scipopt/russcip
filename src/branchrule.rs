@@ -2,12 +2,16 @@ use std::rc::Rc;
 use crate::ffi;
 use crate::variable::Variable;
 
+/// A trait for defining custom branching rules.
 pub trait BranchRule {
+    /// Executes the branching rule on the given candidates and returns the result.
     fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
 }
 
+/// The result of a branching rule execution.
 #[derive(Debug, Clone)]
 pub enum BranchingResult {
+    /// The branching rule did not run
     DidNotRun,
     /// Initiate branching on the given candidate
     BranchOn(BranchingCandidate),
@@ -37,10 +41,14 @@ impl From<BranchingResult> for u32 {
     }
 }
 
+/// A candidate for branching.
 #[derive(Debug, Clone)]
 pub struct BranchingCandidate {
+    /// The variable to branch on.
     pub var: Rc<Variable>,
+    /// The LP solution value of the variable.
     pub lp_sol_val: f64,
+    /// The fractional part of the LP solution value of the variable.
     pub frac: f64,
 }
 

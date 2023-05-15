@@ -3,6 +3,7 @@
 ## Unreleased
 ### Added
 - `ModelRef` to give "unsafe" access to the Model struct to be used in plugins. 
+- Add all missing documentation.
 ### Fixed
 ### Changed
 ### Removed

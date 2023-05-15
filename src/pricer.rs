@@ -1,32 +1,37 @@
 use crate::ffi;
 
+/// A trait for SCIP pricers.
 pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
-    /// farkas: bool
-    /// If true, the pricer should generate columns to repair feasibility of LP.
+    /// * `farkas`: If true, the pricer should generate columns to repair feasibility of LP.
     fn generate_columns(&mut self, farkas: bool) -> PricerResult;
 }
 
+/// An enum representing the possible states of a `PricerResult`.
 #[derive(Debug, PartialEq)]
 pub enum PricerResultState {
-    /// Pricer did not run
+    /// The pricer did not run.
     DidNotRun,
-    /// Pricer added new columns with negative reduced cost
+    /// The pricer added new columns with negative reduced cost.
     FoundColumns,
-    /// Pricer did not find any columns with negative reduced cost (i.e. current LP solution is optimal)
+    /// The pricer did not find any columns with negative reduced cost (i.e. current LP solution is optimal).
     NoColumns,
-    /// Pricer wants to perform early branching
+    /// The pricer wants to perform early branching.
     StopEarly,
 }
 
+/// A struct representing the result of a pricer.
 pub struct PricerResult {
+    /// The state of the pricer result.
     pub state: PricerResultState,
+    /// A calculated lower bound on the objective value of the current node.
     pub lower_bound: Option<f64>,
 }
 
 impl From<PricerResultState> for u32 {
+    /// Converts a `PricerResultState` enum variant to an `SCIP_Result` value.
     fn from(val: PricerResultState) -> Self {
         match val {
             PricerResultState::DidNotRun => ffi::SCIP_Result_SCIP_DIDNOTRUN,
