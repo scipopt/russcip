@@ -49,7 +49,7 @@ doc_comment::doctest!("../README.md");
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
 
-/// Contains the `BranchRule` trait and several implementations of it.
+/// Contains the `BranchRule` trait used to define custom branching rules.
 pub mod branchrule;
 
 /// Contains the `Constraint` struct, which represents a constraint in an optimization problem.
@@ -58,7 +58,7 @@ pub mod constraint;
 /// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;
 
-/// Contains the `Pricer` trait and several implementations of it.
+/// Contains the `Pricer` trait used to define custom variable pricing strategies.
 pub mod pricer;
 
 /// Contains the `Retcode` enum, which represents the return codes of SCIP functions.
