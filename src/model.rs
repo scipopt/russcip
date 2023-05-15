@@ -16,66 +16,72 @@ use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
 
 #[non_exhaustive]
-struct ScipPtr(*mut ffi::SCIP);
+struct ScipPtr {
+    raw: *mut ffi::SCIP,
+    priced_vars: Vec<*mut ffi::SCIP_VAR>,
+}
 
 impl ScipPtr {
     fn new() -> Self {
         let mut scip_ptr = MaybeUninit::uninit();
         scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
-        ScipPtr(scip_ptr)
+        ScipPtr {
+            raw: scip_ptr,
+            priced_vars: Vec::new(),
+        }
     }
 
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         let value = CString::new(value).unwrap();
-        scip_call! { ffi::SCIPsetStringParam(self.0, param.as_ptr(), value.as_ptr()) };
+        scip_call! { ffi::SCIPsetStringParam(self.raw, param.as_ptr(), value.as_ptr()) };
         Ok(())
     }
 
     fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetIntParam(self.0, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
     fn set_longint_param(&mut self, param: &str, value: i64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetLongintParam(self.0, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
     fn set_real_param(&mut self, param: &str, value: f64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetRealParam(self.0, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
     fn set_presolving(&mut self, presolving: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetPresolving(self.0, presolving.into(), true.into()) };
+        scip_call! { ffi::SCIPsetPresolving(self.raw, presolving.into(), true.into()) };
         Ok(())
     }
 
     fn set_separating(&mut self, separating: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetSeparating(self.0, separating.into(), true.into()) };
+        scip_call! { ffi::SCIPsetSeparating(self.raw, separating.into(), true.into()) };
         Ok(())
     }
 
     fn set_heuristics(&mut self, heuristics: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetHeuristics(self.0, heuristics.into(), true.into()) };
+        scip_call! { ffi::SCIPsetHeuristics(self.raw, heuristics.into(), true.into()) };
         Ok(())
     }
 
     fn create_prob(&mut self, name: &str) -> Result<(), Retcode> {
         let name = CString::new(name).unwrap();
-        scip_call!(ffi::SCIPcreateProbBasic(self.0, name.as_ptr()));
+        scip_call!(ffi::SCIPcreateProbBasic(self.raw, name.as_ptr()));
         Ok(())
     }
 
     fn read_prob(&mut self, filename: &str) -> Result<(), Retcode> {
         let filename = CString::new(filename).unwrap();
         scip_call!(ffi::SCIPreadProb(
-            self.0,
+            self.raw,
             filename.as_ptr(),
             std::ptr::null_mut()
         ));
@@ -83,32 +89,32 @@ impl ScipPtr {
     }
 
     fn set_obj_sense(&mut self, sense: ObjSense) -> Result<(), Retcode> {
-        scip_call!(ffi::SCIPsetObjsense(self.0, sense.into()));
+        scip_call!(ffi::SCIPsetObjsense(self.raw, sense.into()));
         Ok(())
     }
 
     fn get_n_vars(&self) -> usize {
-        unsafe { ffi::SCIPgetNVars(self.0) as usize }
+        unsafe { ffi::SCIPgetNVars(self.raw) as usize }
     }
 
     fn get_n_conss(&self) -> usize {
-        unsafe { ffi::SCIPgetNConss(self.0) as usize }
+        unsafe { ffi::SCIPgetNConss(self.raw) as usize }
     }
 
     fn get_status(&self) -> Status {
-        let status = unsafe { ffi::SCIPgetStatus(self.0) };
+        let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.try_into().expect("Unknown SCIP status")
     }
 
     fn print_version(&self) {
-        unsafe { ffi::SCIPprintVersion(self.0, std::ptr::null_mut()) };
+        unsafe { ffi::SCIPprintVersion(self.raw, std::ptr::null_mut()) };
     }
 
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
         scip_call! { ffi::SCIPwriteOrigProblem(
-            self.0,
+            self.raw,
             c_path.as_ptr(),
             c_ext.as_ptr(),
             true.into(),
@@ -117,7 +123,7 @@ impl ScipPtr {
     }
 
     fn include_default_plugins(&mut self) -> Result<(), Retcode> {
-        scip_call!(ffi::SCIPincludeDefaultPlugins(self.0));
+        scip_call!(ffi::SCIPincludeDefaultPlugins(self.raw));
         Ok(())
     }
 
@@ -125,13 +131,16 @@ impl ScipPtr {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.get_n_vars();
         let mut vars = BTreeMap::new();
-        let scip_vars = unsafe { ffi::SCIPgetVars(self.0) };
+        let scip_vars = unsafe { ffi::SCIPgetVars(self.raw) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
             unsafe {
-                ffi::SCIPcaptureVar(self.0, scip_var);
+                ffi::SCIPcaptureVar(self.raw, scip_var);
             }
-            let var = Rc::new(Variable { raw: scip_var });
+            let var = Rc::new(Variable {
+                raw: scip_var,
+                priced: false,
+            });
             vars.insert(var.get_index(), var);
         }
         vars
@@ -141,11 +150,11 @@ impl ScipPtr {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.get_n_conss();
         let mut conss = Vec::with_capacity(n_conss);
-        let scip_conss = unsafe { ffi::SCIPgetConss(self.0) };
+        let scip_conss = unsafe { ffi::SCIPgetConss(self.raw) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
             unsafe {
-                ffi::SCIPcaptureCons(self.0, scip_cons);
+                ffi::SCIPcaptureCons(self.raw, scip_cons);
             }
             let cons = Rc::new(Constraint { raw: scip_cons });
             conss.push(cons);
@@ -154,25 +163,25 @@ impl ScipPtr {
     }
 
     fn solve(&mut self) -> Result<(), Retcode> {
-        scip_call!(ffi::SCIPsolve(self.0));
+        scip_call!(ffi::SCIPsolve(self.raw));
         Ok(())
     }
 
     fn get_n_sols(&self) -> usize {
-        unsafe { ffi::SCIPgetNSols(self.0) as usize }
+        unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
     fn get_best_sol(&self) -> Solution {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.0) };
+        let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
 
         Solution {
-            scip_ptr: self.0,
+            scip_ptr: self.raw,
             raw: sol,
         }
     }
 
     fn get_obj_val(&self) -> f64 {
-        unsafe { ffi::SCIPgetPrimalbound(self.0) }
+        unsafe { ffi::SCIPgetPrimalbound(self.raw) }
     }
 
     fn create_var(
@@ -186,7 +195,7 @@ impl ScipPtr {
         let name = CString::new(name).unwrap();
         let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
-            self.0,
+            self.raw,
             var_ptr.as_mut_ptr(),
             name.as_ptr(),
             lb,
@@ -195,8 +204,39 @@ impl ScipPtr {
             var_type.into(),
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
-        scip_call! { ffi::SCIPaddVar(self.0, var_ptr) };
-        Ok(Variable { raw: var_ptr })
+        scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
+        Ok(Variable {
+            raw: var_ptr,
+            priced: false,
+        })
+    }
+
+    fn create_priced_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Result<Variable, Retcode> {
+        let name = CString::new(name).unwrap();
+        let mut var_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateVarBasic(
+            self.raw,
+            var_ptr.as_mut_ptr(),
+            name.as_ptr(),
+            lb,
+            ub,
+            obj,
+            var_type.into(),
+        ) };
+        let var_ptr = unsafe { var_ptr.assume_init() };
+        self.priced_vars.push(var_ptr);
+        scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
+        Ok(Variable {
+            raw: var_ptr,
+            priced: true,
+        })
     }
 
     fn create_cons(
@@ -211,7 +251,7 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicLinear(
-            self.0,
+            self.raw,
             scip_cons.as_mut_ptr(),
             c_name.as_ptr(),
             0,
@@ -222,9 +262,9 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.0, scip_cons, var.raw, coefs[i]) };
+            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
-        scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
 
@@ -237,7 +277,7 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicSetpart(
-            self.0,
+            self.raw,
             scip_cons.as_mut_ptr(),
             c_name.as_ptr(),
             0,
@@ -245,9 +285,9 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.0, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
-        scip_call! { ffi::SCIPaddCons(self.0, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
 
@@ -257,7 +297,7 @@ impl ScipPtr {
         cons: Rc<Constraint>,
         var: Rc<Variable>,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefSetppc(self.0, cons.raw, var.raw) };
+        scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) };
         Ok(())
     }
 
@@ -287,7 +327,10 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let var = Rc::new(Variable { raw: var_ptr });
+            let var = Rc::new(Variable {
+                raw: var_ptr,
+                priced: false,
+            });
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {
@@ -356,7 +399,7 @@ impl ScipPtr {
         let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
 
         scip_call!(ffi::SCIPincludeBranchrule(
-            self.0,
+            self.raw,
             c_name.as_ptr(),
             c_desc.as_ptr(),
             priority,
@@ -416,8 +459,7 @@ impl ScipPtr {
                 panic!("Farkas pricing should never stop early as LP would remain infeasible");
             }
 
-            if pricing_res.state == PricerResultState::FoundColumns
-            {
+            if pricing_res.state == PricerResultState::FoundColumns {
                 let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
                 assert!(n_vars_before < n_vars_after);
             }
@@ -465,7 +507,7 @@ impl ScipPtr {
         let pricer_faker = pricer_ptr as *mut ffi::SCIP_PricerData;
 
         scip_call!(ffi::SCIPincludePricer(
-            self.0,
+            self.raw,
             c_name.as_ptr(),
             c_desc.as_ptr(),
             priority,
@@ -482,7 +524,7 @@ impl ScipPtr {
         ));
 
         unsafe {
-            ffi::SCIPactivatePricer(self.0, ffi::SCIPfindPricer(self.0, c_name.as_ptr()));
+            ffi::SCIPactivatePricer(self.raw, ffi::SCIPfindPricer(self.raw, c_name.as_ptr()));
         }
 
         Ok(())
@@ -494,20 +536,20 @@ impl ScipPtr {
         var: Rc<Variable>,
         coef: f64,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefLinear(self.0, cons.raw, var.raw, coef) };
+        scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons.raw, var.raw, coef) };
         Ok(())
     }
 
     fn get_n_nodes(&self) -> usize {
-        unsafe { ffi::SCIPgetNNodes(self.0) as usize }
+        unsafe { ffi::SCIPgetNNodes(self.raw) as usize }
     }
 
     fn get_solving_time(&self) -> f64 {
-        unsafe { ffi::SCIPgetSolvingTime(self.0) }
+        unsafe { ffi::SCIPgetSolvingTime(self.raw) }
     }
 
     fn get_n_lp_iterations(&self) -> usize {
-        unsafe { ffi::SCIPgetNLPIterations(self.0) as usize }
+        unsafe { ffi::SCIPgetNLPIterations(self.raw) as usize }
     }
 }
 
@@ -517,7 +559,7 @@ impl Drop for ScipPtr {
         // so we need to release them before freeing the SCIP instance
 
         // first check if we are in a stage where we have variables and constraints
-        let scip_stage = unsafe { ffi::SCIPgetStage(self.0) };
+        let scip_stage = unsafe { ffi::SCIPgetStage(self.raw) };
         if scip_stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_TRANSFORMED
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_INITPRESOLVE
@@ -530,24 +572,32 @@ impl Drop for ScipPtr {
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
         {
             // release variables
-            let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.0) };
-            let vars = unsafe { ffi::SCIPgetOrigVars(self.0) };
+            let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.raw) };
+            let vars = unsafe { ffi::SCIPgetOrigVars(self.raw) };
             for i in 0..n_vars {
                 let mut var = unsafe { *vars.add(i as usize) };
-                scip_call_panic!(ffi::SCIPreleaseVar(self.0, &mut var));
+                scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
+            }
+
+
+            // release priced variables
+            for var in self.priced_vars.iter().cloned() {
+                // get transformed variable
+                let mut var = unsafe { ffi::SCIPvarGetTransVar(var) };
+                scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
             }
 
             // release constraints
-            let n_conss = unsafe { ffi::SCIPgetNOrigConss(self.0) };
-            let conss = unsafe { ffi::SCIPgetOrigConss(self.0) };
+            let n_conss = unsafe { ffi::SCIPgetNOrigConss(self.raw) };
+            let conss = unsafe { ffi::SCIPgetOrigConss(self.raw) };
             for i in 0..n_conss {
                 let mut cons = unsafe { *conss.add(i as usize) };
-                scip_call_panic!(ffi::SCIPreleaseCons(self.0, &mut cons));
+                scip_call_panic!(ffi::SCIPreleaseCons(self.raw, &mut cons));
             }
         }
 
         // free SCIP instance
-        unsafe { ffi::SCIPfree(&mut self.0) };
+        unsafe { ffi::SCIPfree(&mut self.raw) };
     }
 }
 
@@ -750,6 +800,37 @@ impl Model<ProblemCreated> {
         var
     }
 
+    /// Adds a new priced variable to the SCIP data structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `lb` - The lower bound of the variable.
+    /// * `ub` - The upper bound of the variable.
+    /// * `obj` - The objective function coefficient for the variable.
+    /// * `name` - The name of the variable. This should be a unique identifier.
+    /// * `var_type` - The type of the variable, specified as an instance of the `VarType` enum.
+    ///
+    /// # Returns
+    ///
+    /// This function returns a reference-counted smart pointer (`Rc`) to the created `Variable` instance.
+    pub fn add_priced_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Rc<Variable> {
+        let var = self
+            .scip
+            .create_priced_var(lb, ub, obj, name, var_type)
+            .expect("Failed to create variable in state ProblemCreated");
+        let var_id = var.get_index();
+        let var = Rc::new(var);
+        self.state.vars.insert(var_id, var.clone());
+        var
+    }
+
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -877,23 +958,23 @@ impl Model<ProblemCreated> {
         self
     }
 
-/// Includes a new pricer in the SCIP data structure.
-///
-/// # Arguments
-///
-/// * `name` - The name of the variable pricer. This should be a unique identifier.
-/// * `desc` - A brief description of the variable pricer.
-/// * `priority` - The priority of the variable pricer. When SCIP decides which pricer to call, it considers their priorities. A higher value indicates a higher priority.
-/// * `delay` - A boolean indicating whether the pricer should be delayed. If true, the pricer is only called when no other pricers or already existing problem variables with negative reduced costs are found. If this is set to false, the pricer may produce columns that already exist in the problem.
-/// * `pricer` - The pricer to be included. This should be a mutable reference to an object that implements the `Pricer` trait.
-///
-/// # Returns
-///
-/// This function returns the `Model` instance for which the pricer was included. This allows for method chaining.
-///
-/// # Panics
-///
-/// This method will panic if the inclusion of the pricer fails. This can happen if another pricer with the same name already exists.
+    /// Includes a new pricer in the SCIP data structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the variable pricer. This should be a unique identifier.
+    /// * `desc` - A brief description of the variable pricer.
+    /// * `priority` - The priority of the variable pricer. When SCIP decides which pricer to call, it considers their priorities. A higher value indicates a higher priority.
+    /// * `delay` - A boolean indicating whether the pricer should be delayed. If true, the pricer is only called when no other pricers or already existing problem variables with negative reduced costs are found. If this is set to false, the pricer may produce columns that already exist in the problem.
+    /// * `pricer` - The pricer to be included. This should be a mutable reference to an object that implements the `Pricer` trait.
+    ///
+    /// # Returns
+    ///
+    /// This function returns the `Model` instance for which the pricer was included. This allows for method chaining.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if the inclusion of the pricer fails. This can happen if another pricer with the same name already exists.
     pub fn include_pricer(
         self,
         name: &str,
@@ -1273,13 +1354,7 @@ mod tests {
             100.,
             "c1",
         );
-        model.add_cons(
-            vec![x1, x2],
-            &[1., 2.],
-            -f64::INFINITY,
-            80.,
-            "c2",
-        );
+        model.add_cons(vec![x1, x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
         model
     }

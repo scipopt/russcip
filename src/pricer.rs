@@ -44,8 +44,12 @@ impl From<PricerResultState> for u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::status::Status;
     use super::*;
+    use crate::{
+        model::{Model, ModelRef, ProblemCreated},
+        status::Status,
+        variable::VarType,
+    };
 
     struct PanickingPricer;
 
@@ -124,7 +128,6 @@ mod tests {
         model.solve();
     }
 
-
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
@@ -135,7 +138,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn optimal_pricer() {
@@ -149,6 +151,49 @@ mod tests {
             .include_pricer("", "", 9999999, false, &mut pricer);
 
         let solved = model.solve();
+        assert_eq!(solved.get_status(), Status::Optimal);
+    }
+
+    struct AddSameColumnPricer {
+        added: bool,
+        model: ModelRef<Model<ProblemCreated>>,
+    }
+
+    impl Pricer for AddSameColumnPricer {
+        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+            if self.added {
+                PricerResult {
+                    state: PricerResultState::NoColumns,
+                    lower_bound: None,
+                }
+            } else {
+                self.added = true;
+                self.model
+                    .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+                PricerResult {
+                    state: PricerResultState::FoundColumns,
+                    lower_bound: None,
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn add_same_column_pricer() {
+        let mut model = crate::model::Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap();
+
+        let mut pricer = AddSameColumnPricer {
+            added: false,
+            model: ModelRef::new(&mut model),
+        };
+
+        let solved = model
+            .include_pricer("", "", 9999999, false, &mut pricer)
+            .solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }
 }
