@@ -404,9 +404,9 @@ impl ScipPtr {
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
 
             if !farkas {
-                pricing_res
-                    .lower_bound
-                    .map(|lb| unsafe { *lowerbound = lb });
+                if let Some(lb) = pricing_res.lower_bound {
+                    unsafe { *lowerbound = lb };
+                }
                 if pricing_res.state == PricerResultState::StopEarly {
                     unsafe { *stopearly = 1 };
                 }

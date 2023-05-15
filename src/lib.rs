@@ -10,36 +10,35 @@
 //! use russcip::variable::VarType;
 //! use crate::russcip::model::ModelWithProblem;
 //!
-//! fn main() {
-//!   // Create model
-//!   let mut model = Model::new()
-//!   .hide_output()
-//!   .include_default_plugins()
-//!   .create_prob("test")
-//!   .set_obj_sense(ObjSense::Maximize);
+//! 
+//! // Create model
+//! let mut model = Model::new()
+//! .hide_output()
+//! .include_default_plugins()
+//! .create_prob("test")
+//! .set_obj_sense(ObjSense::Maximize);
 //!
-//!   // Add variables
-//!   let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-//!   let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+//! // Add variables
+//! let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+//! let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 //!
-//!   // Add constraints
-//!   model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-//!   model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
+//! // Add constraints
+//! model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
+//! model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
 //!
-//!   let solved_model = model.solve();
+//! let solved_model = model.solve();
 //!
-//!   let status = solved_model.get_status();
-//!   println!("Solved with status {:?}", status);
+//! let status = solved_model.get_status();
+//! println!("Solved with status {:?}", status);
 //!
-//!   let obj_val = solved_model.get_obj_val();
-//!   println!("Objective value: {}", obj_val);
+//! let obj_val = solved_model.get_obj_val();
+//! println!("Objective value: {}", obj_val);
 //!
-//!   let sol = solved_model.get_best_sol().expect("No solution found");
-//!   let vars = solved_model.get_vars();
+//! let sol = solved_model.get_best_sol().expect("No solution found");
+//! let vars = solved_model.get_vars();
 //!
-//!   for var in vars {
-//!       println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
-//!   }
+//! for var in vars {
+//!     println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
 //! }
 
 #![deny(missing_docs)]
