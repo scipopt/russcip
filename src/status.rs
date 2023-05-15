@@ -1,5 +1,6 @@
 use crate::ffi;
 
+/// An enum representing the status of a SCIP optimization run.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
     Unknown,
@@ -21,6 +22,7 @@ pub enum Status {
 }
 
 impl From<u32> for Status {
+    /// Converts a u32 value to a `Status` enum variant.
     fn from(val: u32) -> Self {
         match val {
             ffi::SCIP_Status_SCIP_STATUS_UNKNOWN => Status::Unknown,

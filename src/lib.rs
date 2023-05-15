@@ -55,6 +55,7 @@ pub mod solution;
 pub mod status;
 pub mod variable;
 
+/// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call {
     ($res:expr) => {
@@ -66,6 +67,7 @@ macro_rules! scip_call {
     };
 }
 
+/// A macro for calling a `SCIP` function and panicking if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call_panic {
     ($res:expr) => {
@@ -77,6 +79,7 @@ macro_rules! scip_call_panic {
     };
 }
 
+/// A macro for calling a `SCIP` function and panicking with a custom message if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call_expect {
     ($res:expr, $msg:expr) => {

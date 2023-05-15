@@ -1,5 +1,6 @@
 use crate::ffi;
 
+/// An enum representing the possible return codes from SCIP functions.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Retcode {
     Okay,
@@ -26,6 +27,7 @@ pub enum Retcode {
 }
 
 impl From<ffi::SCIP_Retcode> for Retcode {
+    /// Converts an `SCIP_Retcode` value to a `Retcode` enum variant.
     fn from(val: ffi::SCIP_Retcode) -> Self {
         match val {
             ffi::SCIP_Retcode_SCIP_OKAY => Retcode::Okay,
@@ -54,6 +56,7 @@ impl From<ffi::SCIP_Retcode> for Retcode {
 }
 
 impl From<Retcode> for ffi::SCIP_Retcode {
+    /// Converts a `Retcode` enum variant to an `SCIP_Retcode` value.
     fn from(value: Retcode) -> Self {
         match value {
             Retcode::Okay => ffi::SCIP_Retcode_SCIP_OKAY,
