@@ -4,6 +4,7 @@
 ### Added
 - `ModelRef` to give "unsafe" access to the Model struct to be used in plugins. 
 - Add all missing documentation.
+- Node wrapper struct. 
 ### Fixed
 ### Changed
 ### Removed

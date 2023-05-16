@@ -10,7 +10,7 @@
 //! use russcip::variable::VarType;
 //! use crate::russcip::model::ModelWithProblem;
 //!
-//! 
+//!
 //! // Create model
 //! let mut model = Model::new()
 //! .hide_output()
@@ -72,6 +72,9 @@ pub mod status;
 
 /// Contains the `Variable` struct, which represents a variable in an optimization problem.
 pub mod variable;
+
+/// Contains the `Node` struct, which represents a node in the branch-and-bound tree.
+pub mod node;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]
