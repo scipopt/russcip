@@ -19,7 +19,6 @@ use crate::{ffi, scip_call_panic};
 #[non_exhaustive]
 struct ScipPtr {
     raw: *mut ffi::SCIP,
-    priced_vars: Vec<*mut ffi::SCIP_VAR>,
 }
 
 impl ScipPtr {
@@ -27,10 +26,7 @@ impl ScipPtr {
         let mut scip_ptr = MaybeUninit::uninit();
         scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
-        ScipPtr {
-            raw: scip_ptr,
-            priced_vars: Vec::new(),
-        }
+        ScipPtr { raw: scip_ptr }
     }
 
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -226,7 +222,6 @@ impl ScipPtr {
             var_type.into(),
         ) };
         let mut var_ptr = unsafe { var_ptr.assume_init() };
-        self.priced_vars.push(var_ptr);
         scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
         Ok(Variable { raw: var_ptr })
@@ -1111,7 +1106,7 @@ impl<T> Model<T> {
     /// The caller must ensure that the pointer is used safely and correctly.
     #[cfg(feature = "raw")]
     pub unsafe fn scip_ptr(&self) -> *mut ffi::SCIP {
-        self.scip.0
+        self.scip.raw
     }
 
     /// Returns the status of the optimization model.
