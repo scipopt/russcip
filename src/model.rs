@@ -139,7 +139,6 @@ impl ScipPtr {
             }
             let var = Rc::new(Variable {
                 raw: scip_var,
-                priced: false,
             });
             vars.insert(var.get_index(), var);
         }
@@ -207,7 +206,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
         Ok(Variable {
             raw: var_ptr,
-            priced: false,
         })
     }
 
@@ -236,7 +234,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
         Ok(Variable {
             raw: var_ptr,
-            priced: true,
         })
     }
 
@@ -330,7 +327,6 @@ impl ScipPtr {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
             let var = Rc::new(Variable {
                 raw: var_ptr,
-                priced: false,
             });
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();

@@ -8,7 +8,6 @@ pub type VarId = usize;
 #[derive(Debug)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
-    pub(crate) priced: bool,
 }
 
 impl Variable {
