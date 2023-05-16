@@ -1,6 +1,6 @@
-use std::rc::Rc;
 use crate::ffi;
 use crate::variable::Variable;
+use std::rc::Rc;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
@@ -55,7 +55,7 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ModelRef, ModelWithProblem, ProblemCreated};
+    use crate::model::{ModelRef, ModelWithProblem};
     use crate::{model::Model, status::Status};
 
     struct PanickingBranchingRule;
@@ -135,7 +135,7 @@ mod tests {
     }
 
     struct FirstBranchingRule {
-        model: ModelRef<Model<ProblemCreated>>,
+        model: ModelRef,
     }
 
     impl BranchRule for FirstBranchingRule {

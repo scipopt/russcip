@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
+use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
@@ -137,9 +138,7 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureVar(self.raw, scip_var);
             }
-            let var = Rc::new(Variable {
-                raw: scip_var,
-            });
+            let var = Rc::new(Variable { raw: scip_var });
             vars.insert(var.get_index(), var);
         }
         vars
@@ -204,9 +203,7 @@ impl ScipPtr {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
-        Ok(Variable {
-            raw: var_ptr,
-        })
+        Ok(Variable { raw: var_ptr })
     }
 
     fn create_priced_var(
@@ -232,9 +229,7 @@ impl ScipPtr {
         self.priced_vars.push(var_ptr);
         scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable {
-            raw: var_ptr,
-        })
+        Ok(Variable { raw: var_ptr })
     }
 
     fn create_cons(
@@ -325,9 +320,7 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let var = Rc::new(Variable {
-                raw: var_ptr,
-            });
+            let var = Rc::new(Variable { raw: var_ptr });
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {
@@ -547,6 +540,12 @@ impl ScipPtr {
 
     fn get_n_lp_iterations(&self) -> usize {
         unsafe { ffi::SCIPgetNLPIterations(self.raw) as usize }
+    }
+
+    fn get_focus_node(&self) -> Node {
+        Node {
+            raw: unsafe { ffi::SCIPgetFocusNode(self.raw) },
+        }
     }
 }
 
@@ -1214,15 +1213,15 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 /// A wrapper for a mutable reference to a model instance.
 /// This should only be used if access to the model is required when implementing SCIP plugins,
 /// e.g variable pricers, branching rules.
-pub struct ModelRef<T> {
-    inner: *mut T,
+pub struct ModelRef {
+    inner: *mut Model<ProblemCreated>,
 }
 
-impl<T> ModelRef<T> {
+impl ModelRef {
     /// Creates a new `ModelRef` instance from a mutable reference to a model instance.
-    pub fn new(inner: &mut T) -> Self {
+    pub fn new(inner: &mut Model<ProblemCreated>) -> Self {
         ModelRef {
-            inner: inner as *mut T,
+            inner: inner as *mut Model<ProblemCreated>,
         }
     }
 
@@ -1230,10 +1229,19 @@ impl<T> ModelRef<T> {
     pub fn clone(&mut self) -> Self {
         ModelRef { inner: self.inner }
     }
+
+    /// Returns the current node of the model.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
+    pub fn get_focus_node(&self) -> Node {
+        self.deref().scip.get_focus_node()
+    }
 }
 
-impl<T> Deref for ModelRef<T> {
-    type Target = T;
+impl Deref for ModelRef {
+    type Target = Model<ProblemCreated>;
 
     /// Dereferences the `ModelRef` instance to a reference to the inner model instance.
     fn deref(&self) -> &Self::Target {
@@ -1241,7 +1249,7 @@ impl<T> Deref for ModelRef<T> {
     }
 }
 
-impl<T> DerefMut for ModelRef<T> {
+impl DerefMut for ModelRef {
     /// Dereferences the `ModelRef` instance to a mutable reference to the inner model instance.
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.inner }

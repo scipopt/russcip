@@ -47,7 +47,6 @@ pub enum Retcode {
     Unknown(ffi::SCIP_Retcode),
 }
 
-
 impl From<ffi::SCIP_Retcode> for Retcode {
     /// Converts an `SCIP_Retcode` value to a `Retcode` enum variant.
     fn from(val: ffi::SCIP_Retcode) -> Self {
