@@ -230,9 +230,10 @@ impl ScipPtr {
             obj,
             var_type.into(),
         ) };
-        let var_ptr = unsafe { var_ptr.assume_init() };
+        let mut var_ptr = unsafe { var_ptr.assume_init() };
         self.priced_vars.push(var_ptr);
         scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
         Ok(Variable {
             raw: var_ptr,
             priced: true,
@@ -571,19 +572,11 @@ impl Drop for ScipPtr {
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVED
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
         {
-            // release variables
+            // release original variables
             let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.raw) };
             let vars = unsafe { ffi::SCIPgetOrigVars(self.raw) };
             for i in 0..n_vars {
                 let mut var = unsafe { *vars.add(i as usize) };
-                scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
-            }
-
-
-            // release priced variables
-            for var in self.priced_vars.iter().cloned() {
-                // get transformed variable
-                let mut var = unsafe { ffi::SCIPvarGetTransVar(var) };
                 scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
             }
 
@@ -825,9 +818,7 @@ impl Model<ProblemCreated> {
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var_id = var.get_index();
         let var = Rc::new(var);
-        self.state.vars.insert(var_id, var.clone());
         var
     }
 
