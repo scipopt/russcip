@@ -10,51 +10,73 @@
 //! use russcip::variable::VarType;
 //! use crate::russcip::model::ModelWithProblem;
 //!
-//! fn main() {
-//!   // Create model
-//!   let mut model = Model::new()
-//!   .hide_output()
-//!   .include_default_plugins()
-//!   .create_prob("test")
-//!   .set_obj_sense(ObjSense::Maximize);
 //!
-//!   // Add variables
-//!   let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-//!   let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+//! // Create model
+//! let mut model = Model::new()
+//! .hide_output()
+//! .include_default_plugins()
+//! .create_prob("test")
+//! .set_obj_sense(ObjSense::Maximize);
 //!
-//!   // Add constraints
-//!   model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-//!   model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
+//! // Add variables
+//! let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+//! let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 //!
-//!   let solved_model = model.solve();
+//! // Add constraints
+//! model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
+//! model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
 //!
-//!   let status = solved_model.get_status();
-//!   println!("Solved with status {:?}", status);
+//! let solved_model = model.solve();
 //!
-//!   let obj_val = solved_model.get_obj_val();
-//!   println!("Objective value: {}", obj_val);
+//! let status = solved_model.get_status();
+//! println!("Solved with status {:?}", status);
 //!
-//!   let sol = solved_model.get_best_sol().expect("No solution found");
-//!   let vars = solved_model.get_vars();
+//! let obj_val = solved_model.get_obj_val();
+//! println!("Objective value: {}", obj_val);
 //!
-//!   for var in vars {
-//!       println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
-//!   }
+//! let sol = solved_model.get_best_sol().expect("No solution found");
+//! let vars = solved_model.get_vars();
+//!
+//! for var in vars {
+//!     println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
 //! }
+
+#![deny(missing_docs)]
 
 extern crate doc_comment;
 doc_comment::doctest!("../README.md");
 
+/// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
+
+/// Contains the `BranchRule` trait used to define custom branching rules.
 pub mod branchrule;
-pub mod pricer;
+
+/// Contains the `Constraint` struct, which represents a constraint in an optimization problem.
 pub mod constraint;
+
+/// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;
+
+/// Contains the `Pricer` trait used to define custom variable pricing strategies.
+pub mod pricer;
+
+/// Contains the `Retcode` enum, which represents the return codes of SCIP functions.
 pub mod retcode;
+
+/// Contains the `Solution` struct, which represents a solution to an optimization problem.
 pub mod solution;
+
+/// Contains the `Status` enum, which represents the status of an optimization problem.
 pub mod status;
+
+/// Contains the `Variable` struct, which represents a variable in an optimization problem.
 pub mod variable;
 
+/// Contains the `Node` struct, which represents a node in the branch-and-bound tree.
+pub mod node;
+
+/// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call {
     ($res:expr) => {
@@ -66,6 +88,7 @@ macro_rules! scip_call {
     };
 }
 
+/// A macro for calling a `SCIP` function and panicking if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call_panic {
     ($res:expr) => {
@@ -77,6 +100,7 @@ macro_rules! scip_call_panic {
     };
 }
 
+/// A macro for calling a `SCIP` function and panicking with a custom message if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call_expect {
     ($res:expr, $msg:expr) => {

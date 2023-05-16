@@ -1,31 +1,54 @@
 use crate::ffi;
 
+/// An enum representing the possible return codes from SCIP functions.
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Retcode {
+    /// Normal termination.
     Okay,
+    /// Unspecified error.
     Error,
+    /// Insufficient memory error.
     NoMemory,
+    /// Read error.
     ReadError,
+    /// Write error.
     WriteError,
+    /// File not found error.
     NoFile,
+    /// Cannot create file.
     FileCreateError,
+    /// Error in LP solver.
     LpError,
+    /// No problem exists.
     NoProblem,
+    /// Method cannot be called at this time in solution process.
     InvalidCall,
+    /// Error in input data.
     InvalidData,
+    /// Method returned an invalid result code.
     InvalidResult,
+    /// A required plugin was not found.
     PluginNotFound,
+    /// The parameter with the given name was not found.
     ParameterUnknown,
+    /// The parameter is not of the expected type.
     ParameterWrongType,
+    /// The value is invalid for the given parameter.
     ParameterWrongVal,
+    /// The given key is already existing in table.
     KeyAlreadyExisting,
+    /// Maximal branching depth level exceeded.
     MaxDepthLevel,
+    /// No branching could be created.
     BranchError,
+    /// Function not implemented.
     NotImplemented,
+    /// Any status code not specifically represented in this enum.
     Unknown(ffi::SCIP_Retcode),
 }
 
 impl From<ffi::SCIP_Retcode> for Retcode {
+    /// Converts an `SCIP_Retcode` value to a `Retcode` enum variant.
     fn from(val: ffi::SCIP_Retcode) -> Self {
         match val {
             ffi::SCIP_Retcode_SCIP_OKAY => Retcode::Okay,
@@ -54,6 +77,7 @@ impl From<ffi::SCIP_Retcode> for Retcode {
 }
 
 impl From<Retcode> for ffi::SCIP_Retcode {
+    /// Converts a `Retcode` enum variant to an `SCIP_Retcode` value.
     fn from(value: Retcode) -> Self {
         match value {
             Retcode::Okay => ffi::SCIP_Retcode_SCIP_OKAY,

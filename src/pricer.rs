@@ -1,44 +1,51 @@
 use crate::ffi;
 
+/// A trait for SCIP pricers.
 pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
-    /// farkas: bool
-    /// If true, the pricer should generate columns to repair feasibility of LP.
+    /// * `farkas`: If true, the pricer should generate columns to repair feasibility of LP.
     fn generate_columns(&mut self, farkas: bool) -> PricerResult;
 }
 
+/// An enum representing the possible states of a `PricerResult`.
 #[derive(Debug, PartialEq)]
 pub enum PricerResultState {
-    /// Pricer did not run
+    /// The pricer did not run.
     DidNotRun,
-    /// Pricer added new columns with negative reduced cost
+    /// The pricer added new columns with negative reduced cost.
     FoundColumns,
-    /// Pricer did not find any columns with negative reduced cost (i.e. current LP solution is optimal)
+    /// The pricer did not find any columns with negative reduced cost (i.e. current LP solution is optimal).
     NoColumns,
-    /// Pricer wants to perform early branching
+    /// The pricer wants to perform early branching.
     StopEarly,
 }
 
+/// A struct representing the result of a pricer.
 pub struct PricerResult {
+    /// The state of the pricer result.
     pub state: PricerResultState,
+    /// A calculated lower bound on the objective value of the current node.
     pub lower_bound: Option<f64>,
 }
 
 impl From<PricerResultState> for u32 {
+    /// Converts a `PricerResultState` enum variant to an `SCIP_Result` value.
     fn from(val: PricerResultState) -> Self {
         match val {
             PricerResultState::DidNotRun => ffi::SCIP_Result_SCIP_DIDNOTRUN,
-            PricerResultState::FoundColumns | PricerResultState::StopEarly | PricerResultState::NoColumns => ffi::SCIP_Result_SCIP_SUCCESS,
+            PricerResultState::FoundColumns
+            | PricerResultState::StopEarly
+            | PricerResultState::NoColumns => ffi::SCIP_Result_SCIP_SUCCESS,
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::status::Status;
     use super::*;
+    use crate::{model::ModelRef, status::Status, variable::VarType};
 
     struct PanickingPricer;
 
@@ -63,7 +70,6 @@ mod tests {
         // solve model
         model.solve();
     }
-
 
     struct LyingPricer;
 
@@ -118,7 +124,6 @@ mod tests {
         model.solve();
     }
 
-
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
@@ -129,7 +134,6 @@ mod tests {
             }
         }
     }
-
 
     #[test]
     fn optimal_pricer() {
@@ -143,6 +147,49 @@ mod tests {
             .include_pricer("", "", 9999999, false, &mut pricer);
 
         let solved = model.solve();
+        assert_eq!(solved.get_status(), Status::Optimal);
+    }
+
+    struct AddSameColumnPricer {
+        added: bool,
+        model: ModelRef,
+    }
+
+    impl Pricer for AddSameColumnPricer {
+        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+            if self.added {
+                PricerResult {
+                    state: PricerResultState::NoColumns,
+                    lower_bound: None,
+                }
+            } else {
+                self.added = true;
+                self.model
+                    .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+                PricerResult {
+                    state: PricerResultState::FoundColumns,
+                    lower_bound: None,
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn add_same_column_pricer() {
+        let mut model = crate::model::Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap();
+
+        let mut pricer = AddSameColumnPricer {
+            added: false,
+            model: ModelRef::new(&mut model),
+        };
+
+        let solved = model
+            .include_pricer("", "", 9999999, false, &mut pricer)
+            .solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }
 }
