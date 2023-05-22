@@ -238,7 +238,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        self.priced_vars.push(var_ptr);
         Ok(Variable { raw: trans_var_ptr })
     }
 
