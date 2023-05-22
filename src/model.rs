@@ -19,6 +19,7 @@ use crate::{ffi, scip_call_panic};
 #[non_exhaustive]
 struct ScipPtr {
     raw: *mut ffi::SCIP,
+    consumed: bool,
 }
 
 impl ScipPtr {
@@ -26,7 +27,17 @@ impl ScipPtr {
         let mut scip_ptr = MaybeUninit::uninit();
         scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
-        ScipPtr { raw: scip_ptr }
+        ScipPtr {
+            raw: scip_ptr,
+            consumed: false,
+        }
+    }
+
+    fn clone(&self) -> Self {
+        ScipPtr {
+            raw: self.raw,
+            consumed: true,
+        }
     }
 
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -546,6 +557,9 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
+        if self.consumed {
+            return;
+        }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
         // so we need to release them before freeing the SCIP instance
 
@@ -598,6 +612,7 @@ pub struct Unsolved;
 pub struct PluginsIncluded;
 
 /// Represents the state of an optimization model where the problem has been created.
+#[derive(Clone)]
 pub struct ProblemCreated {
     pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
     pub(crate) conss: Vec<Rc<Constraint>>,
@@ -746,6 +761,24 @@ impl Model<ProblemCreated> {
             .set_obj_sense(sense)
             .expect("Failed to set objective sense in state ProblemCreated");
         self
+    }
+
+    /// Returns a clone of the current model.
+    /// The clone is meant for use in implementing custom plugins.
+    pub fn clone_for_plugins(&self) -> Self {
+        Model {
+            scip: self.scip.clone(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Returns the current node of the model.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
+    pub fn get_focus_node(&self) -> Node {
+        self.deref().scip.get_focus_node()
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
@@ -1202,52 +1235,6 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
         }
-    }
-}
-
-/// A wrapper for a mutable reference to a model instance.
-/// This should only be used if access to the model is required when implementing SCIP plugins,
-/// e.g variable pricers, branching rules.
-pub struct ModelRef {
-    inner: *mut Model<ProblemCreated>,
-}
-
-impl ModelRef {
-    /// Creates a new `ModelRef` instance from a mutable reference to a model instance.
-    pub fn new(inner: &mut Model<ProblemCreated>) -> Self {
-        ModelRef {
-            inner: inner as *mut Model<ProblemCreated>,
-        }
-    }
-
-    /// Clones the `ModelRef` instance.
-    pub fn clone(&mut self) -> Self {
-        ModelRef { inner: self.inner }
-    }
-
-    /// Returns the current node of the model.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
-    pub fn get_focus_node(&self) -> Node {
-        self.deref().scip.get_focus_node()
-    }
-}
-
-impl Deref for ModelRef {
-    type Target = Model<ProblemCreated>;
-
-    /// Dereferences the `ModelRef` instance to a reference to the inner model instance.
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.inner }
-    }
-}
-
-impl DerefMut for ModelRef {
-    /// Dereferences the `ModelRef` instance to a mutable reference to the inner model instance.
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.inner }
     }
 }
 

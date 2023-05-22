@@ -55,7 +55,7 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ModelRef, ModelWithProblem};
+    use crate::model::{ModelWithProblem, ProblemCreated};
     use crate::{model::Model, status::Status};
 
     struct PanickingBranchingRule;
@@ -135,7 +135,7 @@ mod tests {
     }
 
     struct FirstBranchingRule {
-        model: ModelRef,
+        model: Model<ProblemCreated>,
     }
 
     impl BranchRule for FirstBranchingRule {
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn first_branching_rule() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -156,7 +156,7 @@ mod tests {
             .unwrap();
 
         let mut br = FirstBranchingRule {
-            model: ModelRef::new(&mut model),
+            model: model.clone_for_plugins(),
         };
         let solved = model
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)

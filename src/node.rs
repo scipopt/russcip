@@ -32,11 +32,11 @@ impl Node {
 mod tests {
     use crate::{
         branchrule::{BranchRule, BranchingResult},
-        model::{Model, ModelRef},
+        model::{Model, ProblemCreated},
     };
 
     struct NodeDataBranchRule {
-        model: ModelRef,
+        model: Model<ProblemCreated>,
     }
 
     impl BranchRule for NodeDataBranchRule {
@@ -63,7 +63,7 @@ mod tests {
             .unwrap();
 
         let mut br = NodeDataBranchRule {
-            model: ModelRef::new(&mut model),
+            model: model.clone_for_plugins(),
         };
         model
             .include_branch_rule("", "", 100000, 1000, 1., &mut br)

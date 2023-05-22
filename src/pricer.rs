@@ -45,7 +45,7 @@ impl From<PricerResultState> for u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{model::ModelRef, status::Status, variable::VarType};
+    use crate::{model::{ProblemCreated, Model}, status::Status, variable::VarType};
 
     struct PanickingPricer;
 
@@ -152,7 +152,7 @@ mod tests {
 
     struct AddSameColumnPricer {
         added: bool,
-        model: ModelRef,
+        model: Model<ProblemCreated>,
     }
 
     impl Pricer for AddSameColumnPricer {
@@ -184,7 +184,7 @@ mod tests {
 
         let mut pricer = AddSameColumnPricer {
             added: false,
-            model: ModelRef::new(&mut model),
+            model: model.clone_for_plugins(),
         };
 
         let solved = model
