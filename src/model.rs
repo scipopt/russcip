@@ -234,8 +234,12 @@ impl ScipPtr {
         ) };
         let mut var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
+        let mut transformed_var = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: var_ptr })
+        self.priced_vars.push(var_ptr);
+        Ok(Variable { raw: trans_var_ptr })
     }
 
     fn create_cons(
@@ -532,7 +536,38 @@ impl ScipPtr {
         var: Rc<Variable>,
         coef: f64,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons.raw, var.raw, coef) };
+        let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;
+        let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.raw) } == 1;
+        let cons_ptr = if !cons_is_transformed && var_is_transformed {
+            let mut transformed_cons = MaybeUninit::<*mut ffi::SCIP_Cons>::uninit();
+            scip_call!(ffi::SCIPgetTransformedCons(
+                self.raw,
+                cons.raw,
+                transformed_cons.as_mut_ptr()
+            ));
+            unsafe { transformed_cons.assume_init() }
+        } else {
+            cons.raw
+        };
+
+        let var_ptr = if cons_is_transformed && !var_is_transformed {
+            let mut transformed_var = MaybeUninit::<*mut ffi::SCIP_Var>::uninit();
+            scip_call!(ffi::SCIPgetTransformedVar(
+                self.raw,
+                var.raw,
+                transformed_var.as_mut_ptr()
+            ));
+            unsafe { transformed_var.assume_init() }
+        } else {
+            var.raw
+        };
+
+        scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons_ptr, var_ptr, coef) };
+        Ok(())
+    }
+
+    fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetConsModifiable(self.raw, cons.raw, modifiable.into()));
         Ok(())
     }
 
@@ -772,13 +807,20 @@ impl Model<ProblemCreated> {
         }
     }
 
+    /// Sets the constraint as modifiable or not.
+    pub fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) {
+        self.scip
+            .set_cons_modifiable(cons, modifiable)
+            .expect("Failed to set constraint modifiable");
+    }
+
     /// Returns the current node of the model.
     ///
     /// # Panics
     ///
     /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
     pub fn get_focus_node(&self) -> Node {
-        self.deref().scip.get_focus_node()
+        self.scip.get_focus_node()
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.

@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn node_after_solving() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 1)
             .unwrap() // only call brancher once

@@ -45,7 +45,11 @@ impl From<PricerResultState> for u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{model::{ProblemCreated, Model}, status::Status, variable::VarType};
+    use crate::{
+        model::{Model, ProblemCreated, ModelWithProblem},
+        status::Status,
+        variable::VarType,
+    };
 
     struct PanickingPricer;
 
@@ -164,8 +168,15 @@ mod tests {
                 }
             } else {
                 self.added = true;
-                self.model
+                let nvars_before = self.model.get_n_vars();
+                let var = self.model
                     .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+                let conss = self.model.get_conss();
+                for cons in conss {
+                    self.model.add_cons_coef(cons, var.clone(), 1.0);
+                }
+                let nvars_after = self.model.get_n_vars();
+                assert_eq!(nvars_before + 1, nvars_after);
                 PricerResult {
                     state: PricerResultState::FoundColumns,
                     lower_bound: None,
@@ -181,6 +192,11 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
+
+        let conss = model.get_conss();
+        for c in conss {
+            model.set_cons_modifiable(c, true);
+        }
 
         let mut pricer = AddSameColumnPricer {
             added: false,
