@@ -65,8 +65,9 @@ mod tests {
         let mut br = NodeDataBranchRule {
             model: model.clone_for_plugins(),
         };
+
         model
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
     }
 }

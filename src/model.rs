@@ -2,7 +2,6 @@ use core::panic;
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
@@ -357,7 +356,7 @@ impl ScipPtr {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: &mut dyn BranchRule,
+        rule: Box<dyn BranchRule>,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -372,7 +371,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut &mut dyn BranchRule;
+            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
             let cands = ScipPtr::get_lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
@@ -425,7 +424,7 @@ impl ScipPtr {
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: &mut dyn Pricer,
+        pricer: Box<dyn Pricer>,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -440,7 +439,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            let pricer_ptr = data_ptr as *mut &mut dyn Pricer;
+            let pricer_ptr = data_ptr as *mut Box<dyn Pricer>;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
@@ -565,8 +564,16 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) -> Result<(), Retcode> {
-        scip_call!(ffi::SCIPsetConsModifiable(self.raw, cons.raw, modifiable.into()));
+    fn set_cons_modifiable(
+        &mut self,
+        cons: Rc<Constraint>,
+        modifiable: bool,
+    ) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetConsModifiable(
+            self.raw,
+            cons.raw,
+            modifiable.into()
+        ));
         Ok(())
     }
 
@@ -1005,7 +1012,7 @@ impl Model<ProblemCreated> {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: &mut dyn BranchRule,
+        rule: Box<dyn BranchRule>,
     ) -> Self {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
@@ -1036,7 +1043,7 @@ impl Model<ProblemCreated> {
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: &mut dyn Pricer,
+        pricer: Box<dyn Pricer>,
     ) -> Self {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)

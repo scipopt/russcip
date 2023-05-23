@@ -69,7 +69,7 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         // solve model
         model.solve();
@@ -96,7 +96,7 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         model.solve();
     }
@@ -123,7 +123,7 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         model.solve();
     }
@@ -148,19 +148,29 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }
 
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct ComplexData {
+        a: Vec<usize>,
+        b: f64,
+        c: Option<isize>
+    }
+
     struct AddSameColumnPricer {
         added: bool,
         model: Model<ProblemCreated>,
+        data: ComplexData,
     }
 
     impl Pricer for AddSameColumnPricer {
         fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+            assert!(self.data.a == (0..1000).collect::<Vec<usize>>());
             if self.added {
                 PricerResult {
                     state: PricerResultState::NoColumns,
@@ -201,10 +211,15 @@ mod tests {
         let mut pricer = AddSameColumnPricer {
             added: false,
             model: model.clone_for_plugins(),
+            data: ComplexData {
+                a: (0..1000).collect::<Vec<usize>>(),
+                b: 1.0,
+                c: Some(1)
+            },
         };
 
         let solved = model
-            .include_pricer("", "", 9999999, false, &mut pricer)
+            .include_pricer("", "", 9999999, false, Box::new(pricer))
             .solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }
