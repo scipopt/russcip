@@ -389,7 +389,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn BranchRule>) });
             Retcode::Okay.into()
         }
 
@@ -497,7 +497,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn Pricer) });
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Pricer>) });
             Retcode::Okay.into()
         }
 
