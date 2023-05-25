@@ -44,6 +44,7 @@
 #![deny(missing_docs)]
 
 extern crate doc_comment;
+extern crate core;
 doc_comment::doctest!("../README.md");
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
@@ -75,6 +76,9 @@ pub mod variable;
 
 /// Contains the `Node` struct, which represents a node in the branch-and-bound tree.
 pub mod node;
+
+/// Contains the `EventHdlr` trait used to define custom event handlers.
+pub mod eventhdlr;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]
