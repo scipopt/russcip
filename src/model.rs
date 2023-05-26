@@ -982,6 +982,8 @@ impl Model<ProblemCreated> {
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var = Rc::new(var);
+        let var_id = var.get_index();
+        self.state.vars.insert(var_id, var.clone());
         var
     }
 
