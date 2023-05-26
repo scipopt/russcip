@@ -1,6 +1,6 @@
 use core::panic;
 use std::collections::BTreeMap;
-use std::ffi::CString;
+use std::ffi::{CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -8,6 +8,7 @@ use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
+use crate::eventhdlr::{Eventhdlr};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
@@ -346,6 +347,97 @@ impl ScipPtr {
         val: f64,
     ) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPbranchVarVal(scip, var, val, std::ptr::null_mut(), std::ptr::null_mut(),std::ptr::null_mut()) };
+        Ok(())
+    }
+
+    fn include_eventhdlr(
+        &self,
+        name: &str,
+        desc: &str,
+        eventhdlr: Box<dyn Eventhdlr>,
+    ) -> Result<(), Retcode> {
+
+        extern "C" fn eventhdlrexec(
+            _scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+            _event: *mut ffi::SCIP_EVENT,
+            _event_data: *mut ffi::SCIP_EVENTDATA,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            unsafe { (*eventhdlr_ptr).execute() };
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn eventhdlrinit(
+            scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            unsafe {
+            ffi::SCIPcatchEvent(
+                scip,
+                event_type.into(),
+                eventhdlr,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            ) }
+        }
+
+        unsafe extern "C" fn eventhdlrexit(
+            scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            unsafe {
+                ffi::SCIPdropEvent(
+                    scip,
+                    event_type.into(),
+                    eventhdlr,
+                    std::ptr::null_mut(),
+                    0,
+                )
+            }
+        }
+
+        unsafe extern "C" fn eventhdlrfree(
+            _scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            drop(unsafe { Box::from_raw(eventhdlr_ptr) });
+            Retcode::Okay.into()
+        }
+
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+        let eventhdlr_ptr = Box::into_raw(Box::new(eventhdlr));
+
+        unsafe {
+        ffi::SCIPincludeEventhdlr(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            None,
+            Some(eventhdlrfree),
+            Some(eventhdlrinit),
+            Some(eventhdlrexit),
+            None, // initsol
+            None, // exitsol
+            None, // delete
+            Some(eventhdlrexec),
+            eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
+        ); }
+
         Ok(())
     }
 
@@ -1017,6 +1109,30 @@ impl Model<ProblemCreated> {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
+        self
+    }
+
+
+    /// Includes a new event handler in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the event handler. This should be a unique identifier.
+    /// * `desc` - A brief description of the event handler. This is used for informational purposes.
+    /// * `eventhdlr` - The event handler to be included. This should be a mutable reference to an object that implements the `EventHdlr` trait, and represents the event handling logic.
+    ///
+    /// # Returns
+    ///
+    /// This function returns the `Model` instance for which the event handler was included. This allows for method chaining.
+    pub fn include_eventhdlr(
+        self,
+        name: &str,
+        desc: &str,
+        eventhdlr: Box<dyn Eventhdlr>,
+    ) -> Self {
+        self.scip
+            .include_eventhdlr(name, desc, eventhdlr)
+            .expect("Failed to include event handler at state ProblemCreated");
         self
     }
 

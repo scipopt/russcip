@@ -68,7 +68,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn panicking_branchrule() {
-        let mut br = PanickingBranchingRule {};
+        let br = PanickingBranchingRule {};
 
         Model::new()
             .hide_output()
@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn choosing_first_branching_rule() {
-        let mut br = FirstChoosingBranchingRule { chosen: None };
+        let br = FirstChoosingBranchingRule { chosen: None };
 
         let model = Model::new()
             .set_longint_param("limits/nodes", 2) // only call brancher once
@@ -121,7 +121,7 @@ mod tests {
 
     #[test]
     fn cutting_off_branching_rule() {
-        let mut br = CuttingOffBranchingRule {};
+        let br = CuttingOffBranchingRule {};
 
         // create model from miplib instance gen-ip054
         let model = Model::new()
@@ -155,7 +155,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let mut br = FirstBranchingRule {
+        let br = FirstBranchingRule {
             model: model.clone_for_plugins(),
         };
         let solved = model

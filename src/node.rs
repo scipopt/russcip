@@ -62,7 +62,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let mut br = NodeDataBranchRule {
+        let br = NodeDataBranchRule {
             model: model.clone_for_plugins(),
         };
 
