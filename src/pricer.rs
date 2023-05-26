@@ -62,7 +62,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn panicking_pricer() {
-        let mut pricer = PanickingPricer {};
+        let pricer = PanickingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn nothing_pricer() {
-        let mut pricer = LyingPricer {};
+        let pricer = LyingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
@@ -116,7 +116,7 @@ mod tests {
     #[should_panic]
     /// Stops pricing early then throws an error that no branching can be performed
     fn early_stopping_pricer() {
-        let mut pricer = EarlyStoppingPricer {};
+        let pricer = EarlyStoppingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
@@ -141,7 +141,7 @@ mod tests {
 
     #[test]
     fn optimal_pricer() {
-        let mut pricer = OptimalPricer {};
+        let pricer = OptimalPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
@@ -208,7 +208,7 @@ mod tests {
             model.set_cons_modifiable(c, true);
         }
 
-        let mut pricer = AddSameColumnPricer {
+        let pricer = AddSameColumnPricer {
             added: false,
             model: model.clone_for_plugins(),
             data: ComplexData {

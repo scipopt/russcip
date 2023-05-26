@@ -1,4 +1,4 @@
-use std::convert::Into;
+
 use std::ops::{BitOr, BitOrAssign};
 
 /// Trait used to define custom event handlers.
@@ -168,14 +168,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_eventhdlr() {
-        let mut eh = PanickingEventHdlr {};
+        let eh = PanickingEventHdlr {};
 
         Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_eventhdlr("PanickingEventHdlr", "", 99999999, Box::new(eh))
+            .include_eventhdlr("PanickingEventHdlr", "",  Box::new(eh))
             .solve();
     }
 }

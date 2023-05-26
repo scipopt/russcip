@@ -354,15 +354,14 @@ impl ScipPtr {
         &self,
         name: &str,
         desc: &str,
-        priority: i32,
         eventhdlr: Box<dyn Eventhdlr>,
     ) -> Result<(), Retcode> {
 
         extern "C" fn eventhdlrexec(
             _scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
-            event: *mut ffi::SCIP_EVENT,
-            event_data: *mut ffi::SCIP_EVENTDATA,
+            _event: *mut ffi::SCIP_EVENT,
+            _event_data: *mut ffi::SCIP_EVENTDATA,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
@@ -409,7 +408,7 @@ impl ScipPtr {
         }
 
         unsafe extern "C" fn eventhdlrfree(
-            scip: *mut ffi::SCIP,
+            _scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
@@ -1120,7 +1119,6 @@ impl Model<ProblemCreated> {
     ///
     /// * `name` - The name of the event handler. This should be a unique identifier.
     /// * `desc` - A brief description of the event handler. This is used for informational purposes.
-    /// * `priority` - The priority of the event handler. When SCIP processes events, it considers their priorities. A higher value indicates a higher priority.
     /// * `eventhdlr` - The event handler to be included. This should be a mutable reference to an object that implements the `EventHdlr` trait, and represents the event handling logic.
     ///
     /// # Returns
@@ -1130,11 +1128,10 @@ impl Model<ProblemCreated> {
         self,
         name: &str,
         desc: &str,
-        priority: i32,
         eventhdlr: Box<dyn Eventhdlr>,
     ) -> Self {
         self.scip
-            .include_eventhdlr(name, desc, priority, eventhdlr)
+            .include_eventhdlr(name, desc, eventhdlr)
             .expect("Failed to include event handler at state ProblemCreated");
         self
     }
