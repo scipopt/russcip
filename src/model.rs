@@ -408,6 +408,17 @@ impl ScipPtr {
             }
         }
 
+        unsafe extern "C" fn eventhdlrfree(
+            scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            drop(unsafe { Box::from_raw(eventhdlr_ptr) });
+            Retcode::Okay.into()
+        }
+
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
         let eventhdlr_ptr = Box::into_raw(Box::new(eventhdlr));
@@ -418,9 +429,9 @@ impl ScipPtr {
             c_name.as_ptr(),
             c_desc.as_ptr(),
             None,
-            None, // free
-            Some(eventhdlrinit), // init
-            Some(eventhdlrexit), // exit
+            Some(eventhdlrfree),
+            Some(eventhdlrinit),
+            Some(eventhdlrexit),
             None, // initsol
             None, // exitsol
             None, // delete
