@@ -1,4 +1,5 @@
 use core::panic;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{CString};
 use std::mem::MaybeUninit;
@@ -747,14 +748,14 @@ pub struct PluginsIncluded;
 /// Represents the state of an optimization model where the problem has been created.
 #[derive(Clone)]
 pub struct ProblemCreated {
-    pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Rc<Constraint>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
 }
 
 /// Represents the state of an optimization model that has been solved.
 pub struct Solved {
-    pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Rc<Constraint>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
     pub(crate) best_sol: Option<Solution>,
 }
 
@@ -852,8 +853,8 @@ impl Model<PluginsIncluded> {
         Model {
             scip: self.scip,
             state: ProblemCreated {
-                vars: BTreeMap::new(),
-                conss: Vec::new(),
+                vars: Rc::new(RefCell::new(BTreeMap::new())),
+                conss: Rc::new(RefCell::new(Vec::new())),
             },
         }
     }
@@ -869,8 +870,8 @@ impl Model<PluginsIncluded> {
     /// This method returns a `Retcode` error if the problem cannot be read from the file.
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
-        let vars = self.scip.get_vars();
-        let conss = self.scip.get_conss();
+        let vars = Rc::new(RefCell::new(self.scip.get_vars()));
+        let conss = Rc::new(RefCell::new(self.scip.get_conss()));
         let new_model = Model {
             scip: self.scip,
             state: ProblemCreated { vars, conss },
@@ -952,7 +953,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.get_index();
         let var = Rc::new(var);
-        self.state.vars.insert(var_id, var.clone());
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -983,7 +984,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to create variable in state ProblemCreated");
         let var = Rc::new(var);
         let var_id = var.get_index();
-        self.state.vars.insert(var_id, var.clone());
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -1018,7 +1019,7 @@ impl Model<ProblemCreated> {
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
         let cons = Rc::new(cons);
-        self.state.conss.push(cons.clone());
+        self.state.conss.borrow_mut().push(cons.clone());
         cons
     }
 
@@ -1043,7 +1044,7 @@ impl Model<ProblemCreated> {
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
         let cons = Rc::new(cons);
-        self.state.conss.push(cons.clone());
+        self.state.conss.borrow_mut().push(cons.clone());
         cons
     }
 
@@ -1261,12 +1262,12 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn get_vars(&self) -> Vec<Rc<Variable>> {
-                self.state.vars.values().map(Rc::clone).collect()
+                self.state.vars.borrow().values().map(Rc::clone).collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
             fn get_var(&self, var_id: VarId) -> Option<Rc<Variable>> {
-                self.state.vars.get(&var_id).map(Rc::clone)
+                self.state.vars.borrow().get(&var_id).map(Rc::clone)
             }
 
             /// Returns the number of variables in the optimization model.
@@ -1281,7 +1282,7 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all constraints in the optimization model.
             fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss.iter().map(Rc::clone).collect()
+                self.state.conss.borrow().iter().map(Rc::clone).collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
