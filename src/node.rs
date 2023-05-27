@@ -32,11 +32,11 @@ impl Node {
 mod tests {
     use crate::{
         branchrule::{BranchRule, BranchingResult},
-        model::{Model, ModelRef},
+        model::{Model, ProblemCreated},
     };
 
     struct NodeDataBranchRule {
-        model: ModelRef,
+        model: Model<ProblemCreated>,
     }
 
     impl BranchRule for NodeDataBranchRule {
@@ -54,7 +54,7 @@ mod tests {
 
     #[test]
     fn node_after_solving() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 1)
             .unwrap() // only call brancher once
@@ -62,11 +62,12 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let mut br = NodeDataBranchRule {
-            model: ModelRef::new(&mut model),
+        let br = NodeDataBranchRule {
+            model: model.clone_for_plugins(),
         };
+
         model
-            .include_branch_rule("", "", 100000, 1000, 1., &mut br)
+            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
     }
 }

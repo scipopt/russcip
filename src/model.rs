@@ -1,14 +1,15 @@
 use core::panic;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::CString;
+use std::ffi::{CString};
 use std::mem::MaybeUninit;
-use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
+use crate::eventhdlr::{Eventhdlr};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
@@ -19,6 +20,7 @@ use crate::{ffi, scip_call_panic};
 #[non_exhaustive]
 struct ScipPtr {
     raw: *mut ffi::SCIP,
+    consumed: bool,
 }
 
 impl ScipPtr {
@@ -26,7 +28,17 @@ impl ScipPtr {
         let mut scip_ptr = MaybeUninit::uninit();
         scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
-        ScipPtr { raw: scip_ptr }
+        ScipPtr {
+            raw: scip_ptr,
+            consumed: false,
+        }
+    }
+
+    fn clone(&self) -> Self {
+        ScipPtr {
+            raw: self.raw,
+            consumed: true,
+        }
     }
 
     fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
@@ -223,8 +235,11 @@ impl ScipPtr {
         ) };
         let mut var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
+        let mut transformed_var = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: var_ptr })
+        Ok(Variable { raw: trans_var_ptr })
     }
 
     fn create_cons(
@@ -336,6 +351,97 @@ impl ScipPtr {
         Ok(())
     }
 
+    fn include_eventhdlr(
+        &self,
+        name: &str,
+        desc: &str,
+        eventhdlr: Box<dyn Eventhdlr>,
+    ) -> Result<(), Retcode> {
+
+        extern "C" fn eventhdlrexec(
+            _scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+            _event: *mut ffi::SCIP_EVENT,
+            _event_data: *mut ffi::SCIP_EVENTDATA,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            unsafe { (*eventhdlr_ptr).execute() };
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn eventhdlrinit(
+            scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            unsafe {
+            ffi::SCIPcatchEvent(
+                scip,
+                event_type.into(),
+                eventhdlr,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            ) }
+        }
+
+        unsafe extern "C" fn eventhdlrexit(
+            scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            unsafe {
+                ffi::SCIPdropEvent(
+                    scip,
+                    event_type.into(),
+                    eventhdlr,
+                    std::ptr::null_mut(),
+                    0,
+                )
+            }
+        }
+
+        unsafe extern "C" fn eventhdlrfree(
+            _scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            drop(unsafe { Box::from_raw(eventhdlr_ptr) });
+            Retcode::Okay.into()
+        }
+
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+        let eventhdlr_ptr = Box::into_raw(Box::new(eventhdlr));
+
+        unsafe {
+        ffi::SCIPincludeEventhdlr(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            None,
+            Some(eventhdlrfree),
+            Some(eventhdlrinit),
+            Some(eventhdlrexit),
+            None, // initsol
+            None, // exitsol
+            None, // delete
+            Some(eventhdlrexec),
+            eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
+        ); }
+
+        Ok(())
+    }
+
     fn include_branch_rule(
         &self,
         name: &str,
@@ -343,7 +449,7 @@ impl ScipPtr {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: &mut dyn BranchRule,
+        rule: Box<dyn BranchRule>,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -358,7 +464,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut &mut dyn BranchRule;
+            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
             let cands = ScipPtr::get_lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
@@ -376,7 +482,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn BranchRule) });
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn BranchRule>) });
             Retcode::Okay.into()
         }
 
@@ -411,7 +517,7 @@ impl ScipPtr {
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: &mut dyn Pricer,
+        pricer: Box<dyn Pricer>,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -426,7 +532,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            let pricer_ptr = data_ptr as *mut &mut dyn Pricer;
+            let pricer_ptr = data_ptr as *mut Box<dyn Pricer>;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
@@ -484,7 +590,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut &mut dyn Pricer) });
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Pricer>) });
             Retcode::Okay.into()
         }
 
@@ -521,7 +627,46 @@ impl ScipPtr {
         var: Rc<Variable>,
         coef: f64,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons.raw, var.raw, coef) };
+        let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;
+        let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.raw) } == 1;
+        let cons_ptr = if !cons_is_transformed && var_is_transformed {
+            let mut transformed_cons = MaybeUninit::<*mut ffi::SCIP_Cons>::uninit();
+            scip_call!(ffi::SCIPgetTransformedCons(
+                self.raw,
+                cons.raw,
+                transformed_cons.as_mut_ptr()
+            ));
+            unsafe { transformed_cons.assume_init() }
+        } else {
+            cons.raw
+        };
+
+        let var_ptr = if cons_is_transformed && !var_is_transformed {
+            let mut transformed_var = MaybeUninit::<*mut ffi::SCIP_Var>::uninit();
+            scip_call!(ffi::SCIPgetTransformedVar(
+                self.raw,
+                var.raw,
+                transformed_var.as_mut_ptr()
+            ));
+            unsafe { transformed_var.assume_init() }
+        } else {
+            var.raw
+        };
+
+        scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons_ptr, var_ptr, coef) };
+        Ok(())
+    }
+
+    fn set_cons_modifiable(
+        &mut self,
+        cons: Rc<Constraint>,
+        modifiable: bool,
+    ) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetConsModifiable(
+            self.raw,
+            cons.raw,
+            modifiable.into()
+        ));
         Ok(())
     }
 
@@ -546,6 +691,9 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
+        if self.consumed {
+            return;
+        }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
         // so we need to release them before freeing the SCIP instance
 
@@ -598,15 +746,16 @@ pub struct Unsolved;
 pub struct PluginsIncluded;
 
 /// Represents the state of an optimization model where the problem has been created.
+#[derive(Clone)]
 pub struct ProblemCreated {
-    pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Rc<Constraint>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
 }
 
 /// Represents the state of an optimization model that has been solved.
 pub struct Solved {
-    pub(crate) vars: BTreeMap<VarId, Rc<Variable>>,
-    pub(crate) conss: Vec<Rc<Constraint>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
     pub(crate) best_sol: Option<Solution>,
 }
 
@@ -704,8 +853,8 @@ impl Model<PluginsIncluded> {
         Model {
             scip: self.scip,
             state: ProblemCreated {
-                vars: BTreeMap::new(),
-                conss: Vec::new(),
+                vars: Rc::new(RefCell::new(BTreeMap::new())),
+                conss: Rc::new(RefCell::new(Vec::new())),
             },
         }
     }
@@ -721,8 +870,8 @@ impl Model<PluginsIncluded> {
     /// This method returns a `Retcode` error if the problem cannot be read from the file.
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
-        let vars = self.scip.get_vars();
-        let conss = self.scip.get_conss();
+        let vars = Rc::new(RefCell::new(self.scip.get_vars()));
+        let conss = Rc::new(RefCell::new(self.scip.get_conss()));
         let new_model = Model {
             scip: self.scip,
             state: ProblemCreated { vars, conss },
@@ -746,6 +895,31 @@ impl Model<ProblemCreated> {
             .set_obj_sense(sense)
             .expect("Failed to set objective sense in state ProblemCreated");
         self
+    }
+
+    /// Returns a clone of the current model.
+    /// The clone is meant for use in implementing custom plugins.
+    pub fn clone_for_plugins(&self) -> Self {
+        Model {
+            scip: self.scip.clone(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Sets the constraint as modifiable or not.
+    pub fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) {
+        self.scip
+            .set_cons_modifiable(cons, modifiable)
+            .expect("Failed to set constraint modifiable");
+    }
+
+    /// Returns the current node of the model.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
+    pub fn get_focus_node(&self) -> Node {
+        self.scip.get_focus_node()
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
@@ -779,7 +953,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.get_index();
         let var = Rc::new(var);
-        self.state.vars.insert(var_id, var.clone());
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -809,6 +983,8 @@ impl Model<ProblemCreated> {
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var = Rc::new(var);
+        let var_id = var.get_index();
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -843,7 +1019,7 @@ impl Model<ProblemCreated> {
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
         let cons = Rc::new(cons);
-        self.state.conss.push(cons.clone());
+        self.state.conss.borrow_mut().push(cons.clone());
         cons
     }
 
@@ -868,7 +1044,7 @@ impl Model<ProblemCreated> {
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
         let cons = Rc::new(cons);
-        self.state.conss.push(cons.clone());
+        self.state.conss.borrow_mut().push(cons.clone());
         cons
     }
 
@@ -931,11 +1107,35 @@ impl Model<ProblemCreated> {
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: &mut dyn BranchRule,
+        rule: Box<dyn BranchRule>,
     ) -> Self {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
+        self
+    }
+
+
+    /// Includes a new event handler in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the event handler. This should be a unique identifier.
+    /// * `desc` - A brief description of the event handler. This is used for informational purposes.
+    /// * `eventhdlr` - The event handler to be included. This should be a mutable reference to an object that implements the `EventHdlr` trait, and represents the event handling logic.
+    ///
+    /// # Returns
+    ///
+    /// This function returns the `Model` instance for which the event handler was included. This allows for method chaining.
+    pub fn include_eventhdlr(
+        self,
+        name: &str,
+        desc: &str,
+        eventhdlr: Box<dyn Eventhdlr>,
+    ) -> Self {
+        self.scip
+            .include_eventhdlr(name, desc, eventhdlr)
+            .expect("Failed to include event handler at state ProblemCreated");
         self
     }
 
@@ -962,7 +1162,7 @@ impl Model<ProblemCreated> {
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: &mut dyn Pricer,
+        pricer: Box<dyn Pricer>,
     ) -> Self {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)
@@ -1062,12 +1262,12 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn get_vars(&self) -> Vec<Rc<Variable>> {
-                self.state.vars.values().map(Rc::clone).collect()
+                self.state.vars.borrow().values().map(Rc::clone).collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
             fn get_var(&self, var_id: VarId) -> Option<Rc<Variable>> {
-                self.state.vars.get(&var_id).map(Rc::clone)
+                self.state.vars.borrow().get(&var_id).map(Rc::clone)
             }
 
             /// Returns the number of variables in the optimization model.
@@ -1082,7 +1282,7 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all constraints in the optimization model.
             fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss.iter().map(Rc::clone).collect()
+                self.state.conss.borrow().iter().map(Rc::clone).collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
@@ -1202,52 +1402,6 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
         }
-    }
-}
-
-/// A wrapper for a mutable reference to a model instance.
-/// This should only be used if access to the model is required when implementing SCIP plugins,
-/// e.g variable pricers, branching rules.
-pub struct ModelRef {
-    inner: *mut Model<ProblemCreated>,
-}
-
-impl ModelRef {
-    /// Creates a new `ModelRef` instance from a mutable reference to a model instance.
-    pub fn new(inner: &mut Model<ProblemCreated>) -> Self {
-        ModelRef {
-            inner: inner as *mut Model<ProblemCreated>,
-        }
-    }
-
-    /// Clones the `ModelRef` instance.
-    pub fn clone(&mut self) -> Self {
-        ModelRef { inner: self.inner }
-    }
-
-    /// Returns the current node of the model.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
-    pub fn get_focus_node(&self) -> Node {
-        self.deref().scip.get_focus_node()
-    }
-}
-
-impl Deref for ModelRef {
-    type Target = Model<ProblemCreated>;
-
-    /// Dereferences the `ModelRef` instance to a reference to the inner model instance.
-    fn deref(&self) -> &Self::Target {
-        unsafe { &*self.inner }
-    }
-}
-
-impl DerefMut for ModelRef {
-    /// Dereferences the `ModelRef` instance to a mutable reference to the inner model instance.
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { &mut *self.inner }
     }
 }
 

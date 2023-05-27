@@ -45,7 +45,11 @@ impl From<PricerResultState> for u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{model::ModelRef, status::Status, variable::VarType};
+    use crate::{
+        model::{Model, ProblemCreated, ModelWithProblem},
+        status::Status,
+        variable::VarType,
+    };
 
     struct PanickingPricer;
 
@@ -58,14 +62,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn panicking_pricer() {
-        let mut pricer = PanickingPricer {};
+        let pricer = PanickingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         // solve model
         model.solve();
@@ -85,14 +89,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn nothing_pricer() {
-        let mut pricer = LyingPricer {};
+        let pricer = LyingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         model.solve();
     }
@@ -112,14 +116,14 @@ mod tests {
     #[should_panic]
     /// Stops pricing early then throws an error that no branching can be performed
     fn early_stopping_pricer() {
-        let mut pricer = EarlyStoppingPricer {};
+        let pricer = EarlyStoppingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         model.solve();
     }
@@ -137,26 +141,36 @@ mod tests {
 
     #[test]
     fn optimal_pricer() {
-        let mut pricer = OptimalPricer {};
+        let pricer = OptimalPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_pricer("", "", 9999999, false, &mut pricer);
+            .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         let solved = model.solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }
 
+
+    #[derive(Debug, PartialEq, Clone)]
+    struct ComplexData {
+        a: Vec<usize>,
+        b: f64,
+        c: Option<isize>
+    }
+
     struct AddSameColumnPricer {
         added: bool,
-        model: ModelRef,
+        model: Model<ProblemCreated>,
+        data: ComplexData,
     }
 
     impl Pricer for AddSameColumnPricer {
         fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+            assert!(self.data.a == (0..1000).collect::<Vec<usize>>());
             if self.added {
                 PricerResult {
                     state: PricerResultState::NoColumns,
@@ -164,8 +178,15 @@ mod tests {
                 }
             } else {
                 self.added = true;
-                self.model
+                let nvars_before = self.model.get_n_vars();
+                let var = self.model
                     .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+                let conss = self.model.get_conss();
+                for cons in conss {
+                    self.model.add_cons_coef(cons, var.clone(), 1.0);
+                }
+                let nvars_after = self.model.get_n_vars();
+                assert_eq!(nvars_before + 1, nvars_after);
                 PricerResult {
                     state: PricerResultState::FoundColumns,
                     lower_bound: None,
@@ -182,13 +203,23 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let mut pricer = AddSameColumnPricer {
+        let conss = model.get_conss();
+        for c in conss {
+            model.set_cons_modifiable(c, true);
+        }
+
+        let pricer = AddSameColumnPricer {
             added: false,
-            model: ModelRef::new(&mut model),
+            model: model.clone_for_plugins(),
+            data: ComplexData {
+                a: (0..1000).collect::<Vec<usize>>(),
+                b: 1.0,
+                c: Some(1)
+            },
         };
 
         let solved = model
-            .include_pricer("", "", 9999999, false, &mut pricer)
+            .include_pricer("", "", 9999999, false, Box::new(pricer))
             .solve();
         assert_eq!(solved.get_status(), Status::Optimal);
     }

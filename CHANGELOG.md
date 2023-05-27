@@ -1,8 +1,21 @@
 # CHANGELOG
 
-## Unreleased
+## unreleased
 ### Added
+- Event handler plugin support. 
 ### Fixed
+- Fixed sending plugin data to and from SCIP. 
+- Consistent model data across its clones. 
+### Changed
+### Removed
+
+
+## 0.2.3
+### Added
+- Event handler plugin support. 
+### Fixed
+- Fixed sending plugin data to and from SCIP. 
+- Consistent model data across its clones. 
 ### Changed
 ### Removed
 
