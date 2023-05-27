@@ -5,6 +5,7 @@
 - Event handler plugin support. 
 ### Fixed
 - Fixed sending plugin data to and from SCIP. 
+- Consistent model data across its clones. 
 ### Changed
 ### Removed
 
