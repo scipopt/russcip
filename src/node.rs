@@ -26,6 +26,16 @@ impl Node {
     pub fn lower_bound(&self) -> f64 {
         unsafe { ffi::SCIPnodeGetLowerbound(self.raw) }
     }
+
+    /// Returns the parent of the node and `None` if the node is the root node.
+    pub fn get_parent(&self) -> Option<Node> {
+        let parent = unsafe { ffi::SCIPnodeGetParent(self.raw) };
+        if parent.is_null() {
+            None
+        } else {
+            Some(Node { raw: parent })
+        }
+    }
 }
 
 #[cfg(test)]
@@ -48,6 +58,7 @@ mod tests {
             assert_eq!(node.number(), 1);
             assert_eq!(node.depth(), 0);
             assert!(node.lower_bound() < 6777.0);
+            assert!(node.get_parent().is_none());
             BranchingResult::DidNotRun
         }
     }

@@ -2,10 +2,9 @@
 
 ## unreleased
 ### Added
-- Event handler plugin support. 
+- Model methods to create child from the current focus node. 
+- Node method to get its parent. 
 ### Fixed
-- Fixed sending plugin data to and from SCIP. 
-- Consistent model data across its clones. 
 ### Changed
 ### Removed
 

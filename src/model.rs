@@ -1,15 +1,15 @@
 use core::panic;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::{CString};
+use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
 use crate::branchrule::{BranchRule, BranchingCandidate, BranchingResult};
 use crate::constraint::Constraint;
+use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
-use crate::eventhdlr::{Eventhdlr};
 use crate::retcode::Retcode;
 use crate::scip_call;
 use crate::solution::Solution;
@@ -357,7 +357,6 @@ impl ScipPtr {
         desc: &str,
         eventhdlr: Box<dyn Eventhdlr>,
     ) -> Result<(), Retcode> {
-
         extern "C" fn eventhdlrexec(
             _scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
@@ -380,13 +379,14 @@ impl ScipPtr {
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
             let event_type = unsafe { (*eventhdlr_ptr).get_type() };
             unsafe {
-            ffi::SCIPcatchEvent(
-                scip,
-                event_type.into(),
-                eventhdlr,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            ) }
+                ffi::SCIPcatchEvent(
+                    scip,
+                    event_type.into(),
+                    eventhdlr,
+                    std::ptr::null_mut(),
+                    std::ptr::null_mut(),
+                )
+            }
         }
 
         unsafe extern "C" fn eventhdlrexit(
@@ -398,13 +398,7 @@ impl ScipPtr {
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
             let event_type = unsafe { (*eventhdlr_ptr).get_type() };
             unsafe {
-                ffi::SCIPdropEvent(
-                    scip,
-                    event_type.into(),
-                    eventhdlr,
-                    std::ptr::null_mut(),
-                    0,
-                )
+                ffi::SCIPdropEvent(scip, event_type.into(), eventhdlr, std::ptr::null_mut(), 0)
             }
         }
 
@@ -424,20 +418,21 @@ impl ScipPtr {
         let eventhdlr_ptr = Box::into_raw(Box::new(eventhdlr));
 
         unsafe {
-        ffi::SCIPincludeEventhdlr(
-            self.raw,
-            c_name.as_ptr(),
-            c_desc.as_ptr(),
-            None,
-            Some(eventhdlrfree),
-            Some(eventhdlrinit),
-            Some(eventhdlrexit),
-            None, // initsol
-            None, // exitsol
-            None, // delete
-            Some(eventhdlrexec),
-            eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
-        ); }
+            ffi::SCIPincludeEventhdlr(
+                self.raw,
+                c_name.as_ptr(),
+                c_desc.as_ptr(),
+                None,
+                Some(eventhdlrfree),
+                Some(eventhdlrinit),
+                Some(eventhdlrexit),
+                None, // initsol
+                None, // exitsol
+                None, // delete
+                Some(eventhdlrexec),
+                eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
+            );
+        }
 
         Ok(())
     }
@@ -687,6 +682,19 @@ impl ScipPtr {
             raw: unsafe { ffi::SCIPgetFocusNode(self.raw) },
         }
     }
+
+    fn create_child(&mut self) -> Result<Node, Retcode> {
+        let mut node_ptr = MaybeUninit::uninit();
+        scip_call!(ffi::SCIPcreateChild(
+            self.raw,
+            node_ptr.as_mut_ptr(),
+            0.,
+            ffi::SCIPgetLocalTransEstimate(self.raw), // TODO: pass that as an argument
+        ));
+
+        let node_ptr = unsafe { node_ptr.assume_init() };
+        Ok(Node { raw: node_ptr })
+    }
 }
 
 impl Drop for ScipPtr {
@@ -922,6 +930,17 @@ impl Model<ProblemCreated> {
         self.scip.get_focus_node()
     }
 
+    /// Creates a new child node of the current node and returns it.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called from plugins implementations.
+    pub fn create_child(&mut self) -> Node {
+        self.scip
+            .create_child()
+            .expect("Failed to create child node in state ProblemCreated")
+    }
+
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -1115,7 +1134,6 @@ impl Model<ProblemCreated> {
         self
     }
 
-
     /// Includes a new event handler in the model.
     ///
     /// # Arguments
@@ -1127,12 +1145,7 @@ impl Model<ProblemCreated> {
     /// # Returns
     ///
     /// This function returns the `Model` instance for which the event handler was included. This allows for method chaining.
-    pub fn include_eventhdlr(
-        self,
-        name: &str,
-        desc: &str,
-        eventhdlr: Box<dyn Eventhdlr>,
-    ) -> Self {
+    pub fn include_eventhdlr(self, name: &str, desc: &str, eventhdlr: Box<dyn Eventhdlr>) -> Self {
         self.scip
             .include_eventhdlr(name, desc, eventhdlr)
             .expect("Failed to include event handler at state ProblemCreated");
