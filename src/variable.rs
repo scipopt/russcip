@@ -5,7 +5,7 @@ use core::panic;
 pub type VarId = usize;
 
 /// A wrapper for a mutable reference to a SCIP variable.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
 }

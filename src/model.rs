@@ -467,6 +467,13 @@ impl ScipPtr {
                 ScipPtr::branch_var_val(scip, cand.var.raw, cand.lp_sol_val).unwrap();
             };
 
+            if branching_res == BranchingResult::CustomBranching {
+                assert!(
+                    unsafe { ffi::SCIPgetNChildren(scip) > 0 },
+                    "Custom branching rule must create at least one child node"
+                )
+            }
+
             unsafe { *res = branching_res.into() };
             Retcode::Okay.into()
         }

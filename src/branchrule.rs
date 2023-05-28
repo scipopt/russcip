@@ -9,7 +9,7 @@ pub trait BranchRule {
 }
 
 /// The result of a branching rule execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BranchingResult {
     /// The branching rule did not run
     DidNotRun,
@@ -42,7 +42,7 @@ impl From<BranchingResult> for u32 {
 }
 
 /// A candidate for branching.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BranchingCandidate {
     /// The variable to branch on.
     pub var: Rc<Variable>,
@@ -156,6 +156,37 @@ mod tests {
             .unwrap();
 
         let br = FirstBranchingRule {
+            model: model.clone_for_plugins(),
+        };
+        let solved = model
+            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
+            .solve();
+
+        assert!(solved.get_n_nodes() > 1);
+    }
+
+    struct CustomBranchingRule {
+        model: Model<ProblemCreated>,
+    }
+
+    impl BranchRule for CustomBranchingRule {
+        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+            self.model.create_child();
+            BranchingResult::CustomBranching
+        }
+    }
+
+    #[test]
+    fn custom_branching_rule() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/nodes", 2)
+            .unwrap() // only call brancher once
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+
+        let br = CustomBranchingRule {
             model: model.clone_for_plugins(),
         };
         let solved = model
