@@ -3,7 +3,8 @@
 ## unreleased
 ### Added
 - Model methods to create child from the current focus node. 
-- Node method to get its parent. 
+- Node method to get its parent.
+- Methods to add set cover and set packing constraints. 
 ### Fixed
 ### Changed
 ### Removed

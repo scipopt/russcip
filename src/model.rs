@@ -294,6 +294,54 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+
+    /// Create set partitioning constraint
+    fn create_cons_set_cover(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicSetcover(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            0,
+            std::ptr::null_mut(),
+        ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        for var in vars.iter() {
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+        }
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
+
+    /// Create set packing constraint
+    fn create_cons_set_pack(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicSetcover(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            0,
+            std::ptr::null_mut(),
+        ) };
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        for var in vars.iter() {
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+        }
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
     /// Add coefficient to set packing/partitioning/covering constraint
     fn add_cons_coef_setppc(
         &mut self,
@@ -395,11 +443,12 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
-            let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
-            unsafe {
-                ffi::SCIPdropEvent(scip, event_type.into(), eventhdlr, std::ptr::null_mut(), 0)
-            }
+            // let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
+            // let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            // unsafe {
+            //     ffi::SCIPdropEvent(scip, event_type.into(), eventhdlr, std::ptr::null_mut(), 0)
+            // }
+            Retcode::Okay.into()
         }
 
         unsafe extern "C" fn eventhdlrfree(
@@ -1074,6 +1123,59 @@ impl Model<ProblemCreated> {
         cons
     }
 
+
+
+    /// Adds a new set cover constraint to the model with the given variables and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+    pub fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        let cons = self
+            .scip
+            .create_cons_set_part(vars, name)
+            .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.borrow_mut().push(cons.clone());
+        cons
+    }
+
+
+    /// Adds a new set packing constraint to the model with the given variables and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+    pub fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        let cons = self
+            .scip
+            .create_cons_set_part(vars, name)
+            .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.borrow_mut().push(cons.clone());
+        cons
+    }
+
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
     /// # Arguments
@@ -1638,7 +1740,7 @@ mod tests {
     }
 
     #[test]
-    fn set_partitioning() {
+    fn set_cover_partitioning_and_packing() {
         let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
@@ -1650,7 +1752,8 @@ mod tests {
         let cons1 = model.add_cons_set_part(vec![], "c");
         model.add_cons_coef_setppc(cons1, x1);
 
-        let _cons2 = model.add_cons_set_part(vec![x2], "c");
+        model.add_cons_set_cover(vec![x2.clone()], "c");
+        model.add_cons_set_pack(vec![x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.get_status();

@@ -150,25 +150,31 @@ impl From<EventMask> for u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
     use crate::eventhdlr::{Eventhdlr, EventMask };
     use crate::model::Model;
 
-    struct PanickingEventHdlr;
+    struct CountingEventHdlr {
+        counter: Rc<RefCell<usize>>
+    }
 
-    impl Eventhdlr for PanickingEventHdlr {
+    impl Eventhdlr for CountingEventHdlr {
         fn get_type(&self) -> EventMask {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
         fn execute(&mut self) {
-           panic!("Panic!");
+            *self.counter.borrow_mut() += 1;
         }
     }
 
     #[test]
-    #[should_panic]
     fn test_eventhdlr() {
-        let eh = PanickingEventHdlr {};
+        let counter = Rc::new(RefCell::new(0));
+        let eh = CountingEventHdlr {
+            counter: counter.clone()
+        };
 
         Model::new()
             .hide_output()
@@ -177,6 +183,8 @@ mod tests {
             .unwrap()
             .include_eventhdlr("PanickingEventHdlr", "",  Box::new(eh))
             .solve();
+
+        assert!(*counter.borrow() > 1);
     }
 }
 
