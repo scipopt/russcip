@@ -294,7 +294,6 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
-
     /// Create set partitioning constraint
     fn create_cons_set_cover(
         &mut self,
@@ -318,7 +317,6 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
-
     /// Create set packing constraint
     fn create_cons_set_pack(
         &mut self,
@@ -327,7 +325,7 @@ impl ScipPtr {
     ) -> Result<Constraint, Retcode> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
-        scip_call! { ffi::SCIPcreateConsBasicSetcover(
+        scip_call! { ffi::SCIPcreateConsBasicSetpack(
             self.raw,
             scip_cons.as_mut_ptr(),
             c_name.as_ptr(),
@@ -1123,8 +1121,6 @@ impl Model<ProblemCreated> {
         cons
     }
 
-
-
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -1143,13 +1139,12 @@ impl Model<ProblemCreated> {
         assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
         let cons = self
             .scip
-            .create_cons_set_part(vars, name)
-            .expect("Failed to add constraint set partition in state ProblemCreated");
+            .create_cons_set_cover(vars, name)
+            .expect("Failed to add constraint set cover in state ProblemCreated");
         let cons = Rc::new(cons);
         self.state.conss.borrow_mut().push(cons.clone());
         cons
     }
-
 
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
@@ -1169,8 +1164,8 @@ impl Model<ProblemCreated> {
         assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
         let cons = self
             .scip
-            .create_cons_set_part(vars, name)
-            .expect("Failed to add constraint set partition in state ProblemCreated");
+            .create_cons_set_pack(vars, name)
+            .expect("Failed to add constraint set packing in state ProblemCreated");
         let cons = Rc::new(cons);
         self.state.conss.borrow_mut().push(cons.clone());
         cons
