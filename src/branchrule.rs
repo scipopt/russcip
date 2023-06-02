@@ -170,7 +170,7 @@ mod tests {
     }
 
     impl BranchRule for CustomBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+        fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
             self.model.create_child();
             BranchingResult::CustomBranching
         }

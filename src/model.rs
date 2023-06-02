@@ -435,20 +435,6 @@ impl ScipPtr {
             }
         }
 
-        unsafe extern "C" fn eventhdlrexit(
-            scip: *mut ffi::SCIP,
-            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
-        ) -> ffi::SCIP_Retcode {
-            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
-            assert!(!data_ptr.is_null());
-            // let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            // let event_type = unsafe { (*eventhdlr_ptr).get_type() };
-            // unsafe {
-            //     ffi::SCIPdropEvent(scip, event_type.into(), eventhdlr, std::ptr::null_mut(), 0)
-            // }
-            Retcode::Okay.into()
-        }
-
         unsafe extern "C" fn eventhdlrfree(
             _scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
@@ -472,10 +458,10 @@ impl ScipPtr {
                 None,
                 Some(eventhdlrfree),
                 Some(eventhdlrinit),
-                Some(eventhdlrexit),
-                None, // initsol
-                None, // exitsol
-                None, // delete
+                None,
+                None,
+                None,
+                None,
                 Some(eventhdlrexec),
                 eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
             );
