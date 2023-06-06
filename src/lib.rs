@@ -38,7 +38,7 @@
 //! let vars = solved_model.get_vars();
 //!
 //! for var in vars {
-//!     println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
+//!     println!("{} = {}", &var.get_name(), sol.get_var_val(var));
 //! }
 
 #![deny(missing_docs)]

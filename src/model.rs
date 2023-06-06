@@ -340,6 +340,14 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    /// Create solution
+    fn create_sol(&self) -> Result<Solution, Retcode> {
+        let mut sol = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        let sol = unsafe { sol.assume_init() };
+        Ok(Solution { scip_ptr: self.raw, raw: sol })
+    }
+
     /// Add coefficient to set packing/partitioning/covering constraint
     fn add_cons_coef_setppc(
         &mut self,
@@ -1297,6 +1305,12 @@ impl Model<ProblemCreated> {
         new_model._set_best_sol();
         new_model
     }
+
+    /// Creates a new solution initialized to zero.
+    pub fn create_sol(&mut self) -> Solution {
+        self.scip.create_sol()
+            .expect("Failed to create solution in state ProblemCreated")
+    }
 }
 
 impl Model<Solved> {
@@ -1537,8 +1551,8 @@ mod tests {
         let sol = model.get_best_sol().unwrap();
         let vars = model.get_vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.get_var_val(&vars[0]), 40.);
-        assert_eq!(sol.get_var_val(&vars[1]), 20.);
+        assert_eq!(sol.get_var_val(vars[0].clone()), 40.);
+        assert_eq!(sol.get_var_val(vars[1].clone()), 20.);
 
         assert_eq!(sol.get_obj_val(), model.get_obj_val());
     }
@@ -1628,8 +1642,8 @@ mod tests {
         let sol = solved_model.get_best_sol().unwrap();
         let vars = solved_model.get_vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.get_var_val(&vars[0]), 40.);
-        assert_eq!(sol.get_var_val(&vars[1]), 20.);
+        assert_eq!(sol.get_var_val(vars[0].clone()), 40.);
+        assert_eq!(sol.get_var_val(vars[1].clone()), 20.);
     }
 
     #[test]
