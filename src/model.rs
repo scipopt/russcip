@@ -294,6 +294,62 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    fn create_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        use std::os::raw::c_int;
+
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert!(
+            lin_vars.len() <= c_int::MAX as usize,
+            "Number of linear variables exceeds SCIP capabilities"
+        );
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        assert!(
+            quad_vars_1.len() <= c_int::MAX as usize,
+            "Number of quadratic terms exceeds SCIP capabilities"
+        );
+
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        let get_ptrs = |vars: Vec<Rc<Variable>>| {
+            vars.into_iter()
+                .map(|var_rc| var_rc.raw)
+                .collect::<Vec<_>>()
+        };
+        let mut lin_var_ptrs = get_ptrs(lin_vars);
+        let mut quad_vars_1_ptrs = get_ptrs(quad_vars_1);
+        let mut quad_vars_2_ptrs = get_ptrs(quad_vars_2);
+        scip_call! { ffi::SCIPcreateConsBasicQuadraticNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            lin_var_ptrs.len() as c_int,
+            lin_var_ptrs.as_mut_ptr(),
+            lin_coefs.as_mut_ptr(),
+            quad_vars_1_ptrs.len() as c_int,
+            quad_vars_1_ptrs.as_mut_ptr(),
+            quad_vars_2_ptrs.as_mut_ptr(),
+            quad_coefs.as_mut_ptr(),
+            lhs,
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
     /// Add coefficient to set packing/partitioning/covering constraint
     fn add_cons_coef_setppc(
         &mut self,
@@ -1043,6 +1099,58 @@ impl Model<ProblemCreated> {
             .scip
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.borrow_mut().push(cons.clone());
+        cons
+    }
+
+    /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `lin_vars` - The linear variables in the constraint.
+    /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
+    /// * `quad_vars_1` - The first variable in the quadratic constraints.
+    /// * `quad_vars_2` - The second variable in the quadratic constraints.
+    /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint> {
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        let cons = self
+            .scip
+            .create_cons_quadratic(
+                lin_vars,
+                lin_coefs,
+                quad_vars_1,
+                quad_vars_2,
+                quad_coefs,
+                lhs,
+                rhs,
+                name,
+            )
+            .expect("Failed to create constraint in state ProblemCreated");
         let cons = Rc::new(cons);
         self.state.conss.borrow_mut().push(cons.clone());
         cons
