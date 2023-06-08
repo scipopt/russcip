@@ -1,7 +1,7 @@
 use core::panic;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::{CString};
+use std::ffi::{c_int, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -305,8 +305,6 @@ impl ScipPtr {
         rhs: f64,
         name: &str,
     ) -> Result<Constraint, Retcode> {
-        use std::os::raw::c_int;
-
         assert_eq!(lin_vars.len(), lin_coefs.len());
         assert!(
             lin_vars.len() <= c_int::MAX as usize,
