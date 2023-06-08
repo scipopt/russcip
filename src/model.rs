@@ -1745,4 +1745,35 @@ mod tests {
         assert_eq!(status, Status::Optimal);
         assert_eq!(solved_model.get_obj_val(), 7.);
     }
+
+    #[test]
+    fn quadratic_constraint() {
+        // this model should find the maximum manhattan distance a point in a unit-circle can have.
+        // This should be 2*sin(pi/4) = sqrt(2).
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., 1., 1., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 1., 1., "x2", VarType::Continuous);
+
+        let _cons = model.add_cons_quadratic(
+            vec![],
+            &mut [],
+            vec![x1.clone(), x2.clone()],
+            vec![x1.clone(), x2.clone()],
+            &mut [1., 1.],
+            0.,
+            1.,
+            "circle",
+        );
+
+        let solved_model = model.solve();
+        let status = solved_model.get_status();
+        assert_eq!(status, Status::Optimal);
+
+        assert!((2f64.sqrt() - solved_model.get_obj_val()).abs() < 1e-3);
+    }
 }
