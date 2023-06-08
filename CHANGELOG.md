@@ -3,6 +3,7 @@
 ## unreleased
 ### Added
 - Event handler plugin support. 
+- Support for quadratic constraints.
 ### Fixed
 - Fixed sending plugin data to and from SCIP. 
 - Consistent model data across its clones. 
