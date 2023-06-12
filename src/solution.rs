@@ -37,7 +37,8 @@ impl fmt::Debug for Solution {
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
             let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var) };
-            if val > 0.0 {
+            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr) };
+            if val > eps || val < -eps {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
                 // from CString
                 let name = unsafe { std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap() };
