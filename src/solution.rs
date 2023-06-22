@@ -1,7 +1,8 @@
 use std::fmt;
+use std::rc::Rc;
 
-use crate::ffi;
 use crate::variable::Variable;
+use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
 pub struct Solution {
@@ -11,27 +12,33 @@ pub struct Solution {
 
 impl Solution {
     /// Returns the objective value of the solution.
-    pub fn get_obj_val(&self) -> f64 {
+    pub fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr, self.raw) }
     }
 
     /// Returns the value of a variable in the solution.
-    pub fn get_var_val(&self, var: &Variable) -> f64 {
+    pub fn val(&self, var: Rc<Variable>) -> f64 {
         unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var.raw) }
+    }
+
+    /// Sets the value of a variable in the solution.
+    pub fn set_val(&self, var: Rc<Variable>, val: f64) {
+        scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr, self.raw, var.raw, val));
     }
 }
 
 impl fmt::Debug for Solution {
     /// Formats the solution for debugging purposes.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let obj_val = self.get_obj_val();
+        let obj_val = self.obj_val();
         writeln!(f, "Solution with obj val: {obj_val}")?;
         let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr) };
         let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr) };
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
             let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var) };
-            if val > 0.0 {
+            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr) };
+            if val > eps || val < -eps {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
                 // from CString
                 let name = unsafe { std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap() };
@@ -40,4 +47,10 @@ impl fmt::Debug for Solution {
         }
         Ok(())
     }
+}
+
+/// Represents and error that can occur when adding a solution.
+pub enum SolError {
+    /// The solution is infeasible.
+    Infeasible
 }

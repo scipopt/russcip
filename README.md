@@ -63,17 +63,17 @@ fn main() {
 
     let solved_model = model.solve();
 
-    let status = solved_model.get_status();
+    let status = solved_model.status();
     println!("Solved with status {:?}", status);
 
-    let obj_val = solved_model.get_obj_val();
+    let obj_val = solved_model.obj_val();
     println!("Objective value: {}", obj_val);
 
-    let sol = solved_model.get_best_sol().unwrap();
-    let vars = solved_model.get_vars();
+    let sol = solved_model.best_sol().unwrap();
+    let vars = solved_model.vars();
 
     for var in vars {
-        println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
+        println!("{} = {}", &var.name(), sol.val(var));
     }
 }
 

@@ -46,7 +46,7 @@ impl From<PricerResultState> for u32 {
 mod tests {
     use super::*;
     use crate::{
-        model::{Model, ProblemCreated, ModelWithProblem},
+        model::{Model, ModelWithProblem, ProblemCreated},
         status::Status,
         variable::VarType,
     };
@@ -151,15 +151,14 @@ mod tests {
             .include_pricer("", "", 9999999, false, Box::new(pricer));
 
         let solved = model.solve();
-        assert_eq!(solved.get_status(), Status::Optimal);
+        assert_eq!(solved.status(), Status::Optimal);
     }
-
 
     #[derive(Debug, PartialEq, Clone)]
     struct ComplexData {
         a: Vec<usize>,
         b: f64,
-        c: Option<isize>
+        c: Option<isize>,
     }
 
     struct AddSameColumnPricer {
@@ -178,14 +177,15 @@ mod tests {
                 }
             } else {
                 self.added = true;
-                let nvars_before = self.model.get_n_vars();
-                let var = self.model
+                let nvars_before = self.model.n_vars();
+                let var = self
+                    .model
                     .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-                let conss = self.model.get_conss();
+                let conss = self.model.conss();
                 for cons in conss {
                     self.model.add_cons_coef(cons, var.clone(), 1.0);
                 }
-                let nvars_after = self.model.get_n_vars();
+                let nvars_after = self.model.n_vars();
                 assert_eq!(nvars_before + 1, nvars_after);
                 PricerResult {
                     state: PricerResultState::FoundColumns,
@@ -203,7 +203,7 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let conss = model.get_conss();
+        let conss = model.conss();
         for c in conss {
             model.set_cons_modifiable(c, true);
         }
@@ -214,13 +214,13 @@ mod tests {
             data: ComplexData {
                 a: (0..1000).collect::<Vec<usize>>(),
                 b: 1.0,
-                c: Some(1)
+                c: Some(1),
             },
         };
 
         let solved = model
             .include_pricer("", "", 9999999, false, Box::new(pricer))
             .solve();
-        assert_eq!(solved.get_status(), Status::Optimal);
+        assert_eq!(solved.status(), Status::Optimal);
     }
 }

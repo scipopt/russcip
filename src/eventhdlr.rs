@@ -1,14 +1,12 @@
-
 use std::ops::{BitOr, BitOrAssign};
 
 /// Trait used to define custom event handlers.
 pub trait Eventhdlr {
     /// Returns the type of the event handler.
-    fn get_type(&self) -> EventMask;
+    fn var_type(&self) -> EventMask;
     /// Executes the event handler.
     fn execute(&mut self);
 }
-
 
 /// The EventMask represents different states or actions within an optimization problem.
 #[derive(Debug, Copy, Clone)]
@@ -109,11 +107,22 @@ impl EventMask {
     /// Event mask for the change of the domain of a variable.
     pub const DOM_CHANGED: Self = Self(Self::BOUND_CHANGED.0 | Self::HOLE_CHANGED.0);
     /// Event mask for the change of a variable's properties.
-    pub const VAR_CHANGED: Self = Self(Self::VAR_FIXED.0 | Self::VAR_UNLOCKED.0 | Self::OBJ_CHANGED.0 | Self::GBD_CHANGED.0 | Self::DOM_CHANGED.0 | Self::IMPL_ADDED.0 | Self::VAR_DELETED.0 | Self::TYPE_CHANGED.0);
+    pub const VAR_CHANGED: Self = Self(
+        Self::VAR_FIXED.0
+            | Self::VAR_UNLOCKED.0
+            | Self::OBJ_CHANGED.0
+            | Self::GBD_CHANGED.0
+            | Self::DOM_CHANGED.0
+            | Self::IMPL_ADDED.0
+            | Self::VAR_DELETED.0
+            | Self::TYPE_CHANGED.0,
+    );
     /// Event mask for variable-related events.
-    pub const VAR_EVENT: Self = Self(Self::VAR_ADDED.0 | Self::VAR_CHANGED.0 | Self::TYPE_CHANGED.0);
+    pub const VAR_EVENT: Self =
+        Self(Self::VAR_ADDED.0 | Self::VAR_CHANGED.0 | Self::TYPE_CHANGED.0);
     /// Event mask for node-related events.
-    pub const NODE_SOLVED: Self = Self(Self::NODE_FEASIBLE.0 | Self::NODE_INFEASIBLE.0 | Self::NODE_BRANCHED.0);
+    pub const NODE_SOLVED: Self =
+        Self(Self::NODE_FEASIBLE.0 | Self::NODE_INFEASIBLE.0 | Self::NODE_BRANCHED.0);
     /// Event mask for node-related events.
     pub const NODE_EVENT: Self = Self(Self::NODE_FOCUSED.0 | Self::NODE_SOLVED.0);
     /// Event mask for LP-related events.
@@ -123,9 +132,16 @@ impl EventMask {
     /// Event mask for primal solution-related events.
     pub const SOL_EVENT: Self = Self(Self::SOL_FOUND.0);
     /// Event mask for row-related events.
-    pub const ROW_CHANGED: Self = Self(Self::ROW_COEF_CHANGED.0 | Self::ROW_CONST_CHANGED.0 | Self::ROW_SIDE_CHANGED.0);
+    pub const ROW_CHANGED: Self =
+        Self(Self::ROW_COEF_CHANGED.0 | Self::ROW_CONST_CHANGED.0 | Self::ROW_SIDE_CHANGED.0);
     /// Event mask for row-related events.
-    pub const ROW_EVENT: Self = Self(Self::ROW_ADDED_SEPA.0 | Self::ROW_DELETED_SEPA.0 | Self::ROW_ADDED_LP.0 | Self::ROW_DELETED_LP.0 | Self::ROW_CHANGED.0);
+    pub const ROW_EVENT: Self = Self(
+        Self::ROW_ADDED_SEPA.0
+            | Self::ROW_DELETED_SEPA.0
+            | Self::ROW_ADDED_LP.0
+            | Self::ROW_DELETED_LP.0
+            | Self::ROW_CHANGED.0,
+    );
 }
 
 impl BitOr for EventMask {
@@ -150,36 +166,40 @@ impl From<EventMask> for u64 {
 
 #[cfg(test)]
 mod tests {
-    use crate::eventhdlr::{Eventhdlr, EventMask };
+    use crate::eventhdlr::{EventMask, Eventhdlr};
     use crate::model::Model;
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
-    struct PanickingEventHdlr;
+    struct CountingEventHdlr {
+        counter: Rc<RefCell<usize>>,
+    }
 
-    impl Eventhdlr for PanickingEventHdlr {
-        fn get_type(&self) -> EventMask {
+    impl Eventhdlr for CountingEventHdlr {
+        fn var_type(&self) -> EventMask {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
         fn execute(&mut self) {
-           panic!("Panic!");
+            *self.counter.borrow_mut() += 1;
         }
     }
 
     #[test]
-    #[should_panic]
     fn test_eventhdlr() {
-        let eh = PanickingEventHdlr {};
+        let counter = Rc::new(RefCell::new(0));
+        let eh = CountingEventHdlr {
+            counter: counter.clone(),
+        };
 
         Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_eventhdlr("PanickingEventHdlr", "",  Box::new(eh))
+            .include_eventhdlr("PanickingEventHdlr", "", Box::new(eh))
             .solve();
+
+        assert!(*counter.borrow() > 1);
     }
 }
-
-
-
-

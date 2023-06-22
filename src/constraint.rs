@@ -14,7 +14,7 @@ impl Constraint {
     }
 
     /// Returns the name of the constraint.
-    pub fn get_name(&self) -> String {
+    pub fn name(&self) -> String {
         unsafe {
             let name = ffi::SCIPconsGetName(self.raw);
             String::from(std::ffi::CStr::from_ptr(name).to_str().unwrap())

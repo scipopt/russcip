@@ -28,23 +28,23 @@
 //!
 //! let solved_model = model.solve();
 //!
-//! let status = solved_model.get_status();
+//! let status = solved_model.status();
 //! println!("Solved with status {:?}", status);
 //!
-//! let obj_val = solved_model.get_obj_val();
+//! let obj_val = solved_model.obj_val();
 //! println!("Objective value: {}", obj_val);
 //!
-//! let sol = solved_model.get_best_sol().expect("No solution found");
-//! let vars = solved_model.get_vars();
+//! let sol = solved_model.best_sol().expect("No solution found");
+//! let vars = solved_model.vars();
 //!
 //! for var in vars {
-//!     println!("{} = {}", &var.get_name(), sol.get_var_val(&var));
+//!     println!("{} = {}", &var.name(), sol.val(var));
 //! }
 
 #![deny(missing_docs)]
 
-extern crate doc_comment;
 extern crate core;
+extern crate doc_comment;
 doc_comment::doctest!("../README.md");
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
