@@ -6,6 +6,8 @@
 - Node method to get its parent.
 - Methods to add set cover and set packing constraints.
 - Methods to add sols. 
+- Event handler plugin support. 
+- Support for quadratic constraints.
 ### Fixed
 ### Changed
 - Removed the prefix "get_" from all getter methods.

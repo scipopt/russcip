@@ -1,7 +1,7 @@
 use core::panic;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::CString;
+use std::ffi::{c_int, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -294,7 +294,7 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
-    /// Create set partitioning constraint
+    /// Create set cover constraint
     fn create_cons_set_cover(
         &mut self,
         vars: Vec<Rc<Variable>>,
@@ -313,6 +313,60 @@ impl ScipPtr {
         for var in vars.iter() {
             scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
+    fn create_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert!(
+            lin_vars.len() <= c_int::MAX as usize,
+            "Number of linear variables exceeds SCIP capabilities"
+        );
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        assert!(
+            quad_vars_1.len() <= c_int::MAX as usize,
+            "Number of quadratic terms exceeds SCIP capabilities"
+        );
+
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        let get_ptrs = |vars: Vec<Rc<Variable>>| {
+            vars.into_iter()
+                .map(|var_rc| var_rc.raw)
+                .collect::<Vec<_>>()
+        };
+        let mut lin_var_ptrs = get_ptrs(lin_vars);
+        let mut quad_vars_1_ptrs = get_ptrs(quad_vars_1);
+        let mut quad_vars_2_ptrs = get_ptrs(quad_vars_2);
+        scip_call! { ffi::SCIPcreateConsBasicQuadraticNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            lin_var_ptrs.len() as c_int,
+            lin_var_ptrs.as_mut_ptr(),
+            lin_coefs.as_mut_ptr(),
+            quad_vars_1_ptrs.len() as c_int,
+            quad_vars_1_ptrs.as_mut_ptr(),
+            quad_vars_2_ptrs.as_mut_ptr(),
+            quad_coefs.as_mut_ptr(),
+            lhs,
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
@@ -1179,6 +1233,58 @@ impl Model<ProblemCreated> {
         cons
     }
 
+    /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `lin_vars` - The linear variables in the constraint.
+    /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
+    /// * `quad_vars_1` - The first variable in the quadratic constraints.
+    /// * `quad_vars_2` - The second variable in the quadratic constraints.
+    /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint> {
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        let cons = self
+            .scip
+            .create_cons_quadratic(
+                lin_vars,
+                lin_coefs,
+                quad_vars_1,
+                quad_vars_2,
+                quad_coefs,
+                lhs,
+                rhs,
+                name,
+            )
+            .expect("Failed to create constraint in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.borrow_mut().push(cons.clone());
+        cons
+    }
+
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
     /// # Arguments
@@ -1810,5 +1916,36 @@ mod tests {
 
         let model = model.solve();
         assert_eq!(model.n_sols(), 2);
+    }
+
+    #[test]
+    fn quadratic_constraint() {
+        // this model should find the maximum manhattan distance a point in a unit-circle can have.
+        // This should be 2*sin(pi/4) = sqrt(2).
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., 1., 1., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 1., 1., "x2", VarType::Continuous);
+
+        let _cons = model.add_cons_quadratic(
+            vec![],
+            &mut [],
+            vec![x1.clone(), x2.clone()],
+            vec![x1.clone(), x2.clone()],
+            &mut [1., 1.],
+            0.,
+            1.,
+            "circle",
+        );
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+
+        assert!((2f64.sqrt() - solved_model.obj_val()).abs() < 1e-3);
     }
 }

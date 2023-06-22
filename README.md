@@ -87,6 +87,16 @@ russcip = { features = ["raw"] }
 ```
 This enables access to the `scip_ptr` unsafe function in the `Model` struct, which gives you access to the underlying SCIP raw pointer. This is can be used in combination with the `ffi` module to call SCIP functions that are not wrapped yet in the safe interface. 
 
+## Implementing Custom Plugins
+Some of SCIP's plugins are imported to the rust interface as traits. Currently the implemented plugins are: 
+
+|   **Name**    |                          **File**                          |                                                                                              **Docs**                                                                                              |
+|---------------|------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Branching rule| [branchrule.rs](https://github.com/scipopt/russcip/blob/main/src/branchrule.rs) | [docs](https://docs.rs/russcip/latest/russcip/branchrule/trait.BranchRule.html) |
+| Variable Pricer| [pricer.rs](https://github.com/scipopt/russcip/blob/main/src/pricer.rs) | [docs](https://docs.rs/russcip/latest/russcip/pricer/trait.Pricer.html) |
+| Event Handler | [eventhdlr.rs](https://github.com/scipopt/russcip/blob/main/src/eventhdlr.rs) | [docs](https://docs.rs/russcip/latest/russcip/eventhdlr/trait.Eventhdlr.html) |
+
+To add a custom plugin to a SCIP `Model` instance, you should implement its trait and call the corresponding `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the corresponding files. 
 
 ## About SCIP
 
