@@ -28,7 +28,7 @@ impl Node {
     }
 
     /// Returns the parent of the node and `None` if the node is the root node.
-    pub fn get_parent(&self) -> Option<Node> {
+    pub fn parent(&self) -> Option<Node> {
         let parent = unsafe { ffi::SCIPnodeGetParent(self.raw) };
         if parent.is_null() {
             None
@@ -54,11 +54,11 @@ mod tests {
             &mut self,
             _candidates: Vec<crate::branchrule::BranchingCandidate>,
         ) -> BranchingResult {
-            let node = self.model.get_focus_node();
+            let node = self.model.focus_node();
             assert_eq!(node.number(), 1);
             assert_eq!(node.depth(), 0);
             assert!(node.lower_bound() < 6777.0);
-            assert!(node.get_parent().is_none());
+            assert!(node.parent().is_none());
             BranchingResult::DidNotRun
         }
     }

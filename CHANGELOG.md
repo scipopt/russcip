@@ -4,9 +4,11 @@
 ### Added
 - Model methods to create child from the current focus node. 
 - Node method to get its parent.
-- Methods to add set cover and set packing constraints. 
+- Methods to add set cover and set packing constraints.
+- Methods to add sols. 
 ### Fixed
 ### Changed
+- Removed the prefix "get_" from all getter methods.
 ### Removed
 
 

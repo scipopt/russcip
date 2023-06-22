@@ -18,7 +18,7 @@ impl Variable {
     }
 
     /// Returns the index of the variable.
-    pub fn get_index(&self) -> usize {
+    pub fn index(&self) -> usize {
         let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
         if id < 0 {
             panic!("Variable index is negative");
@@ -28,29 +28,29 @@ impl Variable {
     }
 
     /// Returns the name of the variable.
-    pub fn get_name(&self) -> String {
+    pub fn name(&self) -> String {
         let name = unsafe { ffi::SCIPvarGetName(self.raw) };
         let name = unsafe { std::ffi::CStr::from_ptr(name) };
         name.to_str().unwrap().to_string()
     }
 
     /// Returns the objective coefficient of the variable.
-    pub fn get_obj(&self) -> f64 {
+    pub fn obj(&self) -> f64 {
         unsafe { ffi::SCIPvarGetObj(self.raw) }
     }
 
     /// Returns the lower bound of the variable.
-    pub fn get_lb(&self) -> f64 {
+    pub fn lb(&self) -> f64 {
         unsafe { ffi::SCIPvarGetLbLocal(self.raw) }
     }
 
     /// Returns the upper bound of the variable.
-    pub fn get_ub(&self) -> f64 {
+    pub fn ub(&self) -> f64 {
         unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
     }
 
     /// Returns the type of the variable.
-    pub fn get_type(&self) -> VarType {
+    pub fn var_type(&self) -> VarType {
         let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
         var_type.into()
     }
@@ -135,12 +135,12 @@ mod tests {
     fn var_data() -> Result<(), Retcode> {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary);
-        assert_eq!(var.get_index(), 0);
-        assert_eq!(var.get_lb(), 0.0);
-        assert_eq!(var.get_ub(), 1.0);
-        assert_eq!(var.get_obj(), 2.0);
-        assert_eq!(var.get_name(), "x");
-        assert_eq!(var.get_type(), VarType::Binary);
+        assert_eq!(var.index(), 0);
+        assert_eq!(var.lb(), 0.0);
+        assert_eq!(var.ub(), 1.0);
+        assert_eq!(var.obj(), 2.0);
+        assert_eq!(var.name(), "x");
+        assert_eq!(var.var_type(), VarType::Binary);
         Ok(())
     }
 }
