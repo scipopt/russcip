@@ -1,6 +1,7 @@
 use crate::ffi;
 
 /// A constraint in an optimization problem.
+#[derive(Debug)]
 pub struct Constraint {
     /// A pointer to the underlying `SCIP_CONS` C struct.
     pub(crate) raw: *mut ffi::SCIP_CONS,

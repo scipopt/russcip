@@ -132,15 +132,18 @@ mod tests {
     use crate::retcode::Retcode;
 
     #[test]
-    fn var_data() -> Result<(), Retcode> {
+    fn var_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary);
+
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
         assert_eq!(var.ub(), 1.0);
         assert_eq!(var.obj(), 2.0);
         assert_eq!(var.name(), "x");
         assert_eq!(var.var_type(), VarType::Binary);
-        Ok(())
+
+        #[cfg(feature = "raw")]
+        assert!(!var.inner().is_null());
     }
 }
