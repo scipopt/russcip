@@ -141,6 +141,10 @@ mod tests {
         assert_eq!(var.get_obj(), 2.0);
         assert_eq!(var.get_name(), "x");
         assert_eq!(var.get_type(), VarType::Binary);
+
+        #[cfg(feature = "raw")]
+        assert!(!var.inner().is_null());
+
         Ok(())
     }
 }
