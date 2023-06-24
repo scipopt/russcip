@@ -104,7 +104,7 @@ mod tests {
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br));
 
         let solved = model.solve();
-        assert_eq!(solved.get_status(), Status::NodeLimit);
+        assert_eq!(solved.status(), Status::NodeLimit);
         // assert!(br.chosen.is_some());
         // let candidate = br.chosen.unwrap();
         // assert!(candidate.lp_sol_val.fract() > 0.);
@@ -131,7 +131,7 @@ mod tests {
             .unwrap()
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
-        assert_eq!(model.get_n_nodes(), 1);
+        assert_eq!(model.n_nodes(), 1);
     }
 
     struct FirstBranchingRule {
@@ -140,7 +140,7 @@ mod tests {
 
     impl BranchRule for FirstBranchingRule {
         fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            assert!(self.model.get_n_vars() >= candidates.len());
+            assert!(self.model.n_vars() >= candidates.len());
             BranchingResult::BranchOn(candidates[0].clone())
         }
     }
@@ -162,7 +162,7 @@ mod tests {
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
 
-        assert!(solved.get_n_nodes() > 1);
+        assert!(solved.n_nodes() > 1);
     }
 
     struct CustomBranchingRule {
@@ -193,6 +193,6 @@ mod tests {
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
 
-        assert!(solved.get_n_nodes() > 1);
+        assert!(solved.n_nodes() > 1);
     }
 }

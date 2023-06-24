@@ -1,7 +1,7 @@
 use core::panic;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::CString;
+use std::ffi::{c_int, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
 use crate::scip_call;
-use crate::solution::Solution;
+use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
@@ -103,15 +103,15 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_n_vars(&self) -> usize {
+    fn n_vars(&self) -> usize {
         unsafe { ffi::SCIPgetNVars(self.raw) as usize }
     }
 
-    fn get_n_conss(&self) -> usize {
+    fn n_conss(&self) -> usize {
         unsafe { ffi::SCIPgetNConss(self.raw) as usize }
     }
 
-    fn get_status(&self) -> Status {
+    fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.try_into().expect("Unknown SCIP status")
     }
@@ -137,9 +137,9 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_vars(&self) -> BTreeMap<usize, Rc<Variable>> {
+    fn vars(&self) -> BTreeMap<usize, Rc<Variable>> {
         // NOTE: this method should only be called once per SCIP instance
-        let n_vars = self.get_n_vars();
+        let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
         let scip_vars = unsafe { ffi::SCIPgetVars(self.raw) };
         for i in 0..n_vars {
@@ -148,14 +148,14 @@ impl ScipPtr {
                 ffi::SCIPcaptureVar(self.raw, scip_var);
             }
             let var = Rc::new(Variable { raw: scip_var });
-            vars.insert(var.get_index(), var);
+            vars.insert(var.index(), var);
         }
         vars
     }
 
-    fn get_conss(&self) -> Vec<Rc<Constraint>> {
+    fn conss(&self) -> Vec<Rc<Constraint>> {
         // NOTE: this method should only be called once per SCIP instance
-        let n_conss = self.get_n_conss();
+        let n_conss = self.n_conss();
         let mut conss = Vec::with_capacity(n_conss);
         let scip_conss = unsafe { ffi::SCIPgetConss(self.raw) };
         for i in 0..n_conss {
@@ -174,11 +174,11 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_n_sols(&self) -> usize {
+    fn n_sols(&self) -> usize {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
-    fn get_best_sol(&self) -> Solution {
+    fn best_sol(&self) -> Solution {
         let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
 
         Solution {
@@ -187,7 +187,7 @@ impl ScipPtr {
         }
     }
 
-    fn get_obj_val(&self) -> f64 {
+    fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetPrimalbound(self.raw) }
     }
 
@@ -295,7 +295,7 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
-    /// Create set partitioning constraint
+    /// Create set cover constraint
     fn create_cons_set_cover(
         &mut self,
         vars: Vec<Rc<Variable>>,
@@ -314,6 +314,60 @@ impl ScipPtr {
         for var in vars.iter() {
             scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
+    fn create_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert!(
+            lin_vars.len() <= c_int::MAX as usize,
+            "Number of linear variables exceeds SCIP capabilities"
+        );
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        assert!(
+            quad_vars_1.len() <= c_int::MAX as usize,
+            "Number of quadratic terms exceeds SCIP capabilities"
+        );
+
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        let get_ptrs = |vars: Vec<Rc<Variable>>| {
+            vars.into_iter()
+                .map(|var_rc| var_rc.raw)
+                .collect::<Vec<_>>()
+        };
+        let mut lin_var_ptrs = get_ptrs(lin_vars);
+        let mut quad_vars_1_ptrs = get_ptrs(quad_vars_1);
+        let mut quad_vars_2_ptrs = get_ptrs(quad_vars_2);
+        scip_call! { ffi::SCIPcreateConsBasicQuadraticNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            lin_var_ptrs.len() as c_int,
+            lin_var_ptrs.as_mut_ptr(),
+            lin_coefs.as_mut_ptr(),
+            quad_vars_1_ptrs.len() as c_int,
+            quad_vars_1_ptrs.as_mut_ptr(),
+            quad_vars_2_ptrs.as_mut_ptr(),
+            quad_coefs.as_mut_ptr(),
+            lhs,
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
@@ -346,7 +400,10 @@ impl ScipPtr {
         let mut sol = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         let sol = unsafe { sol.assume_init() };
-        Ok(Solution { scip_ptr: self.raw, raw: sol })
+        Ok(Solution {
+            scip_ptr: self.raw,
+            raw: sol,
+        })
     }
 
     /// Add coefficient to set packing/partitioning/covering constraint
@@ -359,7 +416,7 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
+    fn lp_branching_cands(scip: *mut ffi::SCIP) -> Vec<BranchingCandidate> {
         let mut lpcands = MaybeUninit::uninit();
         let mut lpcandssol = MaybeUninit::uninit();
         // let mut lpcandsfrac = MaybeUninit::uninit();
@@ -432,7 +489,7 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
+            let event_type = unsafe { (*eventhdlr_ptr).var_type() };
             unsafe {
                 ffi::SCIPcatchEvent(
                     scip,
@@ -502,7 +559,7 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
             let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
-            let cands = ScipPtr::get_lp_branching_cands(scip);
+            let cands = ScipPtr::lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
@@ -714,19 +771,19 @@ impl ScipPtr {
         Ok(())
     }
 
-    fn get_n_nodes(&self) -> usize {
+    fn n_nodes(&self) -> usize {
         unsafe { ffi::SCIPgetNNodes(self.raw) as usize }
     }
 
-    fn get_solving_time(&self) -> f64 {
+    fn solving_time(&self) -> f64 {
         unsafe { ffi::SCIPgetSolvingTime(self.raw) }
     }
 
-    fn get_n_lp_iterations(&self) -> usize {
+    fn n_lp_iterations(&self) -> usize {
         unsafe { ffi::SCIPgetNLPIterations(self.raw) as usize }
     }
 
-    fn get_focus_node(&self) -> Node {
+    fn focus_node(&self) -> Node {
         Node {
             raw: unsafe { ffi::SCIPgetFocusNode(self.raw) },
         }
@@ -743,6 +800,17 @@ impl ScipPtr {
 
         let node_ptr = unsafe { node_ptr.assume_init() };
         Ok(Node { raw: node_ptr })
+    }
+
+    fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
+        let mut stored = MaybeUninit::uninit();
+        scip_call!(ffi::SCIPaddSol(
+            self.raw,
+            sol.raw,
+            stored.as_mut_ptr()
+        ));
+        let stored = unsafe { stored.assume_init() };
+        Ok(stored == 1)
     }
 }
 
@@ -931,8 +999,8 @@ impl Model<PluginsIncluded> {
     /// This method returns a `Retcode` error if the problem cannot be read from the file.
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         self.scip.read_prob(filename)?;
-        let vars = Rc::new(RefCell::new(self.scip.get_vars()));
-        let conss = Rc::new(RefCell::new(self.scip.get_conss()));
+        let vars = Rc::new(RefCell::new(self.scip.vars()));
+        let conss = Rc::new(RefCell::new(self.scip.conss()));
         let new_model = Model {
             scip: self.scip,
             state: ProblemCreated { vars, conss },
@@ -979,8 +1047,8 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
-    pub fn get_focus_node(&self) -> Node {
-        self.scip.get_focus_node()
+    pub fn focus_node(&self) -> Node {
+        self.scip.focus_node()
     }
 
     /// Creates a new child node of the current node and returns it.
@@ -1023,7 +1091,7 @@ impl Model<ProblemCreated> {
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var_id = var.get_index();
+        let var_id = var.index();
         let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
@@ -1055,7 +1123,7 @@ impl Model<ProblemCreated> {
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var = Rc::new(var);
-        let var_id = var.get_index();
+        let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
@@ -1110,7 +1178,7 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     pub fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_part(vars, name)
@@ -1135,7 +1203,7 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     pub fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_cover(vars, name)
@@ -1160,11 +1228,63 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     pub fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.get_type() == VarType::Binary));
+        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_pack(vars, name)
             .expect("Failed to add constraint set packing in state ProblemCreated");
+        let cons = Rc::new(cons);
+        self.state.conss.borrow_mut().push(cons.clone());
+        cons
+    }
+
+    /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `lin_vars` - The linear variables in the constraint.
+    /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
+    /// * `quad_vars_1` - The first variable in the quadratic constraints.
+    /// * `quad_vars_2` - The second variable in the quadratic constraints.
+    /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint> {
+        assert_eq!(lin_vars.len(), lin_coefs.len());
+        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+        assert_eq!(quad_vars_1.len(), quad_coefs.len());
+        let cons = self
+            .scip
+            .create_cons_quadratic(
+                lin_vars,
+                lin_coefs,
+                quad_vars_1,
+                quad_vars_2,
+                quad_coefs,
+                lhs,
+                rhs,
+                name,
+            )
+            .expect("Failed to create constraint in state ProblemCreated");
         let cons = Rc::new(cons);
         self.state.conss.borrow_mut().push(cons.clone());
         cons
@@ -1198,7 +1318,7 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
     pub fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
-        assert_eq!(var.get_type(), VarType::Binary);
+        assert_eq!(var.var_type(), VarType::Binary);
         self.scip
             .add_cons_coef_setppc(cons, var)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -1313,66 +1433,80 @@ impl Model<ProblemCreated> {
 
     /// Creates a new solution initialized to zero.
     pub fn create_sol(&mut self) -> Solution {
-        self.scip.create_sol()
+        self.scip
+            .create_sol()
             .expect("Failed to create solution in state ProblemCreated")
+    }
+
+    /// Adds a solution to the model
+    ///
+    /// # Returns
+    /// A `Result` indicating whether the solution was added successfully.
+    pub fn add_sol(&self, sol: Solution) -> Result<(), SolError> {
+        let succesfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
+        if succesfully_stored {
+            Ok(())
+        } else {
+            Err(SolError::Infeasible)
+        }
     }
 }
 
 impl Model<Solved> {
     /// Sets the best solution for the optimization model if one exists.
     fn _set_best_sol(&mut self) {
-        if self.scip.get_n_sols() > 0 {
-            self.state.best_sol = Some(self.scip.get_best_sol());
+        if self.scip.n_sols() > 0 {
+            self.state.best_sol = Some(self.scip.best_sol());
         }
     }
 
     /// Returns the best solution for the optimization model, if one exists.
-    pub fn get_best_sol(&self) -> Option<Box<&Solution>> {
+    pub fn best_sol(&self) -> Option<Box<&Solution>> {
         self.state.best_sol.as_ref().map(Box::new)
     }
 
     /// Returns the number of solutions found by the optimization model.
-    pub fn get_n_sols(&self) -> usize {
-        self.scip.get_n_sols()
+    pub fn n_sols(&self) -> usize {
+        self.scip.n_sols()
     }
 
     /// Returns the objective value of the best solution found by the optimization model.
-    pub fn get_obj_val(&self) -> f64 {
-        self.scip.get_obj_val()
+    pub fn obj_val(&self) -> f64 {
+        self.scip.obj_val()
     }
 
     /// Returns the number of nodes explored by the optimization model.
-    pub fn get_n_nodes(&self) -> usize {
-        self.scip.get_n_nodes()
+    pub fn n_nodes(&self) -> usize {
+        self.scip.n_nodes()
     }
 
     /// Returns the total solving time of the optimization model.
-    pub fn get_solving_time(&self) -> f64 {
-        self.scip.get_solving_time()
+    pub fn solving_time(&self) -> f64 {
+        self.scip.solving_time()
     }
 
     /// Returns the number of LP iterations performed by the optimization model.
-    pub fn get_n_lp_iterations(&self) -> usize {
-        self.scip.get_n_lp_iterations()
+    pub fn n_lp_iterations(&self) -> usize {
+        self.scip.n_lp_iterations()
     }
 }
 
 /// A trait for optimization models with a problem created.
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
-    fn get_vars(&self) -> Vec<Rc<Variable>>;
+    fn vars(&self) -> Vec<Rc<Variable>>;
 
     /// Returns the variable with the given ID, if it exists.
-    fn get_var(&self, var_id: VarId) -> Option<Rc<Variable>>;
+    fn var(&self, var_id: VarId) -> Option<Rc<Variable>>;
 
     /// Returns the number of variables in the optimization model.
-    fn get_n_vars(&self) -> usize;
+    fn n_vars(&self) -> usize;
 
     /// Returns the number of constraints in the optimization model.
-    fn get_n_conss(&mut self) -> usize;
+    fn n_conss(&mut self) -> usize;
 
     /// Returns a vector of all constraints in the optimization model.
-    fn get_conss(&mut self) -> Vec<Rc<Constraint>>;
+    fn conss(&mut self) -> Vec<Rc<Constraint>>;
 
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
@@ -1383,27 +1517,27 @@ macro_rules! impl_ModelWithProblem {
         $(impl ModelWithProblem for $t {
 
             /// Returns a vector of all variables in the optimization model.
-            fn get_vars(&self) -> Vec<Rc<Variable>> {
+            fn vars(&self) -> Vec<Rc<Variable>> {
                 self.state.vars.borrow().values().map(Rc::clone).collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
-            fn get_var(&self, var_id: VarId) -> Option<Rc<Variable>> {
+            fn var(&self, var_id: VarId) -> Option<Rc<Variable>> {
                 self.state.vars.borrow().get(&var_id).map(Rc::clone)
             }
 
             /// Returns the number of variables in the optimization model.
-            fn get_n_vars(&self) -> usize {
-                self.scip.get_n_vars()
+            fn n_vars(&self) -> usize {
+                self.scip.n_vars()
             }
 
             /// Returns the number of constraints in the optimization model.
-            fn get_n_conss(&mut self) -> usize {
-                self.scip.get_n_conss()
+            fn n_conss(&mut self) -> usize {
+                self.scip.n_conss()
             }
 
             /// Returns a vector of all constraints in the optimization model.
-            fn get_conss(&mut self) -> Vec<Rc<Constraint>> {
+            fn conss(&mut self) -> Vec<Rc<Constraint>> {
                 self.state.conss.borrow().iter().map(Rc::clone).collect()
             }
 
@@ -1432,8 +1566,8 @@ impl<T> Model<T> {
     }
 
     /// Returns the status of the optimization model.
-    pub fn get_status(&self) -> Status {
-        self.scip.get_status()
+    pub fn status(&self) -> Status {
+        self.scip.status()
     }
 
     /// Prints the version of SCIP used by the optimization model.
@@ -1543,25 +1677,25 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap()
             .solve();
-        let status = model.get_status();
+        let status = model.status();
         assert_eq!(status, Status::Optimal);
 
         //test objective value
-        let obj_val = model.get_obj_val();
+        let obj_val = model.obj_val();
         assert_eq!(obj_val, 200.);
 
         //test constraints
-        let conss = model.get_conss();
+        let conss = model.conss();
         assert_eq!(conss.len(), 2);
 
         //test solution values
-        let sol = model.get_best_sol().unwrap();
-        let vars = model.get_vars();
+        let sol = model.best_sol().unwrap();
+        let vars = model.vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.get_var_val(vars[0].clone()), 40.);
-        assert_eq!(sol.get_var_val(vars[1].clone()), 20.);
+        assert_eq!(sol.val(vars[0].clone()), 40.);
+        assert_eq!(sol.val(vars[1].clone()), 20.);
 
-        assert_eq!(sol.get_obj_val(), model.get_obj_val());
+        assert_eq!(sol.obj_val(), model.obj_val());
     }
 
     #[test]
@@ -1573,11 +1707,11 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap()
             .solve();
-        let status = model.get_status();
+        let status = model.status();
         assert_eq!(status, Status::TimeLimit);
-        assert!(model.get_solving_time() < 0.5);
-        assert_eq!(model.get_n_nodes(), 0);
-        assert_eq!(model.get_n_lp_iterations(), 0);
+        assert!(model.solving_time() < 0.5);
+        assert_eq!(model.n_nodes(), 0);
+        assert_eq!(model.n_lp_iterations(), 0);
     }
 
     #[test]
@@ -1589,21 +1723,21 @@ mod tests {
             .set_obj_sense(ObjSense::Maximize);
         let x1_id = model
             .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
-            .get_index();
+            .index();
         let x2_id = model
             .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)
-            .get_index();
-        let x1 = model.get_var(x1_id).unwrap();
-        let x2 = model.get_var(x2_id).unwrap();
-        assert_eq!(model.get_n_vars(), 2);
-        assert_eq!(model.get_vars().len(), 2);
+            .index();
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+        assert_eq!(model.n_vars(), 2);
+        assert_eq!(model.vars().len(), 2);
         assert!(x1.raw != x2.raw);
-        assert!(x1.get_type() == VarType::Integer);
-        assert!(x2.get_type() == VarType::Continuous);
-        assert!(x1.get_name() == "x1");
-        assert!(x2.get_name() == "x2");
-        assert!(x1.get_obj() == 3.);
-        assert!(x2.get_obj() == 4.);
+        assert!(x1.var_type() == VarType::Integer);
+        assert!(x2.var_type() == VarType::Continuous);
+        assert!(x1.name() == "x1");
+        assert!(x2.name() == "x2");
+        assert!(x1.obj() == 3.);
+        assert!(x2.obj() == 4.);
     }
 
     fn create_model() -> Model<ProblemCreated> {
@@ -1630,27 +1764,27 @@ mod tests {
     #[test]
     fn build_model_with_functions() {
         let mut model = create_model();
-        assert_eq!(model.get_vars().len(), 2);
-        assert_eq!(model.get_n_conss(), 2);
+        assert_eq!(model.vars().len(), 2);
+        assert_eq!(model.n_conss(), 2);
 
-        let conss = model.get_conss();
+        let conss = model.conss();
         assert_eq!(conss.len(), 2);
-        assert_eq!(conss[0].get_name(), "c1");
-        assert_eq!(conss[1].get_name(), "c2");
+        assert_eq!(conss[0].name(), "c1");
+        assert_eq!(conss[1].name(), "c2");
 
         let solved_model = model.solve();
 
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Optimal);
 
-        let obj_val = solved_model.get_obj_val();
+        let obj_val = solved_model.obj_val();
         assert_eq!(obj_val, 200.);
 
-        let sol = solved_model.get_best_sol().unwrap();
-        let vars = solved_model.get_vars();
+        let sol = solved_model.best_sol().unwrap();
+        let vars = solved_model.vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.get_var_val(vars[0].clone()), 40.);
-        assert_eq!(sol.get_var_val(vars[1].clone()), 20.);
+        assert_eq!(sol.val(vars[0].clone()), 40.);
+        assert_eq!(sol.val(vars[1].clone()), 20.);
     }
 
     #[test]
@@ -1664,10 +1798,10 @@ mod tests {
 
         let solved_model = model.solve();
 
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Unbounded);
 
-        let sol = solved_model.get_best_sol();
+        let sol = solved_model.best_sol();
         assert!(sol.is_some());
     }
 
@@ -1683,11 +1817,11 @@ mod tests {
 
         let solved_model = model.solve();
 
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Infeasible);
 
-        assert_eq!(solved_model.get_n_sols(), 0);
-        let sol = solved_model.get_best_sol();
+        assert_eq!(solved_model.n_sols(), 0);
+        let sol = solved_model.best_sol();
         assert!(sol.is_none());
     }
 
@@ -1737,7 +1871,7 @@ mod tests {
         model.add_cons_coef(cons, x2, 10.); // x2 can't be be used
 
         let solved_model = model.solve();
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Unbounded);
     }
 
@@ -1758,9 +1892,68 @@ mod tests {
         model.add_cons_set_pack(vec![x2], "c");
 
         let solved_model = model.solve();
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Optimal);
-        assert_eq!(solved_model.get_obj_val(), 7.);
+        assert_eq!(solved_model.obj_val(), 7.);
+    }
+
+    #[test]
+    fn create_sol() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let cons1 = model.add_cons_set_part(vec![], "c");
+        model.add_cons_coef_setppc(cons1, x1.clone());
+
+        model.add_cons_set_pack(vec![x2.clone()], "c");
+
+        let sol = model.create_sol();
+        assert_eq!(sol.obj_val(), 0.);
+
+        sol.set_val(x1.clone(), 1.);
+        sol.set_val(x2.clone(), 1.);
+        assert_eq!(sol.obj_val(), 7.);
+
+        assert!(model.add_sol(sol).is_ok());
+
+        let model = model.solve();
+        assert_eq!(model.n_sols(), 2);
+    }
+
+    #[test]
+    fn quadratic_constraint() {
+        // this model should find the maximum manhattan distance a point in a unit-circle can have.
+        // This should be 2*sin(pi/4) = sqrt(2).
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., 1., 1., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 1., 1., "x2", VarType::Continuous);
+
+        let _cons = model.add_cons_quadratic(
+            vec![],
+            &mut [],
+            vec![x1.clone(), x2.clone()],
+            vec![x1.clone(), x2.clone()],
+            &mut [1., 1.],
+            0.,
+            1.,
+            "circle",
+        );
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+
+        assert!((2f64.sqrt() - solved_model.obj_val()).abs() < 1e-3);
     }
 
 
@@ -1778,9 +1971,9 @@ mod tests {
         let cons1 = model.add_cons_set_part(vec![x1, x2], "c");
 
         let solved_model = model.solve();
-        let status = solved_model.get_status();
+        let status = solved_model.status();
         assert_eq!(status, Status::Optimal);
-        assert_eq!(solved_model.get_obj_val(), 3.);
+        assert_eq!(solved_model.obj_val(), 3.);
 
         assert!(Path::new("test.vbc").exists());
         fs::remove_file("test.vbc").unwrap();
@@ -1799,8 +1992,8 @@ mod tests {
         let solved = model.solve();
         let read_solved = read_model.solve();
 
-        assert_eq!(solved.get_status(), read_solved.get_status());
-        assert_eq!(solved.get_obj_val(), read_solved.get_obj_val());
+        assert_eq!(solved.status(), read_solved.status());
+        assert_eq!(solved.obj_val(), read_solved.obj_val());
 
         fs::remove_file("test.lp").unwrap();
     }
@@ -1832,6 +2025,6 @@ mod tests {
             .unwrap()
             .solve();
 
-        assert_eq!(model.get_status(), Status::TimeLimit);
+        assert_eq!(model.status(), Status::TimeLimit);
     }
 }
