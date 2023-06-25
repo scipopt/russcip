@@ -804,11 +804,7 @@ impl ScipPtr {
 
     fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSol(
-            self.raw,
-            sol.raw,
-            stored.as_mut_ptr()
-        ));
+        scip_call!(ffi::SCIPaddSol(self.raw, sol.raw, stored.as_mut_ptr()));
         let stored = unsafe { stored.assume_init() };
         Ok(stored == 1)
     }
@@ -1640,17 +1636,6 @@ pub enum ObjSense {
     Maximize,
 }
 
-impl From<ffi::SCIP_OBJSENSE> for ObjSense {
-    /// Converts an `ffi::SCIP_OBJSENSE` value into its corresponding `ObjSense` enum variant.
-    fn from(sense: ffi::SCIP_OBJSENSE) -> Self {
-        match sense {
-            ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE => ObjSense::Maximize,
-            ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE => ObjSense::Minimize,
-            _ => panic!("Unknown objective sense value {:?}", sense),
-        }
-    }
-}
-
 impl From<ObjSense> for ffi::SCIP_OBJSENSE {
     /// Converts an `ObjSense` enum variant into its corresponding `ffi::SCIP_OBJSENSE` value.
     fn from(val: ObjSense) -> Self {
@@ -1665,6 +1650,7 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 mod tests {
     use std::fs;
     use std::path::Path;
+
     use crate::status::Status;
 
     use super::*;
@@ -1915,8 +1901,8 @@ mod tests {
         let sol = model.create_sol();
         assert_eq!(sol.obj_val(), 0.);
 
-        sol.set_val(x1.clone(), 1.);
-        sol.set_val(x2.clone(), 1.);
+        sol.set_val(x1, 1.);
+        sol.set_val(x2, 1.);
         assert_eq!(sol.obj_val(), 7.);
 
         assert!(model.add_sol(sol).is_ok());
@@ -1942,7 +1928,7 @@ mod tests {
             vec![],
             &mut [],
             vec![x1.clone(), x2.clone()],
-            vec![x1.clone(), x2.clone()],
+            vec![x1, x2],
             &mut [1., 1.],
             0.,
             1.,
@@ -1956,19 +1942,19 @@ mod tests {
         assert!((2f64.sqrt() - solved_model.obj_val()).abs() < 1e-3);
     }
 
-
     #[test]
     fn set_str_param() {
         let mut model = Model::new()
             .hide_output()
-            .set_str_param("visual/vbcfilename", "test.vbc").unwrap()
+            .set_str_param("visual/vbcfilename", "test.vbc")
+            .unwrap()
             .include_default_plugins()
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
 
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
-        let cons1 = model.add_cons_set_part(vec![x1, x2], "c");
+        model.add_cons_set_part(vec![x1, x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1979,12 +1965,26 @@ mod tests {
         fs::remove_file("test.vbc").unwrap();
     }
 
+    #[test]
+    fn set_heurs_presolving_separation() {
+        let model = Model::new()
+            .hide_output()
+            .set_heuristics(ParamSetting::Aggressive)
+            .set_presolving(ParamSetting::Fast)
+            .set_separating(ParamSetting::Off)
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::Optimal);
+    }
 
     #[test]
     fn write_and_read_lp() {
         let model = create_model();
 
-        model.write("test.lp", "lp");
+        model.write("test.lp", "lp").unwrap();
 
         let read_model = Model::new()
         .include_default_plugins().read_prob("test.lp").unwrap();
@@ -2017,7 +2017,7 @@ mod tests {
 
     #[test]
     fn set_real_param() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_real_param("limits/time", 0.).unwrap()
             .include_default_plugins()

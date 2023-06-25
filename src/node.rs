@@ -52,14 +52,19 @@ mod tests {
     impl BranchRule for NodeDataBranchRule {
         fn execute(
             &mut self,
-            _candidates: Vec<crate::branchrule::BranchingCandidate>,
+            candidates: Vec<crate::branchrule::BranchingCandidate>,
         ) -> BranchingResult {
             let node = self.model.focus_node();
-            assert_eq!(node.number(), 1);
-            assert_eq!(node.depth(), 0);
-            assert!(node.lower_bound() < 6777.0);
-            assert!(node.parent().is_none());
-            BranchingResult::DidNotRun
+            if node.number() == 1 {
+                assert_eq!(node.depth(), 0);
+                assert!(node.lower_bound() < 6777.0);
+                assert!(node.parent().is_none());
+            } else {
+                assert!(node.depth() > 0);
+                assert!(node.lower_bound() <= 6777.0);
+                assert!(node.parent().is_some());
+            }
+            BranchingResult::BranchOn(candidates[0].clone())
         }
     }
 
@@ -67,7 +72,7 @@ mod tests {
     fn node_after_solving() {
         let model = Model::new()
             .hide_output()
-            .set_longint_param("limits/nodes", 1)
+            .set_longint_param("limits/nodes", 3)
             .unwrap() // only call brancher once
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")

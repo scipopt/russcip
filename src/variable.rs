@@ -20,11 +20,8 @@ impl Variable {
     /// Returns the index of the variable.
     pub fn index(&self) -> usize {
         let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
-        if id < 0 {
-            panic!("Variable index is negative");
-        } else {
-            id as usize
-        }
+        assert!(id >= 0);
+        id as usize
     }
 
     /// Returns the name of the variable.
@@ -53,6 +50,12 @@ impl Variable {
     pub fn var_type(&self) -> VarType {
         let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
         var_type.into()
+    }
+
+    /// Returns the status of the variable.
+    pub fn status(&self) -> VarStatus {
+        let status = unsafe { ffi::SCIPvarGetStatus(self.raw) };
+        status.into()
     }
 }
 
@@ -93,6 +96,7 @@ impl From<ffi::SCIP_Vartype> for VarType {
 }
 
 /// An enum representing the status of a SCIP variable.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarStatus {
     /// The variable is an original variable in the problem.
     Original,
@@ -128,20 +132,20 @@ impl From<u32> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::Model;
-    use crate::retcode::Retcode;
+    use crate::Model;
 
     #[test]
     fn var_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
-        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::Binary);
+        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
 
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
         assert_eq!(var.ub(), 1.0);
         assert_eq!(var.obj(), 2.0);
         assert_eq!(var.name(), "x");
-        assert_eq!(var.var_type(), VarType::Binary);
+        assert_eq!(var.var_type(), VarType::ImplInt);
+        assert_eq!(var.status(), VarStatus::Original);
 
         #[cfg(feature = "raw")]
         assert!(!var.inner().is_null());
