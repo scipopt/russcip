@@ -61,3 +61,108 @@ impl From<u32> for Status {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests{
+    use super::*;
+    use crate::Model;
+
+    #[test]
+    fn time_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_real_param("limits/time", 0.).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::TimeLimit);
+    }
+
+
+    #[test]
+    fn memory_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_real_param("limits/memory", 0.).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::MemoryLimit);
+    }
+
+    #[test]
+    fn gap_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_real_param("limits/gap", 100000.).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::GapLimit);
+    }
+
+    #[test]
+    fn solution_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_int_param("limits/solutions", 0).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::SolutionLimit);
+    }
+
+    #[test]
+    fn total_node_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/totalnodes", 0).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::TotalNodeLimit);
+    }
+
+
+    #[test]
+    fn stall_node_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/stallnodes", 0).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::StallNodeLimit);
+    }
+
+    #[test]
+    fn best_solution_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_int_param("limits/bestsol", 0).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::BestSolutionLimit);
+    }
+
+    #[test]
+    fn unknown() {
+        assert_eq!(Model::new().status(), Status::Unknown);
+    }
+}

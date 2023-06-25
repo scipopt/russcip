@@ -11,6 +11,8 @@
 ### Fixed
 ### Changed
 - Removed the prefix "get_" from all getter methods.
+- Move all public methods and types to root of library (to be easily imported).
+- Increase coverage.
 ### Removed
 
 

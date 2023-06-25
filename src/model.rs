@@ -1968,7 +1968,7 @@ mod tests {
 
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
-        let cons1 = model.add_cons_set_part(vec![x1, x2], "c");
+        model.add_cons_set_part(vec![x1, x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1984,7 +1984,7 @@ mod tests {
     fn write_and_read_lp() {
         let model = create_model();
 
-        model.write("test.lp", "lp");
+        model.write("test.lp", "lp").unwrap();
 
         let read_model = Model::new()
         .include_default_plugins().read_prob("test.lp").unwrap();
@@ -2017,7 +2017,7 @@ mod tests {
 
     #[test]
     fn set_real_param() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_real_param("limits/time", 0.).unwrap()
             .include_default_plugins()
