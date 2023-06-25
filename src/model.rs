@@ -2028,4 +2028,76 @@ mod tests {
 
         assert_eq!(model.status(), Status::Optimal);
     }
+
+
+    #[test]
+    fn set_str_param() {
+        let mut model = Model::new()
+            .hide_output()
+            .set_str_param("visual/vbcfilename", "test.vbc").unwrap()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let cons1 = model.add_cons_set_part(vec![x1, x2], "c");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.obj_val(), 3.);
+
+        assert!(Path::new("test.vbc").exists());
+        fs::remove_file("test.vbc").unwrap();
+    }
+
+
+    #[test]
+    fn write_and_read_lp() {
+        let model = create_model();
+
+        model.write("test.lp", "lp");
+
+        let read_model = Model::new()
+        .include_default_plugins().read_prob("test.lp").unwrap();
+
+        let solved = model.solve();
+        let read_solved = read_model.solve();
+
+        assert_eq!(solved.status(), read_solved.status());
+        assert_eq!(solved.obj_val(), read_solved.obj_val());
+
+        fs::remove_file("test.lp").unwrap();
+    }
+
+
+    #[test]
+    fn print_version() {
+        Model::new().print_version();
+    }
+
+
+    #[test]
+    fn set_int_param() {
+        let res = Model::new()
+            .hide_output()
+            .set_int_param("display/verblevel", -1).unwrap_err();
+
+        assert_eq!(res, Retcode::ParameterWrongVal);
+    }
+
+
+    #[test]
+    fn set_real_param() {
+        let mut model = Model::new()
+            .hide_output()
+            .set_real_param("limits/time", 0.).unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::TimeLimit);
+    }
 }
