@@ -804,11 +804,7 @@ impl ScipPtr {
 
     fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSol(
-            self.raw,
-            sol.raw,
-            stored.as_mut_ptr()
-        ));
+        scip_call!(ffi::SCIPaddSol(self.raw, sol.raw, stored.as_mut_ptr()));
         let stored = unsafe { stored.assume_init() };
         Ok(stored == 1)
     }
@@ -1640,17 +1636,6 @@ pub enum ObjSense {
     Maximize,
 }
 
-impl From<ffi::SCIP_OBJSENSE> for ObjSense {
-    /// Converts an `ffi::SCIP_OBJSENSE` value into its corresponding `ObjSense` enum variant.
-    fn from(sense: ffi::SCIP_OBJSENSE) -> Self {
-        match sense {
-            ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE => ObjSense::Maximize,
-            ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE => ObjSense::Minimize,
-            _ => panic!("Unknown objective sense value {:?}", sense),
-        }
-    }
-}
-
 impl From<ObjSense> for ffi::SCIP_OBJSENSE {
     /// Converts an `ObjSense` enum variant into its corresponding `ffi::SCIP_OBJSENSE` value.
     fn from(val: ObjSense) -> Self {
@@ -1665,6 +1650,7 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 mod tests {
     use std::fs;
     use std::path::Path;
+
     use crate::status::Status;
 
     use super::*;
@@ -1956,12 +1942,12 @@ mod tests {
         assert!((2f64.sqrt() - solved_model.obj_val()).abs() < 1e-3);
     }
 
-
     #[test]
     fn set_str_param() {
         let mut model = Model::new()
             .hide_output()
-            .set_str_param("visual/vbcfilename", "test.vbc").unwrap()
+            .set_str_param("visual/vbcfilename", "test.vbc")
+            .unwrap()
             .include_default_plugins()
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
@@ -1979,7 +1965,6 @@ mod tests {
         fs::remove_file("test.vbc").unwrap();
     }
 
-
     #[test]
     fn write_and_read_lp() {
         let model = create_model();
@@ -1987,7 +1972,9 @@ mod tests {
         model.write("test.lp", "lp").unwrap();
 
         let read_model = Model::new()
-        .include_default_plugins().read_prob("test.lp").unwrap();
+            .include_default_plugins()
+            .read_prob("test.lp")
+            .unwrap();
 
         let solved = model.solve();
         let read_solved = read_model.solve();
@@ -1998,33 +1985,47 @@ mod tests {
         fs::remove_file("test.lp").unwrap();
     }
 
-
     #[test]
     fn print_version() {
         Model::new().print_version();
     }
 
-
     #[test]
     fn set_int_param() {
         let res = Model::new()
             .hide_output()
-            .set_int_param("display/verblevel", -1).unwrap_err();
+            .set_int_param("display/verblevel", -1)
+            .unwrap_err();
 
         assert_eq!(res, Retcode::ParameterWrongVal);
     }
-
 
     #[test]
     fn set_real_param() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/time", 0.).unwrap()
+            .set_real_param("limits/time", 0.)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
             .solve();
 
         assert_eq!(model.status(), Status::TimeLimit);
+    }
+
+    #[test]
+    fn set_heurs_presolving_separation() {
+        let model = Model::new()
+            .hide_output()
+            .set_heuristics(ParamSetting::Aggressive)
+            .set_presolving(ParamSetting::Fast)
+            .set_separating(ParamSetting::Off)
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        assert_eq!(model.status(), Status::Optimal);
     }
 }
