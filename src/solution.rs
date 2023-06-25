@@ -54,3 +54,36 @@ pub enum SolError {
     /// The solution is infeasible.
     Infeasible
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn sol_methods() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        let status = model.status();
+        assert_eq!(status, Status::Optimal);
+
+        //test solution values
+        let sol = model.best_sol().unwrap();
+
+        let debug_str = format!("{:?}", sol);
+        assert!(debug_str.contains("Solution with obj val: 200"));
+        assert!(debug_str.contains("Var t_x1=40"));
+        assert!(debug_str.contains("Var t_x2=20"));
+
+        let vars = model.vars();
+        assert_eq!(sol.val(vars[0].clone()), 40.);
+        assert_eq!(sol.val(vars[1].clone()), 20.);
+
+        assert_eq!(sol.obj_val(), model.obj_val());
+    }
+}
