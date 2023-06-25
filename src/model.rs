@@ -1901,8 +1901,8 @@ mod tests {
         let sol = model.create_sol();
         assert_eq!(sol.obj_val(), 0.);
 
-        sol.set_val(x1.clone(), 1.);
-        sol.set_val(x2.clone(), 1.);
+        sol.set_val(x1, 1.);
+        sol.set_val(x2, 1.);
         assert_eq!(sol.obj_val(), 7.);
 
         assert!(model.add_sol(sol).is_ok());
@@ -1928,7 +1928,7 @@ mod tests {
             vec![],
             &mut [],
             vec![x1.clone(), x2.clone()],
-            vec![x1.clone(), x2.clone()],
+            vec![x1, x2],
             &mut [1., 1.],
             0.,
             1.,
