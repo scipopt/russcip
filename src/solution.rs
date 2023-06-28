@@ -5,6 +5,7 @@ use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
+#[derive(PartialEq, Eq)]
 pub struct Solution {
     pub(crate) scip_ptr: *mut ffi::SCIP,
     pub(crate) raw: *mut ffi::SCIP_SOL,
@@ -62,7 +63,7 @@ mod tests {
 
     #[test]
     fn sol_methods() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")

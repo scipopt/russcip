@@ -1,7 +1,7 @@
 use core::panic;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::ffi::{c_int, CString};
+use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -11,11 +11,11 @@ use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::retcode::Retcode;
-use crate::scip_call;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
+use crate::{scip_call, Heur, HeurResult, HeurTiming};
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -722,6 +722,89 @@ impl ScipPtr {
         Ok(())
     }
 
+    fn include_heur(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        dispchar: char,
+        freq: i32,
+        freqofs: i32,
+        maxdepth: i32,
+        timing: HeurTiming,
+        usessubscip: bool,
+        heur: Box<dyn Heur>,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn heurexec(
+            scip: *mut ffi::SCIP,
+            heur: *mut ffi::SCIP_HEUR,
+            heurtiming: ffi::SCIP_HEURTIMING,
+            nodeinfeasible: ::std::os::raw::c_uint,
+            result: *mut ffi::SCIP_RESULT,
+        ) -> ffi::SCIP_RETCODE {
+            let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
+            assert!(!data_ptr.is_null());
+            let rule_ptr = data_ptr as *mut Box<dyn Heur>;
+
+            let current_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
+            let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0) };
+            if heur_res == HeurResult::FoundSol {
+                let new_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
+
+                if new_n_sols <= current_n_sols {
+                    let heur_name =
+                        unsafe { CStr::from_ptr(ffi::SCIPheurGetName(heur)).to_str().unwrap() };
+                    panic!(
+                        "Heuristic {} returned result {:?}, but no solutions were added",
+                        heur_name, heur_res
+                    );
+                }
+            }
+
+            unsafe { *result = heur_res.into() };
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn heurfree(
+            _scip: *mut ffi::SCIP,
+            heur: *mut ffi::SCIP_HEUR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heur>) });
+            Retcode::Okay.into()
+        }
+
+        let ptr = Box::into_raw(Box::new(heur));
+        let heur_faker = ptr as *mut ffi::SCIP_HEURDATA;
+
+        scip_call!(ffi::SCIPincludeHeur(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            dispchar as ::std::os::raw::c_char,
+            priority,
+            freq,
+            freqofs,
+            maxdepth,
+            timing.into(),
+            usessubscip.into(),
+            None,
+            Some(heurfree),
+            None,
+            None,
+            None,
+            None,
+            Some(heurexec),
+            heur_faker,
+        ));
+
+        Ok(())
+    }
+
     fn add_cons_coef(
         &mut self,
         cons: Rc<Constraint>,
@@ -1350,6 +1433,54 @@ impl Model<ProblemCreated> {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
+        self
+    }
+
+    /// Include a new primal heuristic in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the heuristic. This should be a unique identifier.
+    /// * `desc` - A brief description of the heuristic. This is used for informational purposes.
+    /// * `priority` - The priority of the heuristic. When SCIP decides which heuristic to call, it considers their priorities. A higher value indicates a higher priority.
+    /// * `dispchar` - The display character of the heuristic (used in logs).
+    /// * `freq` - The frequency for calling the heuristic in the tree; 1 means at every node, 2 means at every other node and so on, -1 turns off the heuristic.
+    /// * `freqofs` - The frequency offset for calling the heuristic in the tree; it defines the depth of the branching tree at which the primal heuristic is executed for the first time.
+    /// * `maxdepth` - The maximum depth level up to which this heuristic should be used. If this is -1, the heuristic can be used at any depth.
+    /// * `timing` - The timing mask of the heuristic.
+    /// * `usessubscip` - Should the heuristic use a secondary SCIP instance?
+    /// * `heur` - The heuristic to be included. This should be a Box of an object that implements the `Heur` trait, and represents the heuristic data.
+    ///
+    /// # Returns
+    ///
+    /// This function returns the `Model` instance for which the heuristic was included. This allows for method chaining.
+    pub fn include_heur(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        dispchar: char,
+        freq: i32,
+        freqofs: i32,
+        maxdepth: i32,
+        timing: HeurTiming,
+        usessubscip: bool,
+        heur: Box<dyn Heur>,
+    ) -> Self {
+        self.scip
+            .include_heur(
+                name,
+                desc,
+                priority,
+                dispchar,
+                freq,
+                freqofs,
+                maxdepth,
+                timing,
+                usessubscip,
+                heur,
+            )
+            .expect("Failed to include heuristic at state ProblemCreated");
         self
     }
 
@@ -1987,7 +2118,9 @@ mod tests {
         model.write("test.lp", "lp").unwrap();
 
         let read_model = Model::new()
-        .include_default_plugins().read_prob("test.lp").unwrap();
+            .include_default_plugins()
+            .read_prob("test.lp")
+            .unwrap();
 
         let solved = model.solve();
         let read_solved = read_model.solve();
@@ -1998,28 +2131,27 @@ mod tests {
         fs::remove_file("test.lp").unwrap();
     }
 
-
     #[test]
     fn print_version() {
         Model::new().print_version();
     }
 
-
     #[test]
     fn set_int_param() {
         let res = Model::new()
             .hide_output()
-            .set_int_param("display/verblevel", -1).unwrap_err();
+            .set_int_param("display/verblevel", -1)
+            .unwrap_err();
 
         assert_eq!(res, Retcode::ParameterWrongVal);
     }
-
 
     #[test]
     fn set_real_param() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/time", 0.).unwrap()
+            .set_real_param("limits/time", 0.)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
