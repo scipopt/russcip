@@ -51,6 +51,7 @@ impl fmt::Debug for Solution {
 }
 
 /// Represents and error that can occur when adding a solution.
+#[derive(Debug, PartialEq, Eq)]
 pub enum SolError {
     /// The solution is infeasible.
     Infeasible

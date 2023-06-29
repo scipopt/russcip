@@ -102,7 +102,7 @@ impl From<HeurResult> for u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::Model;
+    use crate::{Model, ModelWithProblem, ProblemCreated, SolError};
 
     use super::*;
 
@@ -133,7 +133,7 @@ mod tests {
             1,
             0,
             -1,
-            HeurTiming::BEFORE_NODE,
+            timing,
             false,
             Box::new(heur),
         ).solve();
@@ -167,6 +167,112 @@ mod tests {
             0,
             -1,
             HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE,
+            false,
+            Box::new(heur),
+        ).solve();
+    }
+
+
+    struct DelayedHeur;
+
+    impl Heuristic for DelayedHeur {
+        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+            HeurResult::Delayed
+        }
+    }
+
+
+    #[test]
+    fn delayed_heur() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap();
+
+        let heur = DelayedHeur;
+        model.include_heur(
+            "delayed_heur",
+            "",
+            9999999,
+            'n',
+            1,
+            0,
+            -1,
+            HeurTiming::BEFORE_NODE,
+            false,
+            Box::new(heur),
+        ).solve();
+    }
+
+
+    struct DidNotRunHeur;
+
+    impl Heuristic for DidNotRunHeur {
+        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+            HeurResult::DidNotRun
+        }
+    }
+
+    #[test]
+    fn did_not_run_heur() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap();
+
+        let heur = DidNotRunHeur;
+        model.include_heur(
+            "did_not_run_heur",
+            "",
+            9999999,
+            'n',
+            1,
+            0,
+            -1,
+            HeurTiming::BEFORE_NODE,
+            false,
+            Box::new(heur),
+        ).solve();
+    }
+
+
+    struct FoundSolHeur {
+        model: Model<ProblemCreated>,
+    }
+
+    impl Heuristic for FoundSolHeur {
+        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+            let sol = self.model.create_sol();
+            for var in self.model.vars() {
+                sol.set_val(var, 1.0);
+            }
+            assert_eq!(sol.obj_val(), 7.0);
+            assert_eq!(self.model.add_sol(sol), Ok(()));
+            HeurResult::FoundSol
+        }
+    }
+
+
+    #[test]
+    fn found_sol_heur() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap();
+
+        let heur = FoundSolHeur { model: model.clone_for_plugins() };
+        model.include_heur(
+            "found_sol_heur",
+            "",
+            9999999,
+            'n',
+            1,
+            0,
+            -1,
+            HeurTiming::BEFORE_NODE,
             false,
             Box::new(heur),
         ).solve();

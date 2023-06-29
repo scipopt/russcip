@@ -889,7 +889,7 @@ impl ScipPtr {
         let mut stored = MaybeUninit::uninit();
         scip_call!(ffi::SCIPaddSol(self.raw, sol.raw, stored.as_mut_ptr()));
         let stored = unsafe { stored.assume_init() };
-        Ok(stored == 1)
+        Ok(stored != 0)
     }
 }
 
