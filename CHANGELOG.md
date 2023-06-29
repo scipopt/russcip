@@ -2,6 +2,7 @@
 
 ## unreleased
 ### Added
+- Primal heuristic plugin
 ### Fixed
 ### Changed
 ### Removed
