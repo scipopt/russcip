@@ -159,7 +159,7 @@ mod tests {
 
         let heur = ImpostorHeur;
         model.include_heur(
-            "lying_heur",
+            "impostor_heur",
             "",
             9999999,
             'n',
