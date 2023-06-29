@@ -15,7 +15,7 @@ use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, scip_call_panic};
-use crate::{scip_call, Heur, HeurResult, HeurTiming};
+use crate::{scip_call, Heuristic, HeurResult, HeurTiming};
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -733,7 +733,7 @@ impl ScipPtr {
         maxdepth: i32,
         timing: HeurTiming,
         usessubscip: bool,
-        heur: Box<dyn Heur>,
+        heur: Box<dyn Heuristic>,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
@@ -747,7 +747,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_RETCODE {
             let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut Box<dyn Heur>;
+            let rule_ptr = data_ptr as *mut Box<dyn Heuristic>;
 
             let current_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
             let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0) };
@@ -774,7 +774,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
             assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heur>) });
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heuristic>) });
             Retcode::Okay.into()
         }
 
@@ -1465,7 +1465,7 @@ impl Model<ProblemCreated> {
         maxdepth: i32,
         timing: HeurTiming,
         usessubscip: bool,
-        heur: Box<dyn Heur>,
+        heur: Box<dyn Heuristic>,
     ) -> Self {
         self.scip
             .include_heur(

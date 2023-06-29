@@ -91,8 +91,8 @@ pub mod eventhdlr;
 pub use eventhdlr::*;
 
 /// Contains the `Heur` trait used to define custom primal heuristics.
-pub mod heur;
-pub use heur::*;
+pub mod heuristic;
+pub use heuristic::*;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]

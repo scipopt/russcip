@@ -4,7 +4,7 @@ use crate::ffi;
 use crate::Solution;
 
 /// A trait for defining custom primal heuristics.
-pub trait Heur {
+pub trait Heuristic {
     /// Executes the heuristic.
     ///
     /// # Arguments
@@ -108,7 +108,7 @@ mod tests {
 
     struct NoSolutionFoundHeur;
 
-    impl Heur for NoSolutionFoundHeur {
+    impl Heuristic for NoSolutionFoundHeur {
         fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
             HeurResult::NoSolFound
         }
@@ -123,6 +123,8 @@ mod tests {
             .unwrap();
 
         let heur = NoSolutionFoundHeur;
+        let mut timing = HeurTiming::BEFORE_PRESOL;
+        timing |= HeurTiming::AFTER_PROP_LOOP;
         model.include_heur(
             "no_sol_found_heur",
             "",
@@ -138,9 +140,9 @@ mod tests {
 
     }
 
-    struct LyingHeur;
+    struct ImpostorHeur;
 
-    impl Heur for LyingHeur {
+    impl Heuristic for ImpostorHeur {
         fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
             HeurResult::FoundSol
         }
@@ -148,14 +150,14 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn lying_heur() {
+    fn impostor_heur() {
             let model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = LyingHeur;
+        let heur = ImpostorHeur;
         model.include_heur(
             "lying_heur",
             "",
@@ -164,7 +166,7 @@ mod tests {
             1,
             0,
             -1,
-            HeurTiming::BEFORE_NODE,
+            HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE,
             false,
             Box::new(heur),
         ).solve();
