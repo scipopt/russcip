@@ -489,7 +489,7 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            let event_type = unsafe { (*eventhdlr_ptr).var_type() };
+            let event_type = unsafe { (*eventhdlr_ptr).get_type() };
             unsafe {
                 ffi::SCIPcatchEvent(
                     scip,
