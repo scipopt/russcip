@@ -95,7 +95,7 @@ Some of SCIP's plugins are imported to the rust interface as traits. Currently t
 | Branching rule| [branchrule.rs](https://github.com/scipopt/russcip/blob/main/src/branchrule.rs) | [docs](https://docs.rs/russcip/latest/russcip/branchrule/trait.BranchRule.html) |
 | Variable Pricer| [pricer.rs](https://github.com/scipopt/russcip/blob/main/src/pricer.rs) | [docs](https://docs.rs/russcip/latest/russcip/pricer/trait.Pricer.html) |
 | Event Handler | [eventhdlr.rs](https://github.com/scipopt/russcip/blob/main/src/eventhdlr.rs) | [docs](https://docs.rs/russcip/latest/russcip/eventhdlr/trait.Eventhdlr.html) |
-| Primal Heuristic | [heur.rs](https://github.com/scipopt/russcip/blob/main/src/heuristic.rs) | [docs](https://docs.rs/russcip/latest/russcip/eventhdlr/trait.Heuristic.html) |
+| Primal Heuristic | [heuristic.rs](https://github.com/scipopt/russcip/blob/main/src/heuristic.rs) | [docs](https://docs.rs/russcip/latest/russcip/eventhdlr/trait.Heuristic.html) |
 
 To add a custom plugin to a SCIP `Model` instance, you should implement its trait and call the corresponding `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the corresponding files. 
 
