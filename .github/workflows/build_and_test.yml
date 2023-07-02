@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/v803/SCIPOptSuite-${{ env.version }}-Linux-debian.deb
+          wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/v803/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
           sudo apt-get update && sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
 
       - name: Install tarpaulin
