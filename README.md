@@ -14,7 +14,7 @@
 [img_coverage]: https://img.shields.io/codecov/c/github/scipopt/russcip
 
 A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). This crate also exposes access to the SCIP's C-API through the `ffi` module. 
-The project is currently an early-stage work in progress, issues/pull-requests are very welcome. 
+The project is currently actively developed, issues/pull-requests are very welcome. 
 ## Dependencies 
 Make sure SCIP is installed, the easiest way to install it is to install a precompiled package from [here](https://scipopt.org/index.php#download) or through conda by running
 ```bash
