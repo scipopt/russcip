@@ -1,8 +1,8 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, ObjSense,
-    ParamSetting, Retcode, Solution, Status, VarType, Variable, Node,
+    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
+    ParamSetting, Retcode, Solution, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -14,7 +14,7 @@ use std::rc::Rc;
 #[non_exhaustive]
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
-    raw: *mut ffi::SCIP,
+    pub(crate) raw: *mut ffi::SCIP,
     consumed: bool,
 }
 
