@@ -48,7 +48,7 @@ mod tests {
     use crate::{
         model::{Model, ModelWithProblem, ProblemCreated},
         status::Status,
-        variable::VarType,
+        variable::VarType, Solving, ProblemOrSolving,
     };
 
     struct PanickingPricer;
@@ -163,7 +163,7 @@ mod tests {
 
     struct AddSameColumnPricer {
         added: bool,
-        model: Model<ProblemCreated>,
+        model: Model<Solving>,
         data: ComplexData,
     }
 

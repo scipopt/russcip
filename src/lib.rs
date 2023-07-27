@@ -8,6 +8,7 @@
 //! use russcip::model::ObjSense;
 //! use russcip::status::Status;
 //! use russcip::variable::VarType;
+//! use crate::russcip::model::ProblemOrSolving;
 //! use crate::russcip::model::ModelWithProblem;
 //!
 //!

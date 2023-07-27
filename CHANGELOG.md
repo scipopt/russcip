@@ -3,6 +3,7 @@
 ## unreleased
 ### Added
 - Primal heuristic plugin
+- Solving Model state, to represent methods accessible when during solving.
 ### Fixed
 ### Changed
 - Moved ScipPtr struct and methods to its own module. 
