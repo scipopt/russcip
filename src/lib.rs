@@ -94,6 +94,8 @@ pub use eventhdlr::*;
 pub mod heuristic;
 pub use heuristic::*;
 
+mod scip;
+
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
 #[macro_export]
 macro_rules! scip_call {
