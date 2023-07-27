@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-
 use std::rc::Rc;
 
 use crate::constraint::Constraint;

@@ -100,7 +100,7 @@ impl From<HeurResult> for u32 {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Model, ModelWithProblem, ProblemOrSolving, SolError, Solving};
+    use crate::{Model, ModelWithProblem, ProblemOrSolving, Solving};
 
     use super::*;
 
