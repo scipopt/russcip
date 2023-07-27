@@ -54,9 +54,8 @@ impl fmt::Debug for Solution {
 #[derive(Debug, PartialEq, Eq)]
 pub enum SolError {
     /// The solution is infeasible.
-    Infeasible
+    Infeasible,
 }
-
 
 #[cfg(test)]
 mod tests {
