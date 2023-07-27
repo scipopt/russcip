@@ -37,12 +37,18 @@ pub struct ProblemCreated {
     pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
 }
 
+/// Represents the state of an optimization model during the solving process (to be used in plugins).
+#[derive(Debug)]
+pub struct Solving {
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+}
+
 /// Represents the state of an optimization model that has been solved.
 #[derive(Debug)]
 pub struct Solved {
     pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
     pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
-    pub(crate) best_sol: Option<Solution>,
 }
 
 impl Model<Unsolved> {
@@ -185,10 +191,13 @@ impl Model<ProblemCreated> {
 
     /// Returns a clone of the current model.
     /// The clone is meant for use in implementing custom plugins.
-    pub fn clone_for_plugins(&self) -> Self {
+    pub fn clone_for_plugins(&self) -> Model<Solving> {
         Model {
             scip: self.scip.clone(),
-            state: self.state.clone(),
+            state: Solving {
+                vars: self.state.vars.clone(),
+                conss: self.state.conss.clone(),
+            },
         }
     }
 
@@ -197,26 +206,6 @@ impl Model<ProblemCreated> {
         self.scip
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
-    }
-
-    /// Returns the current node of the model.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
-    pub fn focus_node(&self) -> Node {
-        self.scip.focus_node()
-    }
-
-    /// Creates a new child node of the current node and returns it.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called from plugins implementations.
-    pub fn create_child(&mut self) -> Node {
-        self.scip
-            .create_child()
-            .expect("Failed to create child node in state ProblemCreated")
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
@@ -252,233 +241,6 @@ impl Model<ProblemCreated> {
         let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
-    }
-
-    /// Adds a new priced variable to the SCIP data structure.
-    ///
-    /// # Arguments
-    ///
-    /// * `lb` - The lower bound of the variable.
-    /// * `ub` - The upper bound of the variable.
-    /// * `obj` - The objective function coefficient for the variable.
-    /// * `name` - The name of the variable. This should be a unique identifier.
-    /// * `var_type` - The type of the variable, specified as an instance of the `VarType` enum.
-    ///
-    /// # Returns
-    ///
-    /// This function returns a reference-counted smart pointer (`Rc`) to the created `Variable` instance.
-    pub fn add_priced_var(
-        &mut self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Rc<Variable> {
-        let var = self
-            .scip
-            .create_priced_var(lb, ub, obj, name, var_type)
-            .expect("Failed to create variable in state ProblemCreated");
-        let var = Rc::new(var);
-        let var_id = var.index();
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
-    }
-
-    /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `vars` - The variables in the constraint.
-    /// * `coefs` - The coefficients of the variables in the constraint.
-    /// * `lhs` - The left-hand side of the constraint.
-    /// * `rhs` - The right-hand side of the constraint.
-    /// * `name` - The name of the constraint.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    pub fn add_cons(
-        &mut self,
-        vars: Vec<Rc<Variable>>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-    ) -> Rc<Constraint> {
-        assert_eq!(vars.len(), coefs.len());
-        let cons = self
-            .scip
-            .create_cons(vars, coefs, lhs, rhs, name)
-            .expect("Failed to create constraint in state ProblemCreated");
-        let cons = Rc::new(cons);
-        self.state.conss.borrow_mut().push(cons.clone());
-        cons
-    }
-
-    /// Adds a new set partitioning constraint to the model with the given variables and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `vars` - The binary variables in the constraint.
-    /// * `name` - The name of the constraint.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    pub fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
-        let cons = self
-            .scip
-            .create_cons_set_part(vars, name)
-            .expect("Failed to add constraint set partition in state ProblemCreated");
-        let cons = Rc::new(cons);
-        self.state.conss.borrow_mut().push(cons.clone());
-        cons
-    }
-
-    /// Adds a new set cover constraint to the model with the given variables and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `vars` - The binary variables in the constraint.
-    /// * `name` - The name of the constraint.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    pub fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
-        let cons = self
-            .scip
-            .create_cons_set_cover(vars, name)
-            .expect("Failed to add constraint set cover in state ProblemCreated");
-        let cons = Rc::new(cons);
-        self.state.conss.borrow_mut().push(cons.clone());
-        cons
-    }
-
-    /// Adds a new set packing constraint to the model with the given variables and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `vars` - The binary variables in the constraint.
-    /// * `name` - The name of the constraint.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    pub fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-        assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
-        let cons = self
-            .scip
-            .create_cons_set_pack(vars, name)
-            .expect("Failed to add constraint set packing in state ProblemCreated");
-        let cons = Rc::new(cons);
-        self.state.conss.borrow_mut().push(cons.clone());
-        cons
-    }
-
-    /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
-    ///
-    /// # Arguments
-    ///
-    /// * `lin_vars` - The linear variables in the constraint.
-    /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
-    /// * `quad_vars_1` - The first variable in the quadratic constraints.
-    /// * `quad_vars_2` - The second variable in the quadratic constraints.
-    /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
-    /// * `lhs` - The left-hand side of the constraint.
-    /// * `rhs` - The right-hand side of the constraint.
-    /// * `name` - The name of the constraint.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    pub fn add_cons_quadratic(
-        &mut self,
-        lin_vars: Vec<Rc<Variable>>,
-        lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
-        quad_coefs: &mut [f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-    ) -> Rc<Constraint> {
-        assert_eq!(lin_vars.len(), lin_coefs.len());
-        assert_eq!(quad_vars_1.len(), quad_vars_2.len());
-        assert_eq!(quad_vars_1.len(), quad_coefs.len());
-        let cons = self
-            .scip
-            .create_cons_quadratic(
-                lin_vars,
-                lin_coefs,
-                quad_vars_1,
-                quad_vars_2,
-                quad_coefs,
-                lhs,
-                rhs,
-                name,
-            )
-            .expect("Failed to create constraint in state ProblemCreated");
-        let cons = Rc::new(cons);
-        self.state.conss.borrow_mut().push(cons.clone());
-        cons
-    }
-
-    /// Adds a coefficient to the given constraint for the given variable and coefficient value.
-    ///
-    /// # Arguments
-    ///
-    /// * `cons` - The constraint to add the coefficient to.
-    /// * `var` - The variable to add the coefficient for.
-    /// * `coef` - The coefficient value to add.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the coefficient cannot be added in the current state.
-    pub fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
-        self.scip
-            .add_cons_coef(cons, var, coef)
-            .expect("Failed to add constraint coefficient in state ProblemCreated");
-    }
-
-    /// Adds a binary variable to the given set partitioning constraint.
-    ///
-    /// # Arguments
-    ///
-    /// * `cons` - The constraint to add the variable to.
-    /// * `var` - The binary variable to add.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    pub fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
-        assert_eq!(var.var_type(), VarType::Binary);
-        self.scip
-            .add_cons_coef_setppc(cons, var)
-            .expect("Failed to add constraint coefficient in state ProblemCreated");
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -624,50 +386,78 @@ impl Model<ProblemCreated> {
         self.scip
             .solve()
             .expect("Failed to solve problem in state ProblemCreated");
-        let mut new_model = Model {
+        let new_model = Model {
             scip: self.scip,
             state: Solved {
                 vars: self.state.vars,
                 conss: self.state.conss,
-                best_sol: None,
             },
         };
-        new_model._set_best_sol();
         new_model
     }
+}
 
-    /// Creates a new solution initialized to zero.
-    pub fn create_sol(&mut self) -> Solution {
-        self.scip
-            .create_sol()
-            .expect("Failed to create solution in state ProblemCreated")
+impl Model<Solving> {
+    /// Returns the current node of the model.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
+    pub fn focus_node(&self) -> Node {
+        self.scip.focus_node()
     }
 
-    /// Adds a solution to the model
+    /// Creates a new child node of the current node and returns it.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if not called from plugins implementations.
+    pub fn create_child(&mut self) -> Node {
+        self.scip
+            .create_child()
+            .expect("Failed to create child node in state ProblemCreated")
+    }
+
+    /// Adds a new priced variable to the SCIP data structure.
+    ///
+    /// # Arguments
+    ///
+    /// * `lb` - The lower bound of the variable.
+    /// * `ub` - The upper bound of the variable.
+    /// * `obj` - The objective function coefficient for the variable.
+    /// * `name` - The name of the variable. This should be a unique identifier.
+    /// * `var_type` - The type of the variable, specified as an instance of the `VarType` enum.
     ///
     /// # Returns
-    /// A `Result` indicating whether the solution was added successfully.
-    pub fn add_sol(&self, sol: Solution) -> Result<(), SolError> {
-        let succesfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
-        if succesfully_stored {
-            Ok(())
-        } else {
-            Err(SolError::Infeasible)
-        }
+    ///
+    /// This function returns a reference-counted smart pointer (`Rc`) to the created `Variable` instance.
+    pub fn add_priced_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Rc<Variable> {
+        let var = self
+            .scip
+            .create_priced_var(lb, ub, obj, name, var_type)
+            .expect("Failed to create variable in state ProblemCreated");
+        let var = Rc::new(var);
+        let var_id = var.index();
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        var
     }
 }
 
 impl Model<Solved> {
-    /// Sets the best solution for the optimization model if one exists.
-    fn _set_best_sol(&mut self) {
-        if self.scip.n_sols() > 0 {
-            self.state.best_sol = Some(self.scip.best_sol());
-        }
-    }
-
     /// Returns the best solution for the optimization model, if one exists.
-    pub fn best_sol(&self) -> Option<Box<&Solution>> {
-        self.state.best_sol.as_ref().map(Box::new)
+    pub fn best_sol(&self) -> Option<Solution> {
+        if self.n_sols() > 0 {
+            Some(self.scip.best_sol())
+        } else {
+            None
+        }
     }
 
     /// Returns the number of solutions found by the optimization model.
@@ -756,7 +546,374 @@ macro_rules! impl_ModelWithProblem {
     }
 }
 
-impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>);
+impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving>);
+
+/// A trait for optimization models with a problem created or solved.
+pub trait ProblemOrSolving {
+    /// Creates a new solution initialized to zero.
+    fn create_sol(&mut self) -> Solution;
+
+    /// Adds a solution to the model
+    ///
+    /// # Returns
+    /// A `Result` indicating whether the solution was added successfully.
+    fn add_sol(&self, sol: Solution) -> Result<(), SolError>;
+
+    /// Adds a binary variable to the given set partitioning constraint.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons` - The constraint to add the variable to.
+    /// * `var` - The binary variable to add.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
+    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>);
+
+    /// Adds a coefficient to the given constraint for the given variable and coefficient value.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons` - The constraint to add the coefficient to.
+    /// * `var` - The variable to add the coefficient for.
+    /// * `coef` - The coefficient value to add.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the coefficient cannot be added in the current state.
+    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64);
+    /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `lin_vars` - The linear variables in the constraint.
+    /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
+    /// * `quad_vars_1` - The first variable in the quadratic constraints.
+    /// * `quad_vars_2` - The second variable in the quadratic constraints.
+    /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_quadratic(
+        &mut self,
+        lin_vars: Vec<Rc<Variable>>,
+        lin_coefs: &mut [f64],
+        quad_vars_1: Vec<Rc<Variable>>,
+        quad_vars_2: Vec<Rc<Variable>>,
+        quad_coefs: &mut [f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint>;
+    /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The variables in the constraint.
+    /// * `coefs` - The coefficients of the variables in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint>;
+    /// Adds a new set partitioning constraint to the model with the given variables and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+    fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    /// Adds a new set cover constraint to the model with the given variables and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+    fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    /// Adds a new set packing constraint to the model with the given variables and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+    fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+}
+
+macro_rules! impl_ProblemOrSolving {
+    (for $($t:ty),+) => {
+        $(impl ProblemOrSolving for $t {
+
+            /// Creates a new solution initialized to zero.
+            fn create_sol(&mut self) -> Solution {
+                self.scip
+                    .create_sol()
+                    .expect("Failed to create solution in state ProblemCreated")
+            }
+
+            /// Adds a solution to the model
+            ///
+            /// # Returns
+            /// A `Result` indicating whether the solution was added successfully.
+            fn add_sol(&self, sol: Solution) -> Result<(), SolError> {
+                let succesfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
+                if succesfully_stored {
+                    Ok(())
+                } else {
+                    Err(SolError::Infeasible)
+                }
+            }
+
+            /// Adds a binary variable to the given set partitioning constraint.
+            ///
+            /// # Arguments
+            ///
+            /// * `cons` - The constraint to add the variable to.
+            /// * `var` - The binary variable to add.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
+            fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+                assert_eq!(var.var_type(), VarType::Binary);
+                self.scip
+                    .add_cons_coef_setppc(cons, var)
+                    .expect("Failed to add constraint coefficient in state ProblemCreated");
+            }
+
+
+            /// Adds a coefficient to the given constraint for the given variable and coefficient value.
+            ///
+            /// # Arguments
+            ///
+            /// * `cons` - The constraint to add the coefficient to.
+            /// * `var` - The variable to add the coefficient for.
+            /// * `coef` - The coefficient value to add.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the coefficient cannot be added in the current state.
+            fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
+                self.scip
+                    .add_cons_coef(cons, var, coef)
+                    .expect("Failed to add constraint coefficient in state ProblemCreated");
+            }
+
+            /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `lin_vars` - The linear variables in the constraint.
+            /// * `lin_coefs` - The coefficients of the linear variables in the constraint.
+            /// * `quad_vars_1` - The first variable in the quadratic constraints.
+            /// * `quad_vars_2` - The second variable in the quadratic constraints.
+            /// * `quad_coefs` - The coefficients of the quadratic terms in the constraint.
+            /// * `lhs` - The left-hand side of the constraint.
+            /// * `rhs` - The right-hand side of the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state.
+            fn add_cons_quadratic(
+                &mut self,
+                lin_vars: Vec<Rc<Variable>>,
+                lin_coefs: &mut [f64],
+                quad_vars_1: Vec<Rc<Variable>>,
+                quad_vars_2: Vec<Rc<Variable>>,
+                quad_coefs: &mut [f64],
+                lhs: f64,
+                rhs: f64,
+                name: &str,
+            ) -> Rc<Constraint> {
+                assert_eq!(lin_vars.len(), lin_coefs.len());
+                assert_eq!(quad_vars_1.len(), quad_vars_2.len());
+                assert_eq!(quad_vars_1.len(), quad_coefs.len());
+                let cons = self
+                    .scip
+                    .create_cons_quadratic(
+                        lin_vars,
+                        lin_coefs,
+                        quad_vars_1,
+                        quad_vars_2,
+                        quad_coefs,
+                        lhs,
+                        rhs,
+                        name,
+                    )
+                    .expect("Failed to create constraint in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+
+
+            /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `vars` - The variables in the constraint.
+            /// * `coefs` - The coefficients of the variables in the constraint.
+            /// * `lhs` - The left-hand side of the constraint.
+            /// * `rhs` - The right-hand side of the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state.
+            fn add_cons(
+                &mut self,
+                vars: Vec<Rc<Variable>>,
+                coefs: &[f64],
+                lhs: f64,
+                rhs: f64,
+                name: &str,
+            ) -> Rc<Constraint> {
+                assert_eq!(vars.len(), coefs.len());
+                let cons = self
+                    .scip
+                    .create_cons(vars, coefs, lhs, rhs, name)
+                    .expect("Failed to create constraint in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+            /// Adds a new set partitioning constraint to the model with the given variables and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `vars` - The binary variables in the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+            fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+                let cons = self
+                    .scip
+                    .create_cons_set_part(vars, name)
+                    .expect("Failed to add constraint set partition in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+            /// Adds a new set cover constraint to the model with the given variables and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `vars` - The binary variables in the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+            fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+                let cons = self
+                    .scip
+                    .create_cons_set_cover(vars, name)
+                    .expect("Failed to add constraint set cover in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+            /// Adds a new set packing constraint to the model with the given variables and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `vars` - The binary variables in the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
+            fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+                let cons = self
+                    .scip
+                    .create_cons_set_pack(vars, name)
+                    .expect("Failed to add constraint set packing in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+        })*
+    }
+}
+
+impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.
