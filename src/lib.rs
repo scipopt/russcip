@@ -10,7 +10,7 @@
 //! use russcip::variable::VarType;
 //! use crate::russcip::model::ProblemOrSolving;
 //! use crate::russcip::model::ModelWithProblem;
-//!
+//! use crate::russcip::WithSolutions;
 //!
 //! // Create model
 //! let mut model = Model::new()

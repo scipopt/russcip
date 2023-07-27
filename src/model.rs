@@ -451,20 +451,6 @@ impl Model<Solving> {
 }
 
 impl Model<Solved> {
-    /// Returns the best solution for the optimization model, if one exists.
-    pub fn best_sol(&self) -> Option<Solution> {
-        if self.n_sols() > 0 {
-            Some(self.scip.best_sol())
-        } else {
-            None
-        }
-    }
-
-    /// Returns the number of solutions found by the optimization model.
-    pub fn n_sols(&self) -> usize {
-        self.scip.n_sols()
-    }
-
     /// Returns the objective value of the best solution found by the optimization model.
     pub fn obj_val(&self) -> f64 {
         self.scip.obj_val()
@@ -914,6 +900,39 @@ macro_rules! impl_ProblemOrSolving {
 }
 
 impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving>);
+
+/// A trait for optimization models with any state that might have solutions.
+pub trait WithSolutions {
+    /// Returns the best solution for the optimization model, if one exists.
+    fn best_sol(&self) -> Option<Solution>;
+
+    /// Returns the number of solutions found by the optimization model.
+    fn n_sols(&self) -> usize;
+}
+
+macro_rules! impl_WithSolutions {
+    (for $($t:ty),+) => {
+        $(impl WithSolutions for $t {
+
+            /// Returns the best solution for the optimization model, if one exists.
+            fn best_sol(&self) -> Option<Solution> {
+                if self.n_sols() > 0 {
+                    Some(self.scip.best_sol())
+                } else {
+                    None
+                }
+            }
+
+            /// Returns the number of solutions found by the optimization model.
+            fn n_sols(&self) -> usize {
+                self.scip.n_sols()
+            }
+
+        })*
+    }
+}
+
+impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.
