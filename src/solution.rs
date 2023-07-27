@@ -5,6 +5,7 @@ use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
+#[derive(PartialEq, Eq)]
 pub struct Solution {
     pub(crate) scip_ptr: *mut ffi::SCIP,
     pub(crate) raw: *mut ffi::SCIP_SOL,
@@ -50,11 +51,11 @@ impl fmt::Debug for Solution {
 }
 
 /// Represents and error that can occur when adding a solution.
+#[derive(Debug, PartialEq, Eq)]
 pub enum SolError {
     /// The solution is infeasible.
-    Infeasible
+    Infeasible,
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -62,7 +63,7 @@ mod tests {
 
     #[test]
     fn sol_methods() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")

@@ -2,8 +2,10 @@
 
 ## unreleased
 ### Added
+- Primal heuristic plugin
 ### Fixed
 ### Changed
+- Moved ScipPtr struct and methods to its own module. 
 ### Removed
 
 ## 0.2.4
