@@ -42,11 +42,11 @@ impl Node {
 mod tests {
     use crate::{
         branchrule::{BranchRule, BranchingResult},
-        model::{Model, ProblemCreated},
+        model::{Model, Solving},
     };
 
     struct NodeDataBranchRule {
-        model: Model<ProblemCreated>,
+        model: Model<Solving>,
     }
 
     impl BranchRule for NodeDataBranchRule {

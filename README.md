@@ -44,6 +44,8 @@ use russcip::status::Status;
 use russcip::variable::VarType;
 use russcip::retcode::Retcode;
 use crate::russcip::model::ModelWithProblem;
+use crate::russcip::model::ProblemOrSolving;
+use crate::russcip::WithSolutions;
 
 fn main() {
     // Create model

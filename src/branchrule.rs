@@ -56,6 +56,7 @@ pub struct BranchingCandidate {
 mod tests {
     use super::*;
     use crate::model::{ModelWithProblem, ProblemCreated};
+    use crate::Solving;
     use crate::{model::Model, status::Status};
 
     struct PanickingBranchingRule;
@@ -135,7 +136,7 @@ mod tests {
     }
 
     struct FirstBranchingRule {
-        model: Model<ProblemCreated>,
+        model: Model<Solving>,
     }
 
     impl BranchRule for FirstBranchingRule {
@@ -166,7 +167,7 @@ mod tests {
     }
 
     struct CustomBranchingRule {
-        model: Model<ProblemCreated>,
+        model: Model<Solving>,
     }
 
     impl BranchRule for CustomBranchingRule {
