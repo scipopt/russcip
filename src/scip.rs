@@ -234,8 +234,11 @@ impl ScipPtr {
         ) };
         let mut var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
-        self.vars_added_in_solving.push(var_ptr);
-        Ok(Variable { raw: var_ptr })
+        let mut transformed_var = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        let trans_var_ptr = unsafe { transformed_var.assume_init() };
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
+        Ok(Variable { raw: trans_var_ptr })
     }
 
     pub(crate) fn create_priced_var(
