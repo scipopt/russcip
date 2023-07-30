@@ -133,6 +133,7 @@ impl From<u32> for VarStatus {
 mod tests {
     use super::*;
     use crate::Model;
+    use crate::model::ProblemOrSolving;
 
     #[test]
     fn var_data() {

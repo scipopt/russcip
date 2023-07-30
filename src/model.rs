@@ -207,41 +207,6 @@ impl Model<ProblemCreated> {
             .expect("Failed to set constraint modifiable");
     }
 
-    /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
-    ///
-    /// # Arguments
-    ///
-    /// * `lb` - The lower bound of the variable.
-    /// * `ub` - The upper bound of the variable.
-    /// * `obj` - The objective coefficient of the variable.
-    /// * `name` - The name of the variable.
-    /// * `var_type` - The type of the variable.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new variable.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the variable cannot be created in the current state.
-    pub fn add_var(
-        &mut self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Rc<Variable> {
-        let var = self
-            .scip
-            .create_var(lb, ub, obj, name, var_type)
-            .expect("Failed to create variable in state ProblemCreated");
-        let var_id = var.index();
-        let var = Rc::new(var);
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
-    }
-
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
     ///
     /// # Arguments
@@ -568,6 +533,7 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the coefficient cannot be added in the current state.
     fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64);
+
     /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -599,6 +565,7 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Rc<Constraint>;
+
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -624,6 +591,33 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Rc<Constraint>;
+
+    /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
+    ///
+    /// # Arguments
+    ///
+    /// * `lb` - The lower bound of the variable.
+    /// * `ub` - The upper bound of the variable.
+    /// * `obj` - The objective coefficient of the variable.
+    /// * `name` - The name of the variable.
+    /// * `var_type` - The type of the variable.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new variable.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the variable cannot be created in the current state.
+    fn add_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Rc<Variable>;
+
     /// Adds a new set partitioning constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -782,6 +776,41 @@ macro_rules! impl_ProblemOrSolving {
                 cons
             }
 
+
+            /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
+            ///
+            /// # Arguments
+            ///
+            /// * `lb` - The lower bound of the variable.
+            /// * `ub` - The upper bound of the variable.
+            /// * `obj` - The objective coefficient of the variable.
+            /// * `name` - The name of the variable.
+            /// * `var_type` - The type of the variable.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new variable.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the variable cannot be created in the current state.
+            fn add_var(
+                &mut self,
+                lb: f64,
+                ub: f64,
+                obj: f64,
+                name: &str,
+                var_type: VarType,
+            ) -> Rc<Variable> {
+                let var = self
+                    .scip
+                    .create_var(lb, ub, obj, name, var_type)
+                    .expect("Failed to create variable in state ProblemCreated");
+                let var_id = var.index();
+                let var = Rc::new(var);
+                self.state.vars.borrow_mut().insert(var_id, var.clone());
+                var
+            }
 
 
             /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
