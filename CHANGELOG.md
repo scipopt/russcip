@@ -4,6 +4,8 @@
 ### Added
 ### Fixed
 ### Changed
+- Free sol after adding in `ScipPtr::add_sol()`.
+- Allow adding a var in `Solving` mode.
 ### Removed
 
 ## 0.2.5
