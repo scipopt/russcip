@@ -432,6 +432,8 @@ impl Model<Solving> {
         var
     }
 
+    /// Adds a new priced variable to the SCIP data structure.
+
     /// Returns the current node of the model.
     ///
     /// # Panics

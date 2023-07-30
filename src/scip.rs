@@ -212,7 +212,6 @@ impl ScipPtr {
         Ok(Variable { raw: var_ptr })
     }
 
-
     pub(crate) fn create_var_solving(
         &mut self,
         lb: f64,
