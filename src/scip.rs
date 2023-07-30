@@ -16,6 +16,7 @@ use std::rc::Rc;
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
     consumed: bool,
+    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>
 }
 
 impl ScipPtr {
@@ -26,6 +27,7 @@ impl ScipPtr {
         ScipPtr {
             raw: scip_ptr,
             consumed: false,
+            vars_added_in_solving: Vec::new(),
         }
     }
 
@@ -33,6 +35,7 @@ impl ScipPtr {
         ScipPtr {
             raw: self.raw,
             consumed: true,
+            vars_added_in_solving: Vec::new(),
         }
     }
 
@@ -207,6 +210,34 @@ impl ScipPtr {
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
         Ok(Variable { raw: var_ptr })
+    }
+
+    pub(crate) fn create_var_solving(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Result<Variable, Retcode> {
+        let name = CString::new(name).unwrap();
+        let mut var_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateVarBasic(
+            self.raw,
+            var_ptr.as_mut_ptr(),
+            name.as_ptr(),
+            lb,
+            ub,
+            obj,
+            var_type.into(),
+        ) };
+        let mut var_ptr = unsafe { var_ptr.assume_init() };
+        scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
+        let mut transformed_var = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        let trans_var_ptr = unsafe { transformed_var.assume_init() };
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
+        Ok(Variable { raw: trans_var_ptr })
     }
 
     pub(crate) fn create_priced_var(
@@ -879,9 +910,9 @@ impl ScipPtr {
         Ok(Node { raw: node_ptr })
     }
 
-    pub(crate) fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
+    pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSol(self.raw, sol.raw, stored.as_mut_ptr()));
+        scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, stored.as_mut_ptr()));
         let stored = unsafe { stored.assume_init() };
         Ok(stored != 0)
     }
@@ -914,6 +945,11 @@ impl Drop for ScipPtr {
             for i in 0..n_vars {
                 let mut var = unsafe { *vars.add(i as usize) };
                 scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
+            }
+
+            // release vars added in solving
+            for var_ptr in self.vars_added_in_solving.iter_mut() {
+                scip_call_panic!(ffi::SCIPreleaseVar(self.raw, var_ptr));
             }
 
             // release constraints
