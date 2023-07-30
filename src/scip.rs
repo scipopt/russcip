@@ -209,6 +209,32 @@ impl ScipPtr {
         Ok(Variable { raw: var_ptr })
     }
 
+
+    pub(crate) fn create_var_solving(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Result<Variable, Retcode> {
+        let name = CString::new(name).unwrap();
+        let mut var_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateVarBasic(
+            self.raw,
+            var_ptr.as_mut_ptr(),
+            name.as_ptr(),
+            lb,
+            ub,
+            obj,
+            var_type.into(),
+        ) };
+        let mut var_ptr = unsafe { var_ptr.assume_init() };
+        scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) }
+        Ok(Variable { raw: var_ptr })
+    }
+
     pub(crate) fn create_priced_var(
         &mut self,
         lb: f64,
