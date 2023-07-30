@@ -16,6 +16,7 @@ use std::rc::Rc;
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
     consumed: bool,
+    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>
 }
 
 impl ScipPtr {
@@ -26,6 +27,7 @@ impl ScipPtr {
         ScipPtr {
             raw: scip_ptr,
             consumed: false,
+            vars_added_in_solving: Vec::new(),
         }
     }
 
@@ -33,6 +35,7 @@ impl ScipPtr {
         ScipPtr {
             raw: self.raw,
             consumed: true,
+            vars_added_in_solving: Vec::new(),
         }
     }
 
@@ -231,7 +234,7 @@ impl ScipPtr {
         ) };
         let mut var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
-        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) }
+        self.vars_added_in_solving.push(var_ptr);
         Ok(Variable { raw: var_ptr })
     }
 
@@ -940,6 +943,11 @@ impl Drop for ScipPtr {
             for i in 0..n_vars {
                 let mut var = unsafe { *vars.add(i as usize) };
                 scip_call_panic!(ffi::SCIPreleaseVar(self.raw, &mut var));
+            }
+
+            // release vars added in solving
+            for var_ptr in self.vars_added_in_solving.iter_mut() {
+                scip_call_panic!(ffi::SCIPreleaseVar(self.raw, var_ptr));
             }
 
             // release constraints
