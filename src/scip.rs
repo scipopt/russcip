@@ -911,9 +911,9 @@ impl ScipPtr {
         Ok(Node { raw: node_ptr })
     }
 
-    pub(crate) fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
+    pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSolFree(self.raw, sol.raw, stored.as_mut_ptr()));
+        scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, stored.as_mut_ptr()));
         let stored = unsafe { stored.assume_init() };
         Ok(stored != 0)
     }
