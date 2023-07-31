@@ -486,28 +486,6 @@ impl Model<Solving> {
     }
 }
 
-impl Model<Solved> {
-    /// Returns the objective value of the best solution found by the optimization model.
-    pub fn obj_val(&self) -> f64 {
-        self.scip.obj_val()
-    }
-
-    /// Returns the number of nodes explored by the optimization model.
-    pub fn n_nodes(&self) -> usize {
-        self.scip.n_nodes()
-    }
-
-    /// Returns the total solving time of the optimization model.
-    pub fn solving_time(&self) -> f64 {
-        self.scip.solving_time()
-    }
-
-    /// Returns the number of LP iterations performed by the optimization model.
-    pub fn n_lp_iterations(&self) -> usize {
-        self.scip.n_lp_iterations()
-    }
-}
-
 /// A trait for optimization models with a problem created.
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
@@ -969,6 +947,51 @@ macro_rules! impl_WithSolutions {
 }
 
 impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+
+/// A trait for optimization models with any state that might have solving statistics.
+pub trait WithSolvingStats {
+    /// Returns the objective value of the best solution found by the optimization model.
+    fn obj_val(&self) -> f64;
+
+    /// Returns the number of nodes explored by the optimization model.
+    fn n_nodes(&self) -> usize;
+
+    /// Returns the total solving time of the optimization model.
+    fn solving_time(&self) -> f64;
+
+    /// Returns the number of LP iterations performed by the optimization model.
+    fn n_lp_iterations(&self) -> usize;
+}
+
+macro_rules! impl_WithSolvingStats {
+    (for $($t:ty),+) => {
+        $(impl WithSolvingStats for $t {
+
+            /// Returns the objective value of the best solution found by the optimization model.
+            fn obj_val(&self) -> f64 {
+                self.scip.obj_val()
+            }
+
+            /// Returns the number of nodes explored by the optimization model.
+            fn n_nodes(&self) -> usize {
+                self.scip.n_nodes()
+            }
+
+            /// Returns the total solving time of the optimization model.
+            fn solving_time(&self) -> f64 {
+                self.scip.solving_time()
+            }
+
+            /// Returns the number of LP iterations performed by the optimization model.
+            fn n_lp_iterations(&self) -> usize {
+                self.scip.n_lp_iterations()
+            }
+
+        })*
+    }
+}
+
+impl_WithSolvingStats!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.

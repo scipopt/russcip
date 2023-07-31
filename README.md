@@ -46,6 +46,7 @@ use russcip::retcode::Retcode;
 use crate::russcip::model::ModelWithProblem;
 use crate::russcip::model::ProblemOrSolving;
 use crate::russcip::WithSolutions;
+use crate::russcip::WithSolvingStats;
 
 fn main() {
     // Create model
