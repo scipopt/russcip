@@ -1075,6 +1075,24 @@ mod tests {
     }
 
     #[test]
+    fn set_obj_integral() {
+        let model = Model::new()
+            .hide_output()
+            .set_obj_integral()
+            .unwrap()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+        let status = model.status();
+        assert_eq!(status, Status::Optimal);
+
+        //test objective value
+        let obj_value = model.obj_val();
+        assert_eq!(obj_value, 200.);
+    }
+
+    #[test]
     fn set_time_limit() {
         let model = Model::new()
             .hide_output()
