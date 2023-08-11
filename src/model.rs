@@ -102,6 +102,12 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
+    /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
+    pub fn set_obj_integral(mut self) -> Result<Self, Retcode> {
+        self.scip.set_obj_integral()?;
+        Ok(self)
+    }
+
     /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
         self.scip
