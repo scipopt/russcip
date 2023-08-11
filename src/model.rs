@@ -102,12 +102,6 @@ impl Model<Unsolved> {
         Ok(self)
     }
 
-    /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
-    pub fn set_obj_integral(mut self) -> Result<Self, Retcode> {
-        self.scip.set_obj_integral()?;
-        Ok(self)
-    }
-
     /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
         self.scip
@@ -211,6 +205,12 @@ impl Model<ProblemCreated> {
         self.scip
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
+    }
+    
+    /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
+    pub fn set_obj_integral(mut self) -> Result<Self, Retcode> {
+        self.scip.set_obj_integral()?;
+        Ok(self)
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
@@ -1078,10 +1078,10 @@ mod tests {
     fn set_obj_integral() {
         let model = Model::new()
             .hide_output()
-            .set_obj_integral()
-            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
+            .unwrap()
+            .set_obj_integral()
             .unwrap()
             .solve();
         let status = model.status();
