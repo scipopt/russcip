@@ -206,6 +206,14 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
+    
+    /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
+    pub fn set_obj_integral(mut self) -> Self {
+        self.scip
+            .set_obj_integral()
+            .expect("Failed to set the objective value as integral");
+        self
+    }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
@@ -1066,6 +1074,23 @@ mod tests {
         assert_eq!(sol.val(vars[1].clone()), 20.);
 
         assert_eq!(sol.obj_val(), model.obj_val());
+    }
+
+    #[test]
+    fn set_obj_integral() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .set_obj_integral()
+            .solve();
+        let status = model.status();
+        assert_eq!(status, Status::Optimal);
+
+        //test objective value
+        let obj_value = model.obj_val();
+        assert_eq!(obj_value, 200.);
     }
 
     #[test]
