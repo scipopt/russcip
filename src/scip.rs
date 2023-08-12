@@ -100,6 +100,11 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn set_obj_integral(&mut self) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetObjIntegral(self.raw));
+        Ok(())
+    }
+
     pub(crate) fn n_vars(&self) -> usize {
         unsafe { ffi::SCIPgetNVars(self.raw) as usize }
     }
