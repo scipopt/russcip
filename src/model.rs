@@ -208,9 +208,11 @@ impl Model<ProblemCreated> {
     }
     
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
-    pub fn set_obj_integral(mut self) -> Result<Self, Retcode> {
-        self.scip.set_obj_integral()?;
-        Ok(self)
+    pub fn set_obj_integral(mut self) -> Self {
+        self.scip
+            .set_obj_integral()
+            .expect("Failed to set the objective value as integral");
+        self
     }
 
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
@@ -1082,7 +1084,6 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap()
             .set_obj_integral()
-            .unwrap()
             .solve();
         let status = model.status();
         assert_eq!(status, Status::Optimal);
