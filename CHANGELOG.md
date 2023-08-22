@@ -3,10 +3,12 @@
 ## unreleased
 ### Added
  - Added method `set_obj_integral` to allow specifying that the objective value is always integral.
+ - Methods to attach data to `Variable`s.
 ### Fixed
 ### Changed
 - Free sol after adding in `ScipPtr::add_sol()`.
 - Allow adding a var in `Solving` mode.
+- Use shared mutable pointers for variables. 
 ### Removed
 
 ## 0.2.5

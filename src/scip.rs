@@ -1,11 +1,9 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
-    ParamSetting, Retcode, Solution, Status, VarType, Variable,
-};
+use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense, ParamSetting, Retcode, Solution, Status, VarType, Variable, SharedMut};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -139,7 +137,7 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn vars(&self) -> BTreeMap<usize, Rc<Variable>> {
+    pub(crate) fn vars(&self) -> BTreeMap<usize, SharedMut<Variable>> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
@@ -149,8 +147,9 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureVar(self.raw, scip_var);
             }
-            let var = Rc::new(Variable { raw: scip_var });
-            vars.insert(var.index(), var);
+            let var = Rc::new(RefCell::new(Variable { raw: scip_var, data: None }));
+            let var_id = var.borrow().index();
+            vars.insert(var_id, var);
         }
         vars
     }
@@ -214,7 +213,7 @@ impl ScipPtr {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
-        Ok(Variable { raw: var_ptr })
+        Ok(Variable { raw: var_ptr, data: None })
     }
 
     pub(crate) fn create_var_solving(
@@ -242,7 +241,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: trans_var_ptr })
+        Ok(Variable { raw: trans_var_ptr, data: None })
     }
 
     pub(crate) fn create_priced_var(
@@ -270,12 +269,12 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: trans_var_ptr })
+        Ok(Variable { raw: trans_var_ptr, data: None })
     }
 
     pub(crate) fn create_cons(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<SharedMut<Variable>>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
@@ -296,7 +295,7 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
+            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.borrow().raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
@@ -305,7 +304,7 @@ impl ScipPtr {
     /// Create set partitioning constraint
     pub(crate) fn create_cons_set_part(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<SharedMut<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -319,7 +318,7 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.borrow().raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
@@ -328,7 +327,7 @@ impl ScipPtr {
     /// Create set cover constraint
     pub(crate) fn create_cons_set_cover(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<SharedMut<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -342,7 +341,7 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.borrow().raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
@@ -350,10 +349,10 @@ impl ScipPtr {
 
     pub(crate) fn create_cons_quadratic(
         &mut self,
-        lin_vars: Vec<Rc<Variable>>,
+        lin_vars: Vec<SharedMut<Variable>>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
+        quad_vars_1: Vec<SharedMut<Variable>>,
+        quad_vars_2: Vec<SharedMut<Variable>>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
@@ -374,9 +373,9 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
 
-        let get_ptrs = |vars: Vec<Rc<Variable>>| {
+        let get_ptrs = |vars: Vec<SharedMut<Variable>>| {
             vars.into_iter()
-                .map(|var_rc| var_rc.raw)
+                .map(|var_rc| var_rc.borrow().raw)
                 .collect::<Vec<_>>()
         };
         let mut lin_var_ptrs = get_ptrs(lin_vars);
@@ -405,7 +404,7 @@ impl ScipPtr {
     /// Create set packing constraint
     pub(crate) fn create_cons_set_pack(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<SharedMut<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -419,7 +418,7 @@ impl ScipPtr {
         ) };
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.borrow().raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
@@ -440,9 +439,9 @@ impl ScipPtr {
     pub(crate) fn add_cons_coef_setppc(
         &mut self,
         cons: Rc<Constraint>,
-        var: Rc<Variable>,
+        var: SharedMut<Variable>,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) };
+        scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.borrow().raw) };
         Ok(())
     }
 
@@ -472,7 +471,7 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let var = Rc::new(Variable { raw: var_ptr });
+            let var = Rc::new(Variable { raw: var_ptr, data: None });
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {
@@ -838,11 +837,11 @@ impl ScipPtr {
     pub(crate) fn add_cons_coef(
         &mut self,
         cons: Rc<Constraint>,
-        var: Rc<Variable>,
+        var: SharedMut<Variable>,
         coef: f64,
     ) -> Result<(), Retcode> {
         let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;
-        let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.raw) } == 1;
+        let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.borrow().raw) } == 1;
         let cons_ptr = if !cons_is_transformed && var_is_transformed {
             let mut transformed_cons = MaybeUninit::<*mut ffi::SCIP_Cons>::uninit();
             scip_call!(ffi::SCIPgetTransformedCons(
@@ -859,12 +858,12 @@ impl ScipPtr {
             let mut transformed_var = MaybeUninit::<*mut ffi::SCIP_Var>::uninit();
             scip_call!(ffi::SCIPgetTransformedVar(
                 self.raw,
-                var.raw,
+                var.borrow().raw,
                 transformed_var.as_mut_ptr()
             ));
             unsafe { transformed_var.assume_init() }
         } else {
-            var.raw
+            var.borrow().raw
         };
 
         scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons_ptr, var_ptr, coef) };
