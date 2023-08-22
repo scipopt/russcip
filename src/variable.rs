@@ -157,16 +157,16 @@ mod tests {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
 
-        assert_eq!(var.borrow().index(), 0);
-        assert_eq!(var.borrow().lb(), 0.0);
-        assert_eq!(var.borrow().ub(), 1.0);
-        assert_eq!(var.borrow().obj(), 2.0);
-        assert_eq!(var.borrow().name(), "x");
-        assert_eq!(var.borrow().var_type(), VarType::ImplInt);
-        assert_eq!(var.borrow().status(), VarStatus::Original);
+        assert_eq!(var.index(), 0);
+        assert_eq!(var.lb(), 0.0);
+        assert_eq!(var.ub(), 1.0);
+        assert_eq!(var.obj(), 2.0);
+        assert_eq!(var.name(), "x");
+        assert_eq!(var.var_type(), VarType::ImplInt);
+        assert_eq!(var.status(), VarStatus::Original);
 
         #[cfg(feature = "raw")]
-        assert!(!var.borrow().inner().is_null());
+        assert!(!var.inner().is_null());
     }
 
     #[test]
@@ -181,7 +181,7 @@ mod tests {
     fn attach_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let mut var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
-        var.borrow_mut().set_data(42);
-        assert_eq!(var.borrow().get_data::<i32>().unwrap(), &42);
+        var.set_data(42);
+        assert_eq!(var.get_data::<i32>().unwrap(), &42);
     }
 }

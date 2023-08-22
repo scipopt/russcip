@@ -40,7 +40,7 @@
 //! let vars = solved_model.vars();
 //!
 //! for var in vars {
-//!     println!("{} = {}", var.borrow().name(), sol.val(var.clone()));
+//!     println!("{} = {}", var.name(), sol.val(var.clone()));
 //! }
 
 #![deny(missing_docs)]

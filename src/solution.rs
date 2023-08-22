@@ -12,20 +12,20 @@ pub struct Solution {
     pub(crate) raw: *mut ffi::SCIP_SOL,
 }
 
-impl Solution {
+impl<'a> Solution {
     /// Returns the objective value of the solution.
     pub fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr, self.raw) }
     }
 
     /// Returns the value of a variable in the solution.
-    pub fn val(&self, var: SharedMut<Variable>) -> f64 {
-        unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var.borrow().raw) }
+    pub fn val(&'a self, var: &'a Variable) -> f64 {
+        unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var.raw) }
     }
 
     /// Sets the value of a variable in the solution.
-    pub fn set_val(&self, var: SharedMut<Variable>, val: f64) {
-        scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr, self.raw, var.borrow().raw, val));
+    pub fn set_val(&'a mut self, var: &'a Variable, val: f64) {
+        scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr, self.raw, var.raw, val));
     }
 }
 

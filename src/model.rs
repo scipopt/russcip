@@ -35,22 +35,22 @@ pub struct PluginsIncluded;
 /// Represents the state of an optimization model where the problem has been created.
 #[derive(Debug, Clone)]
 pub struct ProblemCreated {
-    pub(crate) vars: SharedMut<BTreeMap<VarId, SharedMut<Variable>>>,
-    pub(crate) conss: SharedMut<Vec<Rc<Constraint>>>,
+    pub(crate) vars: SharedMut<BTreeMap<VarId, Variable>>,
+    pub(crate) conss: SharedMut<Vec<Constraint>>,
 }
 
 /// Represents the state of an optimization model during the solving process (to be used in plugins).
 #[derive(Debug)]
 pub struct Solving {
-    pub(crate) vars: SharedMut<BTreeMap<VarId, SharedMut<Variable>>>,
-    pub(crate) conss: SharedMut<Vec<Rc<Constraint>>>,
+    pub(crate) vars: SharedMut<BTreeMap<VarId, Variable>>,
+    pub(crate) conss: SharedMut<Vec<Constraint>>,
 }
 
 /// Represents the state of an optimization model that has been solved.
 #[derive(Debug)]
 pub struct Solved {
-    pub(crate) vars: SharedMut<BTreeMap<VarId, SharedMut<Variable>>>,
-    pub(crate) conss: SharedMut<Vec<Rc<Constraint>>>,
+    pub(crate) vars: SharedMut<BTreeMap<VarId, Variable>>,
+    pub(crate) conss: SharedMut<Vec<Constraint>>,
 }
 
 impl Model<Unsolved> {
@@ -174,7 +174,7 @@ impl Model<PluginsIncluded> {
     }
 }
 
-impl Model<ProblemCreated> {
+impl<'a> Model<ProblemCreated> {
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -204,7 +204,7 @@ impl Model<ProblemCreated> {
     }
 
     /// Sets the constraint as modifiable or not.
-    pub fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) {
+    pub fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool) {
         self.scip
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
@@ -236,21 +236,20 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the variable cannot be created in the current state.
     pub fn add_var(
-        &mut self,
+        &'a mut self,
         lb: f64,
         ub: f64,
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> SharedMut<Variable> {
+    ) -> &'a Variable {
         let var = self
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
-        let var = Rc::new(RefCell::new(var));
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
+        self.state.vars.borrow_mut().insert(var_id, var);
+        self.state.vars.borrow().get(&var_id).unwrap()
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -407,7 +406,7 @@ impl Model<ProblemCreated> {
     }
 }
 
-impl Model<Solving> {
+impl<'a> Model<Solving> {
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -426,21 +425,20 @@ impl Model<Solving> {
     ///
     /// This method panics if the variable cannot be created in the current state.
     pub fn add_var(
-        &mut self,
+        &'a mut self,
         lb: f64,
         ub: f64,
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> SharedMut<Variable> {
+    ) -> &'a Variable {
         let var = self
             .scip
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
-        let var = Rc::new(RefCell::new(var));
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
+        self.state.vars.borrow_mut().insert(var_id, var);
+        self.state.vars.borrow().get(&var_id).unwrap()
     }
 
     /// Returns the current node of the model.
@@ -477,21 +475,20 @@ impl Model<Solving> {
     ///
     /// This function returns a reference-counted smart pointer (`Rc`) to the created `Variable` instance.
     pub fn add_priced_var(
-        &mut self,
+        &'a mut self,
         lb: f64,
         ub: f64,
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> SharedMut<Variable> {
+    ) -> &'a Variable {
         let var = self
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Rc::new(RefCell::new(var));
-        let var_id = var.borrow().index();
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
+        let var_id = var.index();
+        self.state.vars.borrow_mut().insert(var_id, var);
+        self.state.vars.borrow().get(&var_id).unwrap()
     }
 }
 
@@ -505,10 +502,10 @@ impl Model<Solved> {
 /// A trait for optimization models with a problem created.
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
-    fn vars(&self) -> Vec<SharedMut<Variable>>;
+    fn vars(&self) -> Vec<&Variable>;
 
     /// Returns the variable with the given ID, if it exists.
-    fn var(&self, var_id: VarId) -> Option<SharedMut<Variable>>;
+    fn var(&self, var_id: VarId) -> Option<&Variable>;
 
     /// Returns the number of variables in the optimization model.
     fn n_vars(&self) -> usize;
@@ -517,7 +514,7 @@ pub trait ModelWithProblem {
     fn n_conss(&mut self) -> usize;
 
     /// Returns a vector of all constraints in the optimization model.
-    fn conss(&mut self) -> Vec<Rc<Constraint>>;
+    fn conss(&mut self) -> Vec<&Constraint>;
 
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
@@ -525,16 +522,16 @@ pub trait ModelWithProblem {
 
 macro_rules! impl_ModelWithProblem {
     (for $($t:ty),+) => {
-        $(impl ModelWithProblem for $t {
+        $(impl<'a> ModelWithProblem for $t {
 
             /// Returns a vector of all variables in the optimization model.
-            fn vars(&self) -> Vec<SharedMut<Variable>> {
-                self.state.vars.borrow().values().map(Rc::clone).collect()
+            fn vars(&self) -> Vec<&Variable> {
+                self.state.vars.borrow().values().collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
-            fn var(&self, var_id: VarId) -> Option<SharedMut<Variable>> {
-                self.state.vars.borrow().get(&var_id).map(Rc::clone)
+            fn var(&self, var_id: VarId) -> Option<&Variable> {
+                self.state.vars.borrow().get(&var_id)
             }
 
             /// Returns the number of variables in the optimization model.
@@ -548,8 +545,8 @@ macro_rules! impl_ModelWithProblem {
             }
 
             /// Returns a vector of all constraints in the optimization model.
-            fn conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss.borrow().iter().map(Rc::clone).collect()
+            fn conss(&mut self) -> Vec<&Constraint> {
+                self.state.conss.borrow().iter().collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
@@ -565,7 +562,7 @@ macro_rules! impl_ModelWithProblem {
 impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving>);
 
 /// A trait for optimization models with a problem created or solved.
-pub trait ProblemOrSolving {
+pub trait ProblemOrSolving<'a> {
     /// Creates a new solution initialized to zero.
     fn create_sol(&mut self) -> Solution;
 
@@ -585,7 +582,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: SharedMut<Variable>);
+    fn add_cons_coef_setppc(&'a mut self, cons: &'a Constraint, var: &'a Variable);
 
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
@@ -598,7 +595,8 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: SharedMut<Variable>, coef: f64);
+    fn add_cons_coef(&'a mut self, cons: &'a Constraint, var: &'a Variable, coef: f64);
+
     /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -620,16 +618,16 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_quadratic(
-        &mut self,
-        lin_vars: Vec<SharedMut<Variable>>,
+        &'a mut self,
+        lin_vars: Vec<&'a Variable>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<SharedMut<Variable>>,
-        quad_vars_2: Vec<SharedMut<Variable>>,
+        quad_vars_1: Vec<&'a Variable>,
+        quad_vars_2: Vec<&'a Variable>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> &'a Constraint;
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -648,13 +646,14 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons(
-        &mut self,
-        vars: Vec<SharedMut<Variable>>,
+        &'a mut self,
+        vars: Vec<&'a Variable>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> &'a Constraint;
+
     /// Adds a new set partitioning constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -669,7 +668,8 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_part(&'a mut self, vars: Vec<&'a Variable>, name: &str) -> &'a Constraint;
+
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -684,7 +684,8 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_cover(&'a mut self, vars: Vec<&'a Variable>, name: &str) -> &'a Constraint;
+
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -699,12 +700,12 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_pack(&'a mut self, vars: Vec<&'a Variable>, name: &str) -> &'a Constraint;
 }
 
 macro_rules! impl_ProblemOrSolving {
     (for $($t:ty),+) => {
-        $(impl ProblemOrSolving for $t {
+        $(impl<'a> ProblemOrSolving<'a> for $t {
 
             /// Creates a new solution initialized to zero.
             fn create_sol(&mut self) -> Solution {
@@ -736,8 +737,8 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-            fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: SharedMut<Variable>) {
-                assert_eq!(var.borrow().var_type(), VarType::Binary);
+            fn add_cons_coef_setppc(&'a mut self, cons: &'a Constraint, var: &'a Variable) {
+                assert_eq!(var.var_type(), VarType::Binary);
                 self.scip
                     .add_cons_coef_setppc(cons, var)
                     .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -755,7 +756,7 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the coefficient cannot be added in the current state.
-            fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: SharedMut<Variable>, coef: f64) {
+            fn add_cons_coef(&'a mut self, cons: &'a Constraint, var: &'a Variable, coef: f64) {
                 self.scip
                     .add_cons_coef(cons, var, coef)
                     .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -782,16 +783,16 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// This method panics if the constraint cannot be created in the current state.
             fn add_cons_quadratic(
-                &mut self,
-                lin_vars: Vec<SharedMut<Variable>>,
+                &'a mut self,
+                lin_vars: Vec<&'a Variable>,
                 lin_coefs: &mut [f64],
-                quad_vars_1: Vec<SharedMut<Variable>>,
-                quad_vars_2: Vec<SharedMut<Variable>>,
+                quad_vars_1: Vec<&'a Variable>,
+                quad_vars_2: Vec<&'a Variable>,
                 quad_coefs: &mut [f64],
                 lhs: f64,
                 rhs: f64,
                 name: &str,
-            ) -> Rc<Constraint> {
+            ) -> &'a Constraint {
                 assert_eq!(lin_vars.len(), lin_coefs.len());
                 assert_eq!(quad_vars_1.len(), quad_vars_2.len());
                 assert_eq!(quad_vars_1.len(), quad_coefs.len());
@@ -808,9 +809,8 @@ macro_rules! impl_ProblemOrSolving {
                         name,
                     )
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                &cons
             }
 
 
@@ -833,21 +833,20 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// This method panics if the constraint cannot be created in the current state.
             fn add_cons(
-                &mut self,
-                vars: Vec<SharedMut<Variable>>,
+                &'a mut self,
+                vars: Vec<&'a Variable>,
                 coefs: &[f64],
                 lhs: f64,
                 rhs: f64,
                 name: &str,
-            ) -> Rc<Constraint> {
+            ) -> &'a Constraint {
                 assert_eq!(vars.len(), coefs.len());
                 let cons = self
                     .scip
                     .create_cons(vars, coefs, lhs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                &cons
             }
 
             /// Adds a new set partitioning constraint to the model with the given variables and name.
@@ -864,15 +863,14 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_part(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.borrow().var_type() == VarType::Binary));
+            fn add_cons_set_part(&'a mut self, vars: Vec<&'a Variable>, name: &str) -> &'a Constraint {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
                     .scip
                     .create_cons_set_part(vars, name)
                     .expect("Failed to add constraint set partition in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                &cons
             }
 
             /// Adds a new set cover constraint to the model with the given variables and name.
@@ -889,15 +887,14 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_cover(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.borrow().var_type() == VarType::Binary));
+            fn add_cons_set_cover(&'a mut self, vars: Vec<&Variable>, name: &str) -> &'a Constraint {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
                     .scip
                     .create_cons_set_cover(vars, name)
                     .expect("Failed to add constraint set cover in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                &cons
             }
 
             /// Adds a new set packing constraint to the model with the given variables and name.
@@ -914,15 +911,14 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_pack(&mut self, vars: Vec<SharedMut<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.borrow().var_type() == VarType::Binary));
+            fn add_cons_set_pack(&'a mut self, vars: Vec<&Variable>, name: &str) -> &'a Constraint {
+                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
                     .scip
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                &cons
             }
 
         })*
@@ -1187,21 +1183,21 @@ mod tests {
             .set_obj_sense(ObjSense::Maximize);
         let x1_id = model
             .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
-            .borrow().index();
+            .index();
         let x2_id = model
             .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)
-            .borrow().index();
+            .index();
         let x1 = model.var(x1_id).unwrap();
         let x2 = model.var(x2_id).unwrap();
         assert_eq!(model.n_vars(), 2);
         assert_eq!(model.vars().len(), 2);
-        assert!(x1.borrow().raw != x2.borrow().raw);
-        assert!(x1.borrow().var_type() == VarType::Integer);
-        assert!(x2.borrow().var_type() == VarType::Continuous);
-        assert!(x1.borrow().name() == "x1");
-        assert!(x2.borrow().name() == "x2");
-        assert!(x1.borrow().obj() == 3.);
-        assert!(x2.borrow().obj() == 4.);
+        assert!(x1.raw != x2.raw);
+        assert!(x1.var_type() == VarType::Integer);
+        assert!(x2.var_type() == VarType::Continuous);
+        assert!(x1.name() == "x1");
+        assert!(x2.name() == "x2");
+        assert!(x1.obj() == 3.);
+        assert!(x2.obj() == 4.);
     }
 
     fn create_model() -> Model<ProblemCreated> {
