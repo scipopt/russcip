@@ -408,6 +408,41 @@ impl Model<ProblemCreated> {
 }
 
 impl Model<Solving> {
+    /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
+    ///
+    /// # Arguments
+    ///
+    /// * `lb` - The lower bound of the variable.
+    /// * `ub` - The upper bound of the variable.
+    /// * `obj` - The objective coefficient of the variable.
+    /// * `name` - The name of the variable.
+    /// * `var_type` - The type of the variable.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new variable.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the variable cannot be created in the current state.
+    pub fn add_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> SharedMut<Variable> {
+        let var = self
+            .scip
+            .create_var_solving(lb, ub, obj, name, var_type)
+            .expect("Failed to create variable in state ProblemCreated");
+        let var_id = var.index();
+        let var = Rc::new(RefCell::new(var));
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        var
+    }
+
     /// Returns the current node of the model.
     ///
     /// # Panics
