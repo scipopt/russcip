@@ -209,7 +209,7 @@ impl<'a> Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-    
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -242,14 +242,14 @@ impl<'a> Model<ProblemCreated> {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> &'a Variable {
+    ) -> VarId {
         let var = self
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var);
-        self.state.vars.borrow().get(&var_id).unwrap()
+        var_id
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -438,7 +438,9 @@ impl<'a> Model<Solving> {
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var);
-        self.state.vars.borrow().get(&var_id).unwrap()
+        unsafe {
+            self.state.vars.try_borrow_unguarded().unwrap().get(&var_id).unwrap()
+        }
     }
 
     /// Returns the current node of the model.
@@ -488,7 +490,9 @@ impl<'a> Model<Solving> {
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var);
-        self.state.vars.borrow().get(&var_id).unwrap()
+        unsafe {
+            self.state.vars.try_borrow_unguarded().unwrap().get(&var_id).unwrap()
+        }
     }
 }
 
@@ -526,12 +530,12 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn vars(&self) -> Vec<&Variable> {
-                self.state.vars.borrow().values().collect()
+                self.state.vars.try_borrow_unguarded().unwrap().values().collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
             fn var(&self, var_id: VarId) -> Option<&Variable> {
-                self.state.vars.borrow().get(&var_id)
+                self.state.vars.try_borrow_unguarded().unwrap().get(&var_id)
             }
 
             /// Returns the number of variables in the optimization model.
@@ -546,7 +550,7 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all constraints in the optimization model.
             fn conss(&mut self) -> Vec<&Constraint> {
-                self.state.conss.borrow().iter().collect()
+                self.state.conss.try_borrow_unguarded().unwrap().iter().collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
@@ -810,7 +814,10 @@ macro_rules! impl_ProblemOrSolving {
                     )
                     .expect("Failed to create constraint in state ProblemCreated");
                 self.state.conss.borrow_mut().push(cons);
-                &cons
+                unsafe {
+                    self.state.conss.try_borrow_unguarded().unwrap().last().unwrap()
+                }
+
             }
 
 
@@ -846,7 +853,9 @@ macro_rules! impl_ProblemOrSolving {
                     .create_cons(vars, coefs, lhs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
                 self.state.conss.borrow_mut().push(cons);
-                &cons
+                unsafe {
+                    self.state.conss.try_borrow_unguarded().unwrap().last().unwrap()
+                }
             }
 
             /// Adds a new set partitioning constraint to the model with the given variables and name.
@@ -870,7 +879,9 @@ macro_rules! impl_ProblemOrSolving {
                     .create_cons_set_part(vars, name)
                     .expect("Failed to add constraint set partition in state ProblemCreated");
                 self.state.conss.borrow_mut().push(cons);
-                &cons
+                unsafe {
+                    self.state.conss.try_borrow_unguarded().unwrap().last().unwrap()
+                }
             }
 
             /// Adds a new set cover constraint to the model with the given variables and name.
@@ -894,7 +905,9 @@ macro_rules! impl_ProblemOrSolving {
                     .create_cons_set_cover(vars, name)
                     .expect("Failed to add constraint set cover in state ProblemCreated");
                 self.state.conss.borrow_mut().push(cons);
-                &cons
+                unsafe {
+                    self.state.conss.try_borrow_unguarded().unwrap().last().unwrap()
+                }
             }
 
             /// Adds a new set packing constraint to the model with the given variables and name.
@@ -918,7 +931,9 @@ macro_rules! impl_ProblemOrSolving {
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
                 self.state.conss.borrow_mut().push(cons);
-                &cons
+                unsafe {
+                    self.state.conss.try_borrow_unguarded().unwrap().last().unwrap()
+                }
             }
 
         })*
@@ -1182,11 +1197,11 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
         let x1_id = model
-            .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
-            .index();
+            .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+
         let x2_id = model
-            .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)
-            .index();
+            .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
+
         let x1 = model.var(x1_id).unwrap();
         let x2 = model.var(x2_id).unwrap();
         assert_eq!(model.n_vars(), 2);
@@ -1207,10 +1222,13 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
 
-        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+
         model.add_cons(
-            vec![x1.clone(), x2.clone()],
+            vec![x1, x2],
             &[2., 1.],
             -f64::INFINITY,
             100.,
@@ -1271,7 +1289,8 @@ mod tests {
             .set_obj_sense(ObjSense::Maximize)
             .hide_output();
 
-        let var = model.add_var(0., 1., 1., "x1", VarType::Integer);
+        let var_id = model.add_var(0., 1., 1., "x1", VarType::Integer);
+        let var = model.var(var_id).unwrap();
 
         model.add_cons(vec![var], &[1.], -f64::INFINITY, -1., "c1");
 
@@ -1323,8 +1342,11 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
 
-        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let x1_id = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+        let x2_id = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+
         let cons = model.add_cons(vec![], &[], -f64::INFINITY, 10., "c1");
 
         model.add_cons_coef(cons.clone(), x1, 0.); // x1 is unconstrained
@@ -1343,8 +1365,11 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1_id = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2_id = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+
         let cons1 = model.add_cons_set_part(vec![], "c");
         model.add_cons_coef_setppc(cons1, x1);
 
@@ -1365,14 +1390,17 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1_id = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2_id = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+
         let cons1 = model.add_cons_set_part(vec![], "c");
         model.add_cons_coef_setppc(cons1, x1.clone());
 
         model.add_cons_set_pack(vec![x2.clone()], "c");
 
-        let sol = model.create_sol();
+        let mut sol = model.create_sol();
         assert_eq!(sol.obj_val(), 0.);
 
         sol.set_val(x1, 1.);
@@ -1395,8 +1423,10 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
 
-        let x1 = model.add_var(0., 1., 1., "x1", VarType::Continuous);
-        let x2 = model.add_var(0., 1., 1., "x2", VarType::Continuous);
+        let x1_id = model.add_var(0., 1., 1., "x1", VarType::Continuous);
+        let x2_id = model.add_var(0., 1., 1., "x2", VarType::Continuous);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
 
         let _cons = model.add_cons_quadratic(
             vec![],
@@ -1426,8 +1456,11 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1_id = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2_id = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1 = model.var(x1_id).unwrap();
+        let x2 = model.var(x2_id).unwrap();
+
         model.add_cons_set_part(vec![x1, x2], "c");
 
         let solved_model = model.solve();

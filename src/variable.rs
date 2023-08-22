@@ -150,12 +150,13 @@ impl From<u32> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Model;
+    use crate::{Model, ModelWithProblem};
 
     #[test]
     fn var_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
-        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        let var_id = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        let var = model.var(var_id).unwrap();
 
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
@@ -180,7 +181,8 @@ mod tests {
     #[test]
     fn attach_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
-        let mut var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        let mut var_id = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        let mut var = model.var(var_id).unwrap();
         var.set_data(42);
         assert_eq!(var.get_data::<i32>().unwrap(), &42);
     }
