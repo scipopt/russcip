@@ -170,6 +170,14 @@ mod tests {
     }
 
     #[test]
+    fn var_eq() {
+        let mut model = Model::new().include_default_plugins().create_prob("test");
+        let var1 = model.add_var(0.0, 1.0, 2.0, "x", VarType::Integer);
+        let var2 = model.add_var(0.0, 1.0, 2.0, "x", VarType::Integer);
+        assert_ne!(var1, var2);
+    }
+
+    #[test]
     fn attach_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let mut var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
