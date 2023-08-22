@@ -1,13 +1,21 @@
 use crate::ffi;
 use core::panic;
+use std::any::Any;
 
 /// A type alias for a variable ID.
 pub type VarId = usize;
 
 /// A wrapper for a mutable reference to a SCIP variable.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
+    pub(crate) data: Option<Box<dyn Any>>,
+}
+
+impl PartialEq for Variable {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
 }
 
 impl Variable {
@@ -56,6 +64,16 @@ impl Variable {
     pub fn status(&self) -> VarStatus {
         let status = unsafe { ffi::SCIPvarGetStatus(self.raw) };
         status.into()
+    }
+
+    /// Attaches some data to the variable.
+    pub fn set_data<T: Any>(&mut self, data: T) {
+        self.data = Some(Box::new(data));
+    }
+
+    /// Returns a reference to the attached data.
+    pub fn get_data<T: Any>(&self) -> Option<&T> {
+        self.data.as_ref().and_then(|data| data.downcast_ref::<T>())
     }
 }
 
@@ -139,15 +157,23 @@ mod tests {
         let mut model = Model::new().include_default_plugins().create_prob("test");
         let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
 
-        assert_eq!(var.index(), 0);
-        assert_eq!(var.lb(), 0.0);
-        assert_eq!(var.ub(), 1.0);
-        assert_eq!(var.obj(), 2.0);
-        assert_eq!(var.name(), "x");
-        assert_eq!(var.var_type(), VarType::ImplInt);
-        assert_eq!(var.status(), VarStatus::Original);
+        assert_eq!(var.borrow().index(), 0);
+        assert_eq!(var.borrow().lb(), 0.0);
+        assert_eq!(var.borrow().ub(), 1.0);
+        assert_eq!(var.borrow().obj(), 2.0);
+        assert_eq!(var.borrow().name(), "x");
+        assert_eq!(var.borrow().var_type(), VarType::ImplInt);
+        assert_eq!(var.borrow().status(), VarStatus::Original);
 
         #[cfg(feature = "raw")]
-        assert!(!var.inner().is_null());
+        assert!(!var.borrow().inner().is_null());
+    }
+
+    #[test]
+    fn attach_data() {
+        let mut model = Model::new().include_default_plugins().create_prob("test");
+        let mut var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        var.borrow_mut().set_data(42);
+        assert_eq!(var.borrow().get_data::<i32>().unwrap(), &42);
     }
 }
