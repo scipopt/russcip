@@ -19,6 +19,16 @@
 - Moved ScipPtr struct and methods to its own module. 
 ### Removed
 
+## 0.2.5
+### Added
+- Primal heuristic plugin.
+- Solving Model state, to represent methods accessible when during solving.
+- Moved solution query methods to its own trait.
+### Fixed
+### Changed
+- Moved ScipPtr struct and methods to its own module. 
+### Removed
+
 ## 0.2.4
 ### Added
 - Model methods to create child from the current focus node. 
