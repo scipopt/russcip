@@ -677,6 +677,22 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The binary variables in the constraint.
+    /// * `rhs` - The maximum number of non-zero variables this constraint allows
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, rhs: i32, name: &str) -> Rc<Constraint>;
 }
 
 macro_rules! impl_ProblemOrSolving {
@@ -897,6 +913,31 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
+
+            /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `vars` - The binary variables in the constraint.
+            /// * `rhs` - The maximum number of non-zero variables this constraint allows
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state.
+            fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, rhs: i32, name: &str) -> Rc<Constraint> {
+                let cons = self
+                    .scip
+                    .create_cons_cardinality(vars, rhs, name)
+                    .expect("Failed to add cardinality constraint");
                 let cons = Rc::new(cons);
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
@@ -1290,6 +1331,33 @@ mod tests {
         let status = solved_model.status();
         assert_eq!(status, Status::Optimal);
         assert_eq!(solved_model.obj_val(), 7.);
+    }
+
+    #[test]
+    fn cardinality_constraint() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // set up three variables with different objective weights
+        let x1 = model.add_var(0., 10., 4., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 10., 2., "x2", VarType::Integer);
+        let x3 = model.add_var(0., 10., 3., "x3", VarType::Integer);
+        
+        // cardinality constraint allows just two variables to be non-zero
+        model.add_cons_cardinality(vec![x1.clone(), x2.clone(), x3.clone()], 2, "cardinality");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.obj_val(), 70.);
+
+        let solution = solved_model.best_sol().unwrap();
+        assert_eq!(solution.val(x1), 10.);
+        assert_eq!(solution.val(x2), 0.);
+        assert_eq!(solution.val(x3), 10.);
     }
 
     #[test]
