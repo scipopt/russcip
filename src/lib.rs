@@ -11,6 +11,7 @@
 //! use crate::russcip::model::ProblemOrSolving;
 //! use crate::russcip::model::ModelWithProblem;
 //! use crate::russcip::WithSolutions;
+//! use crate::russcip::WithSolvingStats;
 //!
 //! // Create model
 //! let mut model = Model::new()

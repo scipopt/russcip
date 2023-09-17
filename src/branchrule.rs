@@ -1,6 +1,7 @@
 use crate::ffi;
 use crate::variable::Variable;
 use std::rc::Rc;
+use crate::model::WithSolvingStats;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {

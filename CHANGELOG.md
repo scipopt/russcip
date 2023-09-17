@@ -6,6 +6,18 @@
  - Add support for cardinality constraints.
 ### Fixed
 ### Changed
+- Free sol after adding in `ScipPtr::add_sol()`.
+- Allow adding a var in `Solving` mode.
+### Removed
+
+## 0.2.5
+### Added
+- Primal heuristic plugin.
+- Solving Model state, to represent methods accessible when during solving.
+- Moved solution query methods to its own trait.
+### Fixed
+### Changed
+- Moved ScipPtr struct and methods to its own module. 
 ### Removed
 
 ## 0.2.5

@@ -206,7 +206,7 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-
+    
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -405,6 +405,43 @@ impl Model<ProblemCreated> {
 }
 
 impl Model<Solving> {
+    /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
+    ///
+    /// # Arguments
+    ///
+    /// * `lb` - The lower bound of the variable.
+    /// * `ub` - The upper bound of the variable.
+    /// * `obj` - The objective coefficient of the variable.
+    /// * `name` - The name of the variable.
+    /// * `var_type` - The type of the variable.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new variable.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the variable cannot be created in the current state.
+    pub fn add_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+        var_type: VarType,
+    ) -> Rc<Variable> {
+        let var = self
+            .scip
+            .create_var_solving(lb, ub, obj, name, var_type)
+            .expect("Failed to create variable in state ProblemCreated");
+        let var_id = var.index();
+        let var = Rc::new(var);
+        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        var
+    }
+
+    /// Adds a new priced variable to the SCIP data structure.
+
     /// Returns the current node of the model.
     ///
     /// # Panics
@@ -454,7 +491,7 @@ impl Model<Solving> {
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
-    }
+}
 }
 
 impl Model<Solved> {
@@ -987,6 +1024,51 @@ macro_rules! impl_WithSolutions {
 }
 
 impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+
+/// A trait for optimization models with any state that might have solving statistics.
+pub trait WithSolvingStats {
+    /// Returns the objective value of the best solution found by the optimization model.
+    fn obj_val(&self) -> f64;
+
+    /// Returns the number of nodes explored by the optimization model.
+    fn n_nodes(&self) -> usize;
+
+    /// Returns the total solving time of the optimization model.
+    fn solving_time(&self) -> f64;
+
+    /// Returns the number of LP iterations performed by the optimization model.
+    fn n_lp_iterations(&self) -> usize;
+}
+
+macro_rules! impl_WithSolvingStats {
+    (for $($t:ty),+) => {
+        $(impl WithSolvingStats for $t {
+
+            /// Returns the objective value of the best solution found by the optimization model.
+            fn obj_val(&self) -> f64 {
+                self.scip.obj_val()
+            }
+
+            /// Returns the number of nodes explored by the optimization model.
+            fn n_nodes(&self) -> usize {
+                self.scip.n_nodes()
+            }
+
+            /// Returns the total solving time of the optimization model.
+            fn solving_time(&self) -> f64 {
+                self.scip.solving_time()
+            }
+
+            /// Returns the number of LP iterations performed by the optimization model.
+            fn n_lp_iterations(&self) -> usize {
+                self.scip.n_lp_iterations()
+            }
+
+        })*
+    }
+}
+
+impl_WithSolvingStats!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.
