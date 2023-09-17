@@ -25,10 +25,12 @@ jobs:
           wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
           sudo apt-get update && sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
 
-      - name: Install tarpaulin
-        run: cargo install cargo-tarpaulin
-      - name: Run tests
-        run: cargo tarpaulin --verbose --all --out xml
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.15.0'
+          args: '-- --verbose --all --out xml'
+          
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
         with:
