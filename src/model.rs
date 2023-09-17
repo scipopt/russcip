@@ -206,7 +206,7 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-    
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -677,12 +677,13 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
     ///
     /// # Arguments
     ///
     /// * `vars` - The binary variables in the constraint.
-    /// * `rhs` - The maximum number of non-zero variables this constraint allows
+    /// * `cardinality` - The maximum number of non-zero variables this constraint allows
     /// * `name` - The name of the constraint.
     ///
     /// # Returns
@@ -692,7 +693,12 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
-    fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, rhs: i32, name: &str) -> Rc<Constraint>;
+    fn add_cons_cardinality(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        cardinality: usize,
+        name: &str,
+    ) -> Rc<Constraint>;
 }
 
 macro_rules! impl_ProblemOrSolving {
@@ -923,7 +929,7 @@ macro_rules! impl_ProblemOrSolving {
             /// # Arguments
             ///
             /// * `vars` - The binary variables in the constraint.
-            /// * `rhs` - The maximum number of non-zero variables this constraint allows
+            /// * `cardinality` - The maximum number of non-zero variables this constraint allows
             /// * `name` - The name of the constraint.
             ///
             /// # Returns
@@ -933,10 +939,10 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state.
-            fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, rhs: i32, name: &str) -> Rc<Constraint> {
+            fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, cardinality: usize, name: &str) -> Rc<Constraint> {
                 let cons = self
                     .scip
-                    .create_cons_cardinality(vars, rhs, name)
+                    .create_cons_cardinality(vars, cardinality, name)
                     .expect("Failed to add cardinality constraint");
                 let cons = Rc::new(cons);
                 self.state.conss.borrow_mut().push(cons.clone());
@@ -1345,7 +1351,7 @@ mod tests {
         let x1 = model.add_var(0., 10., 4., "x1", VarType::Continuous);
         let x2 = model.add_var(0., 10., 2., "x2", VarType::Integer);
         let x3 = model.add_var(0., 10., 3., "x3", VarType::Integer);
-        
+
         // cardinality constraint allows just two variables to be non-zero
         model.add_cons_cardinality(vec![x1.clone(), x2.clone(), x3.clone()], 2, "cardinality");
 

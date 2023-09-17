@@ -398,7 +398,7 @@ impl ScipPtr {
     pub(crate) fn create_cons_cardinality(
         &mut self,
         vars: Vec<Rc<Variable>>,
-        rhs: i32,
+        cardinality: usize,
         name: &str,
     ) -> Result<Constraint, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -417,11 +417,11 @@ impl ScipPtr {
         for (ind, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddVarCardinality(self.raw, scip_cons, var.raw, std::ptr::null_mut(), ind as f64) };
         }
-        scip_call! { ffi:: SCIPchgCardvalCardinality(self.raw, scip_cons, rhs) };
+        scip_call! { ffi:: SCIPchgCardvalCardinality(self.raw, scip_cons, cardinality as i32) };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(Constraint { raw: scip_cons })
     }
-    
+
     /// Create solution
     pub(crate) fn create_sol(&self) -> Result<Solution, Retcode> {
         let mut sol = MaybeUninit::uninit();
