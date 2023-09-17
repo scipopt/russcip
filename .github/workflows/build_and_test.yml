@@ -35,7 +35,7 @@ jobs:
         uses: actions-rs/tarpaulin@v0.1
         with:
           version: '0.15.0'
-          args: '-- --verbose --all --out xml'
+          args: '--verbose --all --out xml'
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
