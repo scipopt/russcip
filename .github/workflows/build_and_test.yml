@@ -34,8 +34,8 @@ jobs:
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
-          version: '0.27.0'
-          args: '--verbose --all --out xml'
+          version: '0.15.0'
+          args: '--verbose --all --out Xml'
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
