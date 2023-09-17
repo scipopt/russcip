@@ -206,7 +206,7 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-    
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -1040,10 +1040,10 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
 
 #[cfg(test)]
 mod tests {
+    use crate::status::Status;
+    use rayon::prelude::*;
     use std::fs;
     use std::path::Path;
-
-    use crate::status::Status;
 
     use super::*;
 
@@ -1436,5 +1436,18 @@ mod tests {
             .solve();
 
         assert_eq!(model.status(), Status::TimeLimit);
+    }
+
+    #[test]
+    fn test_thread_safety() {
+        let statuses = (0..1000)
+            .into_par_iter()
+            .map(|_| {
+                let model = create_model().hide_output().solve();
+                model.status()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(statuses.iter().all(|&s| s == Status::Optimal));
     }
 }
