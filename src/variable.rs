@@ -4,6 +4,9 @@ use core::panic;
 /// A type alias for a variable ID.
 pub type VarId = usize;
 
+/// A type alias for a constraint ID.
+pub type ConsId = usize;
+
 /// A wrapper for a mutable reference to a SCIP variable.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Variable {

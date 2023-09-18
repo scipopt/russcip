@@ -4,13 +4,13 @@ use std::rc::Rc;
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
-use crate::ffi;
 use crate::node::Node;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
+use crate::{ffi, ConsId};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 
 /// Represents an optimization model.
@@ -32,22 +32,22 @@ pub struct PluginsIncluded;
 /// Represents the state of an optimization model where the problem has been created.
 #[derive(Debug, Clone)]
 pub struct ProblemCreated {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Variable>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Constraint>>>,
 }
 
 /// Represents the state of an optimization model during the solving process (to be used in plugins).
 #[derive(Debug)]
 pub struct Solving {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Variable>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Constraint>>>,
 }
 
 /// Represents the state of an optimization model that has been solved.
 #[derive(Debug)]
 pub struct Solved {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Variable>>>,
+    pub(crate) conss: Rc<RefCell<Vec<Constraint>>>,
 }
 
 impl Model<Unsolved> {
@@ -206,7 +206,7 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-    
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -232,22 +232,15 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method panics if the variable cannot be created in the current state.
-    pub fn add_var(
-        &mut self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Rc<Variable> {
+    pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> VarId {
         let var = self
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
-        let var = Rc::new(var);
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
+        let var = var;
+        self.state.vars.borrow_mut().insert(var_id, var);
+        var_id
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -422,22 +415,15 @@ impl Model<Solving> {
     /// # Panics
     ///
     /// This method panics if the variable cannot be created in the current state.
-    pub fn add_var(
-        &mut self,
-        lb: f64,
-        ub: f64,
-        obj: f64,
-        name: &str,
-        var_type: VarType,
-    ) -> Rc<Variable> {
+    pub fn add_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str, var_type: VarType) -> VarId {
         let var = self
             .scip
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var_id = var.index();
-        let var = Rc::new(var);
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
+        let var = var;
+        self.state.vars.borrow_mut().insert(var_id, var);
+        var_id
     }
 
     /// Adds a new priced variable to the SCIP data structure.
@@ -482,16 +468,16 @@ impl Model<Solving> {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> Rc<Variable> {
+    ) -> VarId {
         let var = self
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Rc::new(var);
+        let var = var;
         let var_id = var.index();
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
-        var
-}
+        self.state.vars.borrow_mut().insert(var_id, var);
+        var_id
+    }
 }
 
 impl Model<Solved> {
@@ -519,10 +505,10 @@ impl Model<Solved> {
 /// A trait for optimization models with a problem created.
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
-    fn vars(&self) -> Vec<Rc<Variable>>;
+    fn vars(&self) -> Vec<&Variable>;
 
     /// Returns the variable with the given ID, if it exists.
-    fn var(&self, var_id: VarId) -> Option<Rc<Variable>>;
+    fn var(&self, var_id: VarId) -> Option<&Variable>;
 
     /// Returns the number of variables in the optimization model.
     fn n_vars(&self) -> usize;
@@ -531,7 +517,7 @@ pub trait ModelWithProblem {
     fn n_conss(&mut self) -> usize;
 
     /// Returns a vector of all constraints in the optimization model.
-    fn conss(&mut self) -> Vec<Rc<Constraint>>;
+    fn conss(&mut self) -> Vec<&Constraint>;
 
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
@@ -542,13 +528,13 @@ macro_rules! impl_ModelWithProblem {
         $(impl ModelWithProblem for $t {
 
             /// Returns a vector of all variables in the optimization model.
-            fn vars(&self) -> Vec<Rc<Variable>> {
-                self.state.vars.borrow().values().map(Rc::clone).collect()
+            fn vars(&self) -> Vec<&Variable> {
+                self.state.vars.borrow().values().collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
-            fn var(&self, var_id: VarId) -> Option<Rc<Variable>> {
-                self.state.vars.borrow().get(&var_id).map(Rc::clone)
+            fn var(&self, var_id: VarId) -> Option<&Variable> {
+                self.state.vars.borrow().get(&var_id)
             }
 
             /// Returns the number of variables in the optimization model.
@@ -562,8 +548,8 @@ macro_rules! impl_ModelWithProblem {
             }
 
             /// Returns a vector of all constraints in the optimization model.
-            fn conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss.borrow().iter().map(Rc::clone).collect()
+            fn conss(&mut self) -> Vec<&Constraint> {
+                self.state.conss.borrow().iter().collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
@@ -599,7 +585,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>);
+    fn add_cons_coef_setppc(&mut self, cons: ConsId, var: VarId);
 
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
@@ -612,7 +598,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64);
+    fn add_cons_coef(&mut self, cons: ConsId, var: VarId, coef: f64);
     /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -827,7 +813,7 @@ macro_rules! impl_ProblemOrSolving {
                 lhs: f64,
                 rhs: f64,
                 name: &str,
-            ) -> Rc<Constraint> {
+            ) {
                 assert_eq!(lin_vars.len(), lin_coefs.len());
                 assert_eq!(quad_vars_1.len(), quad_vars_2.len());
                 assert_eq!(quad_vars_1.len(), quad_coefs.len());
@@ -844,9 +830,8 @@ macro_rules! impl_ProblemOrSolving {
                         name,
                     )
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                let cons = cons;
+                self.state.conss.borrow_mut().push(cons);
             }
 
 

@@ -16,7 +16,7 @@ use std::rc::Rc;
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
     consumed: bool,
-    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>
+    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
 impl ScipPtr {
@@ -139,7 +139,7 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn vars(&self) -> BTreeMap<usize, Rc<Variable>> {
+    pub(crate) fn vars(&self) -> BTreeMap<usize, Variable> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
@@ -149,13 +149,13 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureVar(self.raw, scip_var);
             }
-            let var = Rc::new(Variable { raw: scip_var });
+            let var = Variable { raw: scip_var };
             vars.insert(var.index(), var);
         }
         vars
     }
 
-    pub(crate) fn conss(&self) -> Vec<Rc<Constraint>> {
+    pub(crate) fn conss(&self) -> Vec<Constraint> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.n_conss();
         let mut conss = Vec::with_capacity(n_conss);
@@ -165,7 +165,7 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureCons(self.raw, scip_cons);
             }
-            let cons = Rc::new(Constraint { raw: scip_cons });
+            let cons = Constraint { raw: scip_cons };
             conss.push(cons);
         }
         conss
@@ -945,7 +945,11 @@ impl ScipPtr {
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, stored.as_mut_ptr()));
+        scip_call!(ffi::SCIPaddSolFree(
+            self.raw,
+            &mut sol.raw,
+            stored.as_mut_ptr()
+        ));
         let stored = unsafe { stored.assume_init() };
         Ok(stored != 0)
     }
