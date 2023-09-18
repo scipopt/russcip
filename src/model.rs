@@ -201,7 +201,8 @@ impl Model<ProblemCreated> {
     }
 
     /// Sets the constraint as modifiable or not.
-    pub fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) {
+    pub fn set_cons_modifiable(&mut self, cons_id: ConsId, modifiable: bool) {
+        let cons = self.cons(cons_id).raw;
         self.scip
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
@@ -508,13 +509,22 @@ pub trait ModelWithProblem {
     fn vars(&self) -> Vec<&Variable>;
 
     /// Returns the variable with the given ID, if it exists.
-    fn var(&self, var_id: VarId) -> Option<&Variable>;
+    ///
+    /// # Panics
+    /// if the constraint is not found
+    fn var(&self, var_id: VarId) -> &Variable;
 
     /// Returns the number of variables in the optimization model.
     fn n_vars(&self) -> usize;
 
     /// Returns the number of constraints in the optimization model.
     fn n_conss(&mut self) -> usize;
+
+    /// Returns the constraint with the given ID
+    ///
+    /// # Panics
+    /// if the constraint is not found
+    fn cons(&self, cons_id: ConsId) -> &Constraint;
 
     /// Returns a vector of all constraints in the optimization model.
     fn conss(&mut self) -> Vec<&Constraint>;
@@ -529,12 +539,13 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn vars(&self) -> Vec<&Variable> {
-                self.state.vars.borrow().values().collect()
+                let vars = self.state.vars.borrow();
+                vars.values().collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
-            fn var(&self, var_id: VarId) -> Option<&Variable> {
-                self.state.vars.borrow().get(&var_id)
+            fn var(&self, var_id: VarId) -> &Variable {
+                self.state.vars.borrow().get(&var_id).expect("Variable not found")
             }
 
             /// Returns the number of variables in the optimization model.
@@ -545,6 +556,15 @@ macro_rules! impl_ModelWithProblem {
             /// Returns the number of constraints in the optimization model.
             fn n_conss(&mut self) -> usize {
                 self.scip.n_conss()
+            }
+
+
+            /// Returns the constraint with the given ID
+            ///
+            /// # Panics
+            /// if the constraint is not found
+            fn cons(&self, cons_id: ConsId) -> &Constraint {
+                self.state.conss.borrow().get(cons_id).expect("Constraint not found")
             }
 
             /// Returns a vector of all constraints in the optimization model.
@@ -614,22 +634,23 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_quadratic(
         &mut self,
-        lin_vars: Vec<Rc<Variable>>,
+        lin_vars: Vec<VarId>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
+        quad_vars_1: Vec<VarId>,
+        quad_vars_2: Vec<VarId>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> ConsId;
+
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -642,19 +663,20 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<VarId>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> ConsId;
+
     /// Adds a new set partitioning constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -664,12 +686,13 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_part(&mut self, vars: Vec<VarId>, name: &str) -> ConsId;
+
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -679,12 +702,13 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_cover(&mut self, var_ids: Vec<VarId>, name: &str) -> ConsId;
+
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -694,12 +718,12 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_pack(&mut self, var_ids: Vec<VarId>, name: &str) -> ConsId;
 
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
     ///
@@ -711,17 +735,17 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// Id of the constraint.
     ///
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_cardinality(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<VarId>,
         cardinality: usize,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> ConsId;
 }
 
 macro_rules! impl_ProblemOrSolving {
@@ -758,7 +782,9 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-            fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+            fn add_cons_coef_setppc(&mut self, cons_id: ConsId, var_id: VarId) {
+                let cons = self.cons(cons_id);
+                let var = self.var(var_id);
                 assert_eq!(var.var_type(), VarType::Binary);
                 self.scip
                     .add_cons_coef_setppc(cons, var)
@@ -777,7 +803,9 @@ macro_rules! impl_ProblemOrSolving {
             /// # Panics
             ///
             /// This method panics if the coefficient cannot be added in the current state.
-            fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
+            fn add_cons_coef(&mut self, cons_id: ConsId, var_id: VarId, coef: f64)  {
+                let cons = self.cons(cons_id);
+                let var = self.var(var_id);
                 self.scip
                     .add_cons_coef(cons, var, coef)
                     .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -798,25 +826,30 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state.
             fn add_cons_quadratic(
                 &mut self,
-                lin_vars: Vec<Rc<Variable>>,
+                lin_var_ids: Vec<VarId>,
                 lin_coefs: &mut [f64],
-                quad_vars_1: Vec<Rc<Variable>>,
-                quad_vars_2: Vec<Rc<Variable>>,
+                quad_var_ids_1: Vec<VarId>,
+                quad_var_ids_2: Vec<VarId>,
                 quad_coefs: &mut [f64],
                 lhs: f64,
                 rhs: f64,
                 name: &str,
-            ) {
-                assert_eq!(lin_vars.len(), lin_coefs.len());
-                assert_eq!(quad_vars_1.len(), quad_vars_2.len());
-                assert_eq!(quad_vars_1.len(), quad_coefs.len());
+            ) -> ConsId {
+                assert_eq!(lin_var_ids.len(), lin_coefs.len());
+                assert_eq!(quad_var_ids_1.len(), quad_var_ids_2.len());
+                assert_eq!(quad_var_ids_1.len(), quad_coefs.len());
+
+                let lin_vars = lin_var_ids.iter().map(|&id| self.var(id)).collect();
+                let quad_vars_1 = quad_var_ids_1.iter().map(|&id| self.var(id)).collect();
+                let quad_vars_2 = quad_var_ids_2.iter().map(|&id| self.var(id)).collect();
+
                 let cons = self
                     .scip
                     .create_cons_quadratic(
@@ -832,6 +865,7 @@ macro_rules! impl_ProblemOrSolving {
                     .expect("Failed to create constraint in state ProblemCreated");
                 let cons = cons;
                 self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
 
@@ -848,27 +882,27 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state.
             fn add_cons(
                 &mut self,
-                vars: Vec<Rc<Variable>>,
+                var_ids: Vec<VarId>,
                 coefs: &[f64],
                 lhs: f64,
                 rhs: f64,
                 name: &str,
-            ) -> Rc<Constraint> {
-                assert_eq!(vars.len(), coefs.len());
+            ) -> ConsId  {
+                assert_eq!(var_ids.len(), coefs.len());
+                let vars = var_ids.iter().map(|&id| self.var(id)).collect();
                 let cons = self
                     .scip
                     .create_cons(vars, coefs, lhs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
             /// Adds a new set partitioning constraint to the model with the given variables and name.
@@ -880,20 +914,20 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+            fn add_cons_set_part(&mut self, var_ids: Vec<VarId>, name: &str) -> ConsId  {
+                assert!(var_ids.iter().all(|&v| self.var(v).var_type() == VarType::Binary));
+                let vars = var_ids.iter().map(|&id| self.var(id)).collect();
                 let cons = self
                     .scip
                     .create_cons_set_part(vars, name)
                     .expect("Failed to add constraint set partition in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
             /// Adds a new set cover constraint to the model with the given variables and name.
@@ -905,20 +939,20 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+            fn add_cons_set_cover(&mut self, var_ids: Vec<VarId>, name: &str) -> ConsId  {
+                assert!(var_ids.iter().all(|&v| self.var(v).var_type() == VarType::Binary));
+                let vars = var_ids.iter().map(|&id| self.var(id)).collect();
                 let cons = self
                     .scip
                     .create_cons_set_cover(vars, name)
                     .expect("Failed to add constraint set cover in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
             /// Adds a new set packing constraint to the model with the given variables and name.
@@ -930,20 +964,20 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-            fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
-                assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
+            fn add_cons_set_pack(&mut self, var_ids: Vec<VarId>, name: &str) -> ConsId {
+                assert!(var_ids.iter().all(|&v| self.var(v).var_type() == VarType::Binary));
+                let vars = var_ids.iter().map(|&id| self.var(id)).collect();
                 let cons = self
                     .scip
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
             /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
@@ -956,19 +990,19 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// # Returns
             ///
-            /// A reference-counted pointer to the new constraint.
+            /// Id of the constraint.
             ///
             /// # Panics
             ///
             /// This method panics if the constraint cannot be created in the current state.
-            fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, cardinality: usize, name: &str) -> Rc<Constraint> {
+            fn add_cons_cardinality(&mut self, vars: Vec<VarId>, cardinality: usize, name: &str) -> ConsId  {
+                let vars = vars.iter().map(|&id| self.var(id)).collect();
                 let cons = self
                     .scip
                     .create_cons_cardinality(vars, cardinality, name)
                     .expect("Failed to add cardinality constraint");
-                let cons = Rc::new(cons);
-                self.state.conss.borrow_mut().push(cons.clone());
-                cons
+                self.state.conss.borrow_mut().push(cons);
+                self.state.conss.borrow().len() - 1
             }
 
         })*
@@ -1231,13 +1265,11 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
         let x1_id = model
-            .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
-            .index();
+            .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2_id = model
-            .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous)
-            .index();
-        let x1 = model.var(x1_id).unwrap();
-        let x2 = model.var(x2_id).unwrap();
+            .add_var(0., f64::INFINITY, 4., "x2", VarType::Continuous);
+        let x1 = model.var(x1_id);
+        let x2 = model.var(x2_id);
         assert_eq!(model.n_vars(), 2);
         assert_eq!(model.vars().len(), 2);
         assert!(x1.raw != x2.raw);
@@ -1415,12 +1447,12 @@ mod tests {
             .set_obj_sense(ObjSense::Maximize);
 
         // set up three variables with different objective weights
-        let x1 = model.add_var(0., 10., 4., "x1", VarType::Continuous);
-        let x2 = model.add_var(0., 10., 2., "x2", VarType::Integer);
-        let x3 = model.add_var(0., 10., 3., "x3", VarType::Integer);
+        let x1_id = model.add_var(0., 10., 4., "x1", VarType::Continuous);
+        let x2_id = model.add_var(0., 10., 2., "x2", VarType::Integer);
+        let x3_id = model.add_var(0., 10., 3., "x3", VarType::Integer);
 
         // cardinality constraint allows just two variables to be non-zero
-        model.add_cons_cardinality(vec![x1.clone(), x2.clone(), x3.clone()], 2, "cardinality");
+        model.add_cons_cardinality(vec![x1_id, x2_id, x3_id], 2, "cardinality");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1428,6 +1460,10 @@ mod tests {
         assert_eq!(solved_model.obj_val(), 70.);
 
         let solution = solved_model.best_sol().unwrap();
+        let x1 = model.var(x1_id);
+        let x2 = model.var(x2_id);
+        let x3 = model.var(x3_id);
+
         assert_eq!(solution.val(x1), 10.);
         assert_eq!(solution.val(x2), 0.);
         assert_eq!(solution.val(x3), 10.);
@@ -1441,16 +1477,18 @@ mod tests {
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        let x1_id = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2_id = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1, x1.clone());
+        model.add_cons_coef_setppc(cons1, x1_id);
 
-        model.add_cons_set_pack(vec![x2.clone()], "c");
+        model.add_cons_set_pack(vec![x2_id], "c");
 
         let sol = model.create_sol();
         assert_eq!(sol.obj_val(), 0.);
 
+        let x1 = model.var(x1_id);
+        let x2 = model.var(x2_id);
         sol.set_val(x1, 1.);
         sol.set_val(x2, 1.);
         assert_eq!(sol.obj_val(), 7.);

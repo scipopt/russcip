@@ -1,6 +1,4 @@
 use std::fmt;
-use std::rc::Rc;
-
 use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
 
@@ -18,12 +16,12 @@ impl Solution {
     }
 
     /// Returns the value of a variable in the solution.
-    pub fn val(&self, var: Rc<Variable>) -> f64 {
+    pub fn val(&self, var: &Variable) -> f64 {
         unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var.raw) }
     }
 
     /// Sets the value of a variable in the solution.
-    pub fn set_val(&self, var: Rc<Variable>, val: f64) {
+    pub fn set_val(&self, var: &Variable, val: f64) {
         scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr, self.raw, var.raw, val));
     }
 }

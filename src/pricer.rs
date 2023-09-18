@@ -178,12 +178,11 @@ mod tests {
             } else {
                 self.added = true;
                 let nvars_before = self.model.n_vars();
-                let var = self
+                let var_id = self
                     .model
                     .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-                let conss = self.model.conss();
-                for cons in conss {
-                    self.model.add_cons_coef(cons, var.clone(), 1.0);
+                for cons_id in 0..self.model.n_conss() {
+                    self.model.add_cons_coef(cons_id, var_id, 1.0);
                 }
                 let nvars_after = self.model.n_vars();
                 assert_eq!(nvars_before + 1, nvars_after);
@@ -203,9 +202,8 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let conss = model.conss();
-        for c in conss {
-            model.set_cons_modifiable(c, true);
+        for cons_id in 0..model.n_conss() {
+            model.set_cons_modifiable(cons_id, true);
         }
 
         let pricer = AddSameColumnPricer {
