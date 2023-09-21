@@ -67,6 +67,16 @@ jobs:
           rustup toolchain install nightly  
           RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
 
+  publish-crate:
+    needs: linux-conda-test
+    #    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - name: publish crate
+        uses: katyo/publish-crates@v2
+        with:
+          dry-run: true
+
   # TODO: fix windows workflow 
   # Windows-test:
   #   env:
