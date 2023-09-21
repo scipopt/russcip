@@ -16,10 +16,8 @@ on:
 jobs:
   test-with-coverage:
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies (SCIPOptSuite)
         run: |
           wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-Linux-ubuntu.deb
@@ -42,17 +40,14 @@ jobs:
         with:
           fail_ci_if_error: true
 
-  Linux-conda-test:
+  linux-conda-test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
         with:
           activate-environment: test
           allow-softlinks: true
-
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
@@ -68,6 +63,23 @@ jobs:
         run: |
           rustup toolchain install nightly  
           RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
+
+  publish-crate:
+    needs:
+      - linux-conda-test
+      - test-with-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: publish crate
+        uses: katyo/publish-crates@v2
+        with:
+          dry-run: ${{ github.event_name != 'release' }}
+          registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   # TODO: fix windows workflow 
   # Windows-test:

@@ -1,6 +1,12 @@
 # CHANGELOG
 
-## unreleased
+## untracked
+### Added
+### Fixed
+### Changed
+### Removed
+
+## 0.2.6
 ### Added
  - Added method `set_obj_integral` to allow specifying that the objective value is always integral.
  - Add support for cardinality constraints.
