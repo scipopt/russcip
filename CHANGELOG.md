@@ -8,6 +8,7 @@
 ### Changed
 - Free sol after adding in `ScipPtr::add_sol()`.
 - Allow adding a var in `Solving` mode.
+- Allow setting parameters from all states.
 ### Removed
 
 ## 0.2.5
