@@ -4,6 +4,7 @@
 ### Added
  - Added method `set_obj_integral` to allow specifying that the objective value is always integral.
  - Add support for cardinality constraints.
+ - Simplify imports by adding `prelude` module.
 ### Fixed
 ### Changed
 - Free sol after adding in `ScipPtr::add_sol()`.
