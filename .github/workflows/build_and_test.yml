@@ -68,10 +68,17 @@ jobs:
           RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
 
   publish-crate:
-    needs: linux-conda-test
+    needs:
+      - linux-conda-test
+      - test-with-coverage
     #    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
       - name: publish crate
         uses: katyo/publish-crates@v2
         with:
