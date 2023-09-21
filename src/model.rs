@@ -66,65 +66,6 @@ impl Model<Unsolved> {
             state: Unsolved {},
         })
     }
-
-    /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
-    pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
-        self.scip
-            .include_default_plugins()
-            .expect("Failed to include default plugins");
-        Model {
-            scip: self.scip,
-            state: PluginsIncluded {},
-        }
-    }
-
-    /// Sets a SCIP string parameter and returns a new `Model` instance with the parameter set.
-    pub fn set_str_param(mut self, param: &str, value: &str) -> Result<Self, Retcode> {
-        self.scip.set_str_param(param, value)?;
-        Ok(self)
-    }
-
-    /// Sets a SCIP integer parameter and returns a new `Model` instance with the parameter set.
-    pub fn set_int_param(mut self, param: &str, value: i32) -> Result<Self, Retcode> {
-        self.scip.set_int_param(param, value)?;
-        Ok(self)
-    }
-
-    /// Sets a SCIP long integer parameter and returns a new `Model` instance with the parameter set.
-    pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
-        self.scip.set_longint_param(param, value)?;
-        Ok(self)
-    }
-
-    /// Sets a SCIP real parameter and returns a new `Model` instance with the parameter set.
-    pub fn set_real_param(mut self, param: &str, value: f64) -> Result<Self, Retcode> {
-        self.scip.set_real_param(param, value)?;
-        Ok(self)
-    }
-
-    /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
-    pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
-        self.scip
-            .set_presolving(presolving)
-            .expect("Failed to set presolving with valid value");
-        self
-    }
-
-    /// Sets the separating parameter of the SCIP instance and returns the same `Model` instance.
-    pub fn set_separating(mut self, separating: ParamSetting) -> Self {
-        self.scip
-            .set_separating(separating)
-            .expect("Failed to set separating with valid value");
-        self
-    }
-
-    /// Sets the heuristics parameter of the SCIP instance and returns the same `Model` instance.
-    pub fn set_heuristics(mut self, heuristics: ParamSetting) -> Self {
-        self.scip
-            .set_heuristics(heuristics)
-            .expect("Failed to set heuristics with valid value");
-        self
-    }
 }
 
 impl Model<PluginsIncluded> {
@@ -206,7 +147,7 @@ impl Model<ProblemCreated> {
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
     }
-    
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
@@ -491,7 +432,7 @@ impl Model<Solving> {
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
-}
+    }
 }
 
 impl Model<Solved> {
@@ -1111,6 +1052,66 @@ impl<T> Model<T> {
             .expect("Failed to set time limit");
         self
     }
+
+
+    /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
+    pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
+        self.scip
+            .include_default_plugins()
+            .expect("Failed to include default plugins");
+        Model {
+            scip: self.scip,
+            state: PluginsIncluded {},
+        }
+    }
+
+    /// Sets a SCIP string parameter and returns a new `Model` instance with the parameter set.
+    pub fn set_str_param(mut self, param: &str, value: &str) -> Result<Self, Retcode> {
+        self.scip.set_str_param(param, value)?;
+        Ok(self)
+    }
+
+    /// Sets a SCIP integer parameter and returns a new `Model` instance with the parameter set.
+    pub fn set_int_param(mut self, param: &str, value: i32) -> Result<Self, Retcode> {
+        self.scip.set_int_param(param, value)?;
+        Ok(self)
+    }
+
+    /// Sets a SCIP long integer parameter and returns a new `Model` instance with the parameter set.
+    pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
+        self.scip.set_longint_param(param, value)?;
+        Ok(self)
+    }
+
+    /// Sets a SCIP real parameter and returns a new `Model` instance with the parameter set.
+    pub fn set_real_param(mut self, param: &str, value: f64) -> Result<Self, Retcode> {
+        self.scip.set_real_param(param, value)?;
+        Ok(self)
+    }
+
+    /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
+    pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
+        self.scip
+            .set_presolving(presolving)
+            .expect("Failed to set presolving with valid value");
+        self
+    }
+
+    /// Sets the separating parameter of the SCIP instance and returns the same `Model` instance.
+    pub fn set_separating(mut self, separating: ParamSetting) -> Self {
+        self.scip
+            .set_separating(separating)
+            .expect("Failed to set separating with valid value");
+        self
+    }
+
+    /// Sets the heuristics parameter of the SCIP instance and returns the same `Model` instance.
+    pub fn set_heuristics(mut self, heuristics: ParamSetting) -> Self {
+        self.scip
+            .set_heuristics(heuristics)
+            .expect("Failed to set heuristics with valid value");
+        self
+    }
 }
 
 /// The default implementation for a `Model` instance in the `ProblemCreated` state.
@@ -1605,5 +1606,18 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert!(statuses.iter().all(|&s| s == Status::Optimal));
+    }
+
+    #[test]
+    fn set_param_all_states() {
+        Model::new()
+            .set_int_param("display/verblevel", 0).unwrap()
+            .include_default_plugins()
+            .set_int_param("display/verblevel", 0).unwrap()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .set_int_param("display/verblevel", 0).unwrap()
+            .solve()
+            .set_int_param("display/verblevel", 0).unwrap();
     }
 }
