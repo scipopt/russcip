@@ -4,14 +4,7 @@
 //! # Example
 //! Model and solve an integer program.
 //! ```rust
-//! use russcip::model::Model;
-//! use russcip::model::ObjSense;
-//! use russcip::status::Status;
-//! use russcip::variable::VarType;
-//! use crate::russcip::model::ProblemOrSolving;
-//! use crate::russcip::model::ModelWithProblem;
-//! use crate::russcip::WithSolutions;
-//! use crate::russcip::WithSolvingStats;
+//! use russcip::prelude::*;
 //!
 //! // Create model
 //! let mut model = Model::new()
@@ -95,6 +88,9 @@ pub use eventhdlr::*;
 /// Contains the `Heur` trait used to define custom primal heuristics.
 pub mod heuristic;
 pub use heuristic::*;
+
+/// Contains all the traits and structs that are re-exported by default.
+pub mod prelude;
 
 mod scip;
 
