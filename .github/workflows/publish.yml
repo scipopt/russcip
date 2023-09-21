@@ -1,0 +1,16 @@
+name: publish
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  publish-crate:
+    needs: test-with-coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: publish crate
+        uses: katyo/publish-crates@v2
+        with:
+          dry-run: true

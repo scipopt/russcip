@@ -16,8 +16,6 @@ on:
 jobs:
   test-with-coverage:
     runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: true
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies (SCIPOptSuite)
@@ -42,7 +40,7 @@ jobs:
         with:
           fail_ci_if_error: true
 
-  Linux-conda-test:
+  linux-conda-test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
