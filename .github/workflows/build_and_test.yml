@@ -65,9 +65,9 @@ jobs:
           RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
 
   publish-crate:
-#    needs:
-#      - linux-conda-test
-#      - test-with-coverage
+    needs:
+      - linux-conda-test
+      - test-with-coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
