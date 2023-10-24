@@ -1,5 +1,6 @@
 use crate::ffi;
 use core::panic;
+use std::hash::{Hash, Hasher};
 
 /// A type alias for a variable ID.
 pub type VarId = usize;
@@ -8,6 +9,13 @@ pub type VarId = usize;
 #[derive(Debug, PartialEq, Eq)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
+    pub(crate) id: VarId,
+}
+
+impl Hash for Variable {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
 }
 
 impl Variable {
@@ -19,9 +27,7 @@ impl Variable {
 
     /// Returns the index of the variable.
     pub fn index(&self) -> usize {
-        let id = unsafe { ffi::SCIPvarGetIndex(self.raw) };
-        assert!(id >= 0);
-        id as usize
+        self.id
     }
 
     /// Returns the name of the variable.

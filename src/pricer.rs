@@ -46,7 +46,7 @@ impl From<PricerResultState> for u32 {
 mod tests {
     use super::*;
     use crate::{
-        model::{Model, ModelWithProblem, ProblemCreated},
+        model::{Model, ModelWithProblem},
         status::Status,
         variable::VarType, Solving, ProblemOrSolving,
     };

@@ -149,7 +149,9 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureVar(self.raw, scip_var);
             }
-            let var = Rc::new(Variable { raw: scip_var });
+            let id = unsafe { ffi::SCIPvarGetIndex(scip_var) as usize };
+            let var = Rc::new(Variable { raw: scip_var, id });
+
             vars.insert(var.index(), var);
         }
         vars
@@ -214,7 +216,8 @@ impl ScipPtr {
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
-        Ok(Variable { raw: var_ptr })
+        let id = unsafe { ffi::SCIPvarGetIndex(var_ptr) as usize };
+        Ok(Variable { raw: var_ptr, id })
     }
 
     pub(crate) fn create_var_solving(
@@ -242,7 +245,8 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: trans_var_ptr })
+        let id = unsafe { ffi::SCIPvarGetIndex(var_ptr) as usize };
+        Ok(Variable { raw: trans_var_ptr, id })
     }
 
     pub(crate) fn create_priced_var(
@@ -270,7 +274,8 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        Ok(Variable { raw: trans_var_ptr })
+        let id = unsafe { ffi::SCIPvarGetIndex(trans_var_ptr) as usize };
+        Ok(Variable { raw: trans_var_ptr, id })
     }
 
     pub(crate) fn create_cons(
@@ -500,7 +505,8 @@ impl ScipPtr {
         let mut cands = Vec::with_capacity(nlpcands as usize);
         for i in 0..nlpcands {
             let var_ptr = unsafe { *lpcands.add(i as usize) };
-            let var = Rc::new(Variable { raw: var_ptr });
+            let id = unsafe { ffi::SCIPvarGetIndex(var_ptr) as usize };
+            let var = Rc::new(Variable { raw: var_ptr, id });
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();
             cands.push(BranchingCandidate {

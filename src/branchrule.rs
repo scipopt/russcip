@@ -56,11 +56,12 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ModelWithProblem, ProblemCreated};
+    use crate::model::{ModelWithProblem};
     use crate::Solving;
     use crate::{model::Model, status::Status};
 
     struct PanickingBranchingRule;
+
     impl BranchRule for PanickingBranchingRule {
         fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
             panic!("Not implemented")
