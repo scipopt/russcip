@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::ops::Range;
 use std::rc::Rc;
 
 use crate::constraint::Constraint;
@@ -12,6 +13,7 @@ use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
+use crate::expr::Expr;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -585,6 +587,7 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Rc<Constraint>;
+
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -610,6 +613,30 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Rc<Constraint>;
+
+    /// Adds a new constraint to the model from expression
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The expression in the constraint.
+    /// * `bounds` - The bounds of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_expr(
+        &mut self,
+        expr: Expr,
+        bounds: Range<f64>,
+        name: &str,
+    ) -> Rc<Constraint>;
+
+
     /// Adds a new set partitioning constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -625,6 +652,7 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -640,6 +668,7 @@ pub trait ProblemOrSolving {
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
     fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
     /// # Arguments
@@ -825,6 +854,30 @@ macro_rules! impl_ProblemOrSolving {
                 let cons = Rc::new(cons);
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
+            }
+
+            /// Adds a new constraint to the model from expression
+            ///
+            /// # Arguments
+            ///
+            /// * `expr` - The expression in the constraint.
+            /// * `bounds` - The bounds of the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state.
+            fn add_cons_expr(
+                &mut self,
+                expr: Expr,
+                bounds: Range<f64>,
+                name: &str,
+            ) -> Rc<Constraint> {
+                todo!()
             }
 
             /// Adds a new set partitioning constraint to the model with the given variables and name.
