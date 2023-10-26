@@ -1,4 +1,5 @@
 use std::ops::{BitOr, BitOrAssign};
+use scip_sys::SCIP_Result;
 
 use crate::ffi;
 
@@ -87,7 +88,7 @@ impl From<u32> for HeurTiming {
     }
 }
 
-impl From<HeurResult> for u32 {
+impl From<HeurResult> for SCIP_Result {
     fn from(val: HeurResult) -> Self {
         match val {
             HeurResult::FoundSol => ffi::SCIP_Result_SCIP_FOUNDSOL,

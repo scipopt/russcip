@@ -1,3 +1,4 @@
+use scip_sys::SCIP_Result;
 use crate::ffi;
 
 /// A trait for SCIP pricers.
@@ -30,7 +31,7 @@ pub struct PricerResult {
     pub lower_bound: Option<f64>,
 }
 
-impl From<PricerResultState> for u32 {
+impl From<PricerResultState> for SCIP_Result {
     /// Converts a `PricerResultState` enum variant to an `SCIP_Result` value.
     fn from(val: PricerResultState) -> Self {
         match val {

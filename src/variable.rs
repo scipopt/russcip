@@ -1,5 +1,6 @@
 use crate::ffi;
 use core::panic;
+use scip_sys::SCIP_Status;
 
 /// A type alias for a variable ID.
 pub type VarId = usize;
@@ -114,8 +115,8 @@ pub enum VarStatus {
     NegatedVar,
 }
 
-impl From<u32> for VarStatus {
-    fn from(status: u32) -> Self {
+impl From<SCIP_Status> for VarStatus {
+    fn from(status: SCIP_Status) -> Self {
         match status {
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_ORIGINAL => VarStatus::Original,
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_LOOSE => VarStatus::Loose,
