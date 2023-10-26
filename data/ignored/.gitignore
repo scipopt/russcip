@@ -1,0 +1,3 @@
+# ignore everything except .gitignore, ensuring this directory actually exists
+*
+!.gitignore
