@@ -12,7 +12,7 @@ exclude = ["data/test/*"]
 raw = []
 
 [dependencies]
-scip-sys =  "0.1.4"
+scip-sys =  "0.1.5"
 doc-comment = "0.3.3"
 
 [dev-dependencies]
