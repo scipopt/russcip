@@ -2,7 +2,6 @@ use crate::ffi;
 use crate::variable::Variable;
 use std::rc::Rc;
 use scip_sys::SCIP_Result;
-use crate::model::WithSolvingStats;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
@@ -57,7 +56,7 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ModelWithProblem, ProblemCreated};
+    use crate::model::ModelWithProblem;
     use crate::Solving;
     use crate::{model::Model, status::Status};
 
