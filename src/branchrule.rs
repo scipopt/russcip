@@ -1,7 +1,7 @@
 use crate::ffi;
 use crate::variable::Variable;
 use std::rc::Rc;
-use crate::model::WithSolvingStats;
+use scip_sys::SCIP_Result;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
@@ -28,7 +28,7 @@ pub enum BranchingResult {
     ConsAdded,
 }
 
-impl From<BranchingResult> for u32 {
+impl From<BranchingResult> for SCIP_Result {
     fn from(val: BranchingResult) -> Self {
         match val {
             BranchingResult::DidNotRun => ffi::SCIP_Result_SCIP_DIDNOTRUN,
@@ -56,7 +56,7 @@ pub struct BranchingCandidate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ModelWithProblem, ProblemCreated};
+    use crate::model::ModelWithProblem;
     use crate::Solving;
     use crate::{model::Model, status::Status};
 

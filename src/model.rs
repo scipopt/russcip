@@ -1510,9 +1510,10 @@ mod tests {
 
     #[test]
     fn set_str_param() {
+        let output_path = "data/ignored/test.vbc";
         let mut model = Model::new()
             .hide_output()
-            .set_str_param("visual/vbcfilename", "test.vbc")
+            .set_str_param("visual/vbcfilename", output_path)
             .unwrap()
             .include_default_plugins()
             .create_prob("test")
@@ -1527,8 +1528,11 @@ mod tests {
         assert_eq!(status, Status::Optimal);
         assert_eq!(solved_model.obj_val(), 3.);
 
-        assert!(Path::new("test.vbc").exists());
-        fs::remove_file("test.vbc").unwrap();
+        assert!(Path::new(output_path).exists());
+
+        // drop model so the file is closed and it can be removed
+        drop(solved_model);
+        fs::remove_file(output_path).unwrap();
     }
 
     #[test]

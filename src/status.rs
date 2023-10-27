@@ -1,3 +1,4 @@
+use scip_sys::SCIP_Status;
 use crate::ffi;
 
 /// An enum representing the status of a SCIP optimization run.
@@ -37,9 +38,9 @@ pub enum Status {
     Terminate,
 }
 
-impl From<u32> for Status {
+impl From<SCIP_Status> for Status {
     /// Converts a u32 value to a `Status` enum variant.
-    fn from(val: u32) -> Self {
+    fn from(val: SCIP_Status) -> Self {
         match val {
             ffi::SCIP_Status_SCIP_STATUS_UNKNOWN => Status::Unknown,
             ffi::SCIP_Status_SCIP_STATUS_USERINTERRUPT => Status::UserInterrupt,

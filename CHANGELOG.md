@@ -3,6 +3,7 @@
 ## untracked
 ### Added
 ### Fixed
+ - Fixed Windows MSVC build.
 ### Changed
 ### Removed
 
