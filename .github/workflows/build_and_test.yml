@@ -100,7 +100,7 @@ jobs:
         shell: powershell
         run: |
           $Env:SCIPOPTDIR = "${{ env.SCIPOPTDIR }}"
-          $Env:PATH += ";$Env:SCIPOPTDIR/lib"
+          $Env:PATH += ";$Env:SCIPOPTDIR/bin"
           cargo build
           cargo test
 
