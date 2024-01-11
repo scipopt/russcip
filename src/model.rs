@@ -979,6 +979,7 @@ macro_rules! impl_ProblemOrSolving {
                 name: &str,
             ) -> Rc<Constraint> {
                 assert_eq!(vars.len(), coefs.len());
+                assert_eq!(bin_var.var_type(), VarType::Binary);
                 let cons = self
                     .scip
                     .create_cons_indicator(bin_var, vars, coefs, rhs, name)
