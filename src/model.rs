@@ -677,6 +677,32 @@ pub trait ProblemOrSolving {
         cardinality: usize,
         name: &str,
     ) -> Rc<Constraint>;
+
+    /// Adds a new indicator constraint to the model with the given variables, coefficients, right-hand side, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `bin_var` - The binary variable in the constraint.
+    /// * `vars` - The variables of the constraints.
+    /// * `coefs` - The coefficients of the variables in the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_indicator(
+        &mut self,
+        bin_var: Rc<Variable>,
+        vars: Vec<Rc<Variable>>,
+        coefs: &mut [f64],
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint>;
 }
 
 macro_rules! impl_ProblemOrSolving {
@@ -927,6 +953,41 @@ macro_rules! impl_ProblemOrSolving {
                 cons
             }
 
+            /// Adds a new indicator constraint to the model with the given variables, coefficients, right-hand side, and name.
+            ///
+            /// # Arguments
+            ///
+            /// * `bin_var` - The binary variable in the constraint.
+            /// * `vars` - The variables of the constraints.
+            /// * `coefs` - The coefficients of the variables in the constraint.
+            /// * `rhs` - The right-hand side of the constraint.
+            /// * `name` - The name of the constraint.
+            ///
+            /// # Returns
+            ///
+            /// A reference-counted pointer to the new constraint.
+            ///
+            /// # Panics
+            ///
+            /// This method panics if the constraint cannot be created in the current state.
+            fn add_cons_indicator(
+                &mut self,
+                bin_var: Rc<Variable>,
+                vars: Vec<Rc<Variable>>,
+                coefs: &mut [f64],
+                rhs: f64,
+                name: &str,
+            ) -> Rc<Constraint> {
+                assert_eq!(vars.len(), coefs.len());
+                assert_eq!(bin_var.var_type(), VarType::Binary);
+                let cons = self
+                    .scip
+                    .create_cons_indicator(bin_var, vars, coefs, rhs, name)
+                    .expect("Failed to create constraint in state ProblemCreated");
+                let cons = Rc::new(cons);
+                self.state.conss.borrow_mut().push(cons.clone());
+                cons
+            }
         })*
     }
 }
@@ -1447,6 +1508,45 @@ mod tests {
         assert_eq!(solution.val(x1), 10.);
         assert_eq!(solution.val(x2), 0.);
         assert_eq!(solution.val(x3), 10.);
+    }
+
+    #[test]
+    fn indicator_constraint() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // set up two integers variables with weight 1 and a binary variable with weight 0
+        let x1 = model.add_var(0., 10., 1., "x1", VarType::Integer);
+        let x2 = model.add_var(0., 10., 1., "x2", VarType::Integer);
+        let b = model.add_var(0., 1., 0., "b", VarType::Binary);
+
+        // Indicator constraint: `b == 1` implies `x1 - x2 <= -1`
+        model.add_cons_indicator(
+            b.clone(), 
+            vec![x1.clone(), x2.clone()], 
+            &mut [1., -1.], 
+            -1.,
+            "indicator"
+        );
+
+        // Force `b` to be exactly 1 and later make sure that the constraint `x1 - x2 <= -1` is
+        // indeed active
+        model.add_cons(vec![b.clone()], &[1.], 1., 1., "c1");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.obj_val(), 19.);
+
+        let solution = solved_model.best_sol().unwrap();
+
+        // Indeed `x1 - x2 <= -1` when `b == 1`
+        assert_eq!(solution.val(x1), 9.);
+        assert_eq!(solution.val(x2), 10.);
+        assert_eq!(solution.val(b), 1.);
     }
 
     #[test]

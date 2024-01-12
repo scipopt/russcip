@@ -2,6 +2,7 @@
 
 ## untracked
 ### Added
+ - Add support for indicator constraints
 ### Fixed
  - Fixed Windows MSVC build.
 ### Changed

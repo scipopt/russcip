@@ -453,6 +453,36 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    pub(crate) fn create_cons_indicator(
+        &mut self,
+        bin_var: Rc<Variable>,
+        vars: Vec<Rc<Variable>>,
+        coefs: &mut [f64],
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        assert_eq!(vars.len(), coefs.len());
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        scip_call! { ffi::SCIPcreateConsBasicIndicator(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            bin_var.raw,
+            vars.len() as c_int,
+            (vars.into_iter()
+              .map(|var_rc| var_rc.raw)
+                .collect::<Vec<_>>()).as_mut_ptr(),
+            coefs.as_mut_ptr(),
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(Constraint { raw: scip_cons })
+    }
+
     /// Create solution
     pub(crate) fn create_sol(&self) -> Result<Solution, Retcode> {
         let mut sol = MaybeUninit::uninit();
