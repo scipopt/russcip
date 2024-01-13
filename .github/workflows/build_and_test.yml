@@ -2,6 +2,7 @@ name: tests
 
 env:
   version: 8.0.3
+  RUST_VERSION: 1.74.0
 
 on:
   push:
@@ -104,6 +105,31 @@ jobs:
           $Env:PATH += ";$Env:SCIPOPTDIR/bin"
           cargo build
           cargo test
+
+  cargo-fmt-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+
+  cargo-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Check Clippy Linter
+        run: cargo clippy --all-features --all-targets -- -D warnings
 
 # TODO: move to scip-sys repo
 #  MacOS-test:

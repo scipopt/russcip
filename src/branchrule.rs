@@ -1,7 +1,7 @@
 use crate::ffi;
 use crate::variable::Variable;
-use std::rc::Rc;
 use scip_sys::SCIP_Result;
+use std::rc::Rc;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {

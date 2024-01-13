@@ -1,5 +1,5 @@
-use std::ops::{BitOr, BitOrAssign};
 use scip_sys::SCIP_Result;
+use std::ops::{BitOr, BitOrAssign};
 
 use crate::ffi;
 
