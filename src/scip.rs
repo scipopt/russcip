@@ -16,7 +16,7 @@ use std::rc::Rc;
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
     consumed: bool,
-    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>
+    vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
 impl ScipPtr {
@@ -348,6 +348,7 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_cons_quadratic(
         &mut self,
         lin_vars: Vec<Rc<Variable>>,
@@ -810,6 +811,7 @@ impl ScipPtr {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn include_heur(
         &self,
         name: &str,
@@ -975,7 +977,11 @@ impl ScipPtr {
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, stored.as_mut_ptr()));
+        scip_call!(ffi::SCIPaddSolFree(
+            self.raw,
+            &mut sol.raw,
+            stored.as_mut_ptr()
+        ));
         let stored = unsafe { stored.assume_init() };
         Ok(stored != 0)
     }

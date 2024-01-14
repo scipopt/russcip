@@ -1,5 +1,5 @@
-use scip_sys::SCIP_Status;
 use crate::ffi;
+use scip_sys::SCIP_Status;
 
 /// An enum representing the status of a SCIP optimization run.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -63,9 +63,8 @@ impl From<SCIP_Status> for Status {
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
     use crate::Model;
 
@@ -73,7 +72,8 @@ mod tests{
     fn time_limit() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/time", 0.).unwrap()
+            .set_real_param("limits/time", 0.)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
@@ -82,12 +82,12 @@ mod tests{
         assert_eq!(model.status(), Status::TimeLimit);
     }
 
-
     #[test]
     fn memory_limit() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/memory", 0.).unwrap()
+            .set_real_param("limits/memory", 0.)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap()
@@ -100,7 +100,8 @@ mod tests{
     fn gap_limit() {
         let model = Model::new()
             .hide_output()
-            .set_real_param("limits/gap", 100000.).unwrap()
+            .set_real_param("limits/gap", 100000.)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap()
@@ -113,7 +114,8 @@ mod tests{
     fn solution_limit() {
         let model = Model::new()
             .hide_output()
-            .set_int_param("limits/solutions", 0).unwrap()
+            .set_int_param("limits/solutions", 0)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
@@ -126,7 +128,8 @@ mod tests{
     fn total_node_limit() {
         let model = Model::new()
             .hide_output()
-            .set_longint_param("limits/totalnodes", 0).unwrap()
+            .set_longint_param("limits/totalnodes", 0)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
@@ -135,12 +138,12 @@ mod tests{
         assert_eq!(model.status(), Status::TotalNodeLimit);
     }
 
-
     #[test]
     fn stall_node_limit() {
         let model = Model::new()
             .hide_output()
-            .set_longint_param("limits/stallnodes", 0).unwrap()
+            .set_longint_param("limits/stallnodes", 0)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
@@ -153,7 +156,8 @@ mod tests{
     fn best_solution_limit() {
         let model = Model::new()
             .hide_output()
-            .set_int_param("limits/bestsol", 0).unwrap()
+            .set_int_param("limits/bestsol", 0)
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()

@@ -1,5 +1,5 @@
-use scip_sys::SCIP_Result;
 use crate::ffi;
+use scip_sys::SCIP_Result;
 
 /// A trait for SCIP pricers.
 pub trait Pricer {
@@ -49,7 +49,8 @@ mod tests {
     use crate::{
         model::{Model, ModelWithProblem},
         status::Status,
-        variable::VarType, Solving, ProblemOrSolving,
+        variable::VarType,
+        ProblemOrSolving, Solving,
     };
 
     struct PanickingPricer;

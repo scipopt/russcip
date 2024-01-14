@@ -242,6 +242,7 @@ impl Model<ProblemCreated> {
     /// # Returns
     ///
     /// This function returns the `Model` instance for which the heuristic was included. This allows for method chaining.
+    #[allow(clippy::too_many_arguments)]
     pub fn include_heur(
         self,
         name: &str,
@@ -334,14 +335,13 @@ impl Model<ProblemCreated> {
         self.scip
             .solve()
             .expect("Failed to solve problem in state ProblemCreated");
-        let new_model = Model {
+        Model {
             scip: self.scip,
             state: Solved {
                 vars: self.state.vars,
                 conss: self.state.conss,
             },
-        };
-        new_model
+        }
     }
 }
 
@@ -574,6 +574,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
+    #[allow(clippy::too_many_arguments)]
     fn add_cons_quadratic(
         &mut self,
         lin_vars: Vec<Rc<Variable>>,
@@ -1114,7 +1115,6 @@ impl<T> Model<T> {
         self
     }
 
-
     /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
     pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
         self.scip
@@ -1525,11 +1525,11 @@ mod tests {
 
         // Indicator constraint: `b == 1` implies `x1 - x2 <= -1`
         model.add_cons_indicator(
-            b.clone(), 
-            vec![x1.clone(), x2.clone()], 
-            &mut [1., -1.], 
+            b.clone(),
+            vec![x1.clone(), x2.clone()],
+            &mut [1., -1.],
             -1.,
-            "indicator"
+            "indicator",
         );
 
         // Force `b` to be exactly 1 and later make sure that the constraint `x1 - x2 <= -1` is
@@ -1715,13 +1715,17 @@ mod tests {
     #[test]
     fn set_param_all_states() {
         Model::new()
-            .set_int_param("display/verblevel", 0).unwrap()
+            .set_int_param("display/verblevel", 0)
+            .unwrap()
             .include_default_plugins()
-            .set_int_param("display/verblevel", 0).unwrap()
+            .set_int_param("display/verblevel", 0)
+            .unwrap()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .set_int_param("display/verblevel", 0).unwrap()
+            .set_int_param("display/verblevel", 0)
+            .unwrap()
             .solve()
-            .set_int_param("display/verblevel", 0).unwrap();
+            .set_int_param("display/verblevel", 0)
+            .unwrap();
     }
 }
