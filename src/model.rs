@@ -242,7 +242,6 @@ impl Model<ProblemCreated> {
     /// # Returns
     ///
     /// This function returns the `Model` instance for which the heuristic was included. This allows for method chaining.
-    #[allow(clippy::too_many_arguments)]
     pub fn include_heur(
         self,
         name: &str,
@@ -574,7 +573,6 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
-    #[allow(clippy::too_many_arguments)]
     fn add_cons_quadratic(
         &mut self,
         lin_vars: Vec<Rc<Variable>>,

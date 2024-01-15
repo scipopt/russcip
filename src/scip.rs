@@ -348,7 +348,6 @@ impl ScipPtr {
         Ok(Constraint { raw: scip_cons })
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_cons_quadratic(
         &mut self,
         lin_vars: Vec<Rc<Variable>>,
@@ -811,7 +810,6 @@ impl ScipPtr {
         Ok(())
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn include_heur(
         &self,
         name: &str,
