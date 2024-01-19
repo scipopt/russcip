@@ -1113,6 +1113,18 @@ impl<T> Model<T> {
         self
     }
 
+    /// Sets the memory limit for the optimization model.
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_limit` - The memory limit in MB.
+    pub fn set_memory_limit(mut self, memory_limit: usize) -> Self {
+        self.scip
+            .set_real_param("limits/memory", memory_limit as f64)
+            .expect("Failed to set memory limit");
+        self
+    }
+
     /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
     pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
         self.scip
