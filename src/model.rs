@@ -1311,6 +1311,22 @@ mod tests {
     }
 
     #[test]
+    fn set_memory_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_memory_limit(0)
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+        let status = model.status();
+        assert_eq!(status, Status::MemoryLimit);
+        assert!(model.solving_time() < 0.5);
+        assert_eq!(model.n_nodes(), 0);
+        assert_eq!(model.n_lp_iterations(), 0);
+    }
+
+    #[test]
     fn add_variable() {
         let mut model = Model::new()
             .hide_output()
