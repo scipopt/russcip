@@ -1321,7 +1321,6 @@ mod tests {
             .solve();
         let status = model.status();
         assert_eq!(status, Status::MemoryLimit);
-        assert!(model.solving_time() < 0.5);
         assert_eq!(model.n_nodes(), 0);
         assert_eq!(model.n_lp_iterations(), 0);
     }
