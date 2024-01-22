@@ -3,6 +3,7 @@
 ## untracked
 ### Added
  - Add support for indicator constraints
+ - Added method `set_memory_limit` to allow specifying a memory limit.
 ### Fixed
  - Fixed Windows MSVC build.
 ### Changed

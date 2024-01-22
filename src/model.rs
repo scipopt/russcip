@@ -1113,6 +1113,18 @@ impl<T> Model<T> {
         self
     }
 
+    /// Sets the memory limit for the optimization model.
+    ///
+    /// # Arguments
+    ///
+    /// * `memory_limit` - The memory limit in MB.
+    pub fn set_memory_limit(mut self, memory_limit: usize) -> Self {
+        self.scip
+            .set_real_param("limits/memory", memory_limit as f64)
+            .expect("Failed to set memory limit");
+        self
+    }
+
     /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
     pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
         self.scip
@@ -1294,6 +1306,21 @@ mod tests {
         let status = model.status();
         assert_eq!(status, Status::TimeLimit);
         assert!(model.solving_time() < 0.5);
+        assert_eq!(model.n_nodes(), 0);
+        assert_eq!(model.n_lp_iterations(), 0);
+    }
+
+    #[test]
+    fn set_memory_limit() {
+        let model = Model::new()
+            .hide_output()
+            .set_memory_limit(0)
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+        let status = model.status();
+        assert_eq!(status, Status::MemoryLimit);
         assert_eq!(model.n_nodes(), 0);
         assert_eq!(model.n_lp_iterations(), 0);
     }
