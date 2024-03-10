@@ -29,7 +29,7 @@ jobs:
         with:
           toolchain: stable
           override: true
-          
+
       - name: Run cargo-tarpaulin
         uses: actions-rs/tarpaulin@v0.1
         with:
@@ -130,45 +130,3 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check Clippy Linter
         run: cargo clippy --all-features --all-targets -- -D warnings
-
-# TODO: move to scip-sys repo
-#  MacOS-test:
-#    runs-on: macos-latest
-#    steps:
-#      - uses: actions/checkout@v2
-#
-#      - name: Cache dependencies (SCIPOptSuite)
-#        id: cache-scip
-#        uses: actions/cache@v2
-#        with:
-#          path: |
-#            ${{ runner.workspace }}/scipoptsuite
-#            ~/Library/Caches/Homebrew/tbb--*
-#            /usr/local/opt/tbb*
-#            ~/Library/Caches/Homebrew/downloads/*--tbb-*
-#            ~/Library/Caches/Homebrew/boost--*
-#            /usr/local/opt/boost*
-#            ~/Library/Caches/Homebrew/downloads/*--boost-*
-#          key: ${{ runner.os }}-scipopt-${{ env.version }}-${{ hashFiles('**/lockfiles') }}
-#          restore-keys: |
-#            ${{ runner.os }}-scipopt-${{ env.version }}-
-#
-#      - name: Install dependencies (SCIPOptSuite)
-#        if: steps.cache-scip.outputs.cache-hit != 'true'
-#        run: |
-#          brew install tbb boost bison
-#          wget --quiet --no-check-certificate https://scipopt.org/download/release/scipoptsuite-${{ env.version }}.tgz
-#          tar xfz scipoptsuite-${{ env.version }}.tgz
-#          cd scipoptsuite-${{ env.version }}
-#          mkdir build
-#          cd build
-#          cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/scipoptsuite -DIPOPT=off -DSYM=none -DTPI=tny -DREADLINE=off
-#          make install -j
-#
-#      - name: Build and test
-#        run: |
-#          brew install tbb boost bison
-#          export SCIPOPTDIR=${{ runner.workspace }}/scipoptsuite/
-#          export DYLD_LIBRARY_PATH=${DYLD_LIBRARY_PATH}:${{ runner.workspace }}/scipoptsuite/lib
-#          cargo build
-#          cargo test

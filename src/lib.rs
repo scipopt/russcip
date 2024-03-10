@@ -1,46 +1,9 @@
 //! # russcip
-//! Safe Rust interface for SCIP.
+//! Safe Rust interface for [SCIP](https://scipopt.org/) optimization suite.
 //!
-//! # Example
-//! Model and solve an integer program.
-//! ```rust
-//! use russcip::prelude::*;
-//!
-//! // Create model
-//! let mut model = Model::new()
-//! .hide_output()
-//! .include_default_plugins()
-//! .create_prob("test")
-//! .set_obj_sense(ObjSense::Maximize);
-//!
-//! // Add variables
-//! let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-//! let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-//!
-//! // Add constraints
-//! model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-//! model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
-//!
-//! let solved_model = model.solve();
-//!
-//! let status = solved_model.status();
-//! println!("Solved with status {:?}", status);
-//!
-//! let obj_val = solved_model.obj_val();
-//! println!("Objective value: {}", obj_val);
-//!
-//! let sol = solved_model.best_sol().expect("No solution found");
-//! let vars = solved_model.vars();
-//!
-//! for var in vars {
-//!     println!("{} = {}", &var.name(), sol.val(var));
-//! }
+//! For examples and usage, please refer to the [repository](https://github.com/scipopt/russcip).
 
 #![deny(missing_docs)]
-
-extern crate core;
-extern crate doc_comment;
-doc_comment::doctest!("../README.md");
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
