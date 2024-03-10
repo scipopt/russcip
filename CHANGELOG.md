@@ -4,6 +4,7 @@
 ### Added
  - Add support for indicator constraints
  - Added method `set_memory_limit` to allow specifying a memory limit.
+ - Added `bundled` feature to download a precompiled binary for the user's OS and architecture.
 ### Fixed
  - Fixed Windows MSVC build.
 ### Changed

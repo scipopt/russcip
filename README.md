@@ -14,26 +14,33 @@
 [img_coverage]: https://img.shields.io/codecov/c/github/scipopt/russcip
 
 A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). This crate also exposes access to the SCIP's C-API through the `ffi` module. 
-The project is currently actively developed, issues/pull-requests are very welcome. 
-## Dependencies 
-Make sure SCIP is installed, the easiest way to install it is to install a precompiled package from [here](https://scipopt.org/index.php#download) or through conda by running
-```bash
-conda install --channel conda-forge scip
-```
-After which `russcip` would be able to find the installation in the current Conda environment. Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable. 
-
-*russcip* is tested against SCIP 8.0.3 but it might work for other versions depending on which functionality you use. 
+The project is currently actively developed, issues/pull-requests are very welcome.
 
 ## Installation
 By running
 ```bash
-cargo add russcip
+cargo add russcip --features bundled
 ```
 or to get the most recent version, add the following to your `Cargo.toml`
 ```toml
 [dependencies]
-russcip = { git = "https://github.com/scipopt/russcip" }
+russcip = { git = "https://github.com/scipopt/russcip", features = ["bundled"] }
 ```
+
+The `bundled` feature will download a precompiled SCIP as part of the build process.
+This is the easiest to get started with russcip, if you want to use a custom SCIP installation check the [section](#custom-scip-installation) below.
+
+
+## Custom SCIP installation
+If the `bundled` feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
+to install SCIP using conda run the following command
+```bash
+conda install --channel conda-forge scip
+```
+Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable.
+
+*russcip* is tested against SCIP 9.0.0 but it might work for other versions depending on which functionality you use. 
+
 
 ## Example
 Model and solve an integer program.

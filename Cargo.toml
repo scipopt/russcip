@@ -10,9 +10,10 @@ exclude = ["data/test/*"]
 
 [features]
 raw = []
+bundled = ["scip-sys/bundled"]
 
 [dependencies]
-scip-sys =  "0.1.5"
+scip-sys =  {  version= "0.1.7" }
 doc-comment = "0.3.3"
 
 [dev-dependencies]
