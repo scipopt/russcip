@@ -13,8 +13,7 @@ raw = []
 bundled = ["scip-sys/bundled"]
 
 [dependencies]
-scip-sys =  {  version= "0.1.7" }
-doc-comment = "0.3.3"
+scip-sys =  {  path="../scip-sys", version= "0.1.7" }
 
 [dev-dependencies]
 rayon = "1.5.1"
