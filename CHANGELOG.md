@@ -1,9 +1,15 @@
 # CHANGELOG
 
-## untracked
+### Added
+### Fixed
+### Changed
+### Remove
+
+## 0.3.0
 ### Added
  - Add support for indicator constraints
  - Added method `set_memory_limit` to allow specifying a memory limit.
+ - Added `bundled` feature, to download precompiled SCIP binaries. 
 ### Fixed
  - Fixed Windows MSVC build.
 ### Changed
