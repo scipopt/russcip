@@ -14,65 +14,41 @@
 [img_coverage]: https://img.shields.io/codecov/c/github/scipopt/russcip
 
 A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). This crate also exposes access to the SCIP's C-API through the `ffi` module. 
-The project is currently actively developed, issues/pull-requests are very welcome. 
-## Dependencies 
-Make sure SCIP is installed, the easiest way to install it is to install a precompiled package from [here](https://scipopt.org/index.php#download) or through conda by running
-```bash
-conda install --channel conda-forge scip
-```
-After which `russcip` would be able to find the installation in the current Conda environment. Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable. 
-
-*russcip* is tested against SCIP 8.0.3 but it might work for other versions depending on which functionality you use. 
+The project is currently actively developed, issues/pull-requests are very welcome.
 
 ## Installation
 By running
 ```bash
-cargo add russcip
+cargo add russcip --features bundled
 ```
 or to get the most recent version, add the following to your `Cargo.toml`
 ```toml
 [dependencies]
-russcip = { git = "https://github.com/scipopt/russcip" }
+russcip = { git = "https://github.com/scipopt/russcip", features = ["bundled"] }
 ```
 
-## Example
-Model and solve an integer program.
-```rust
-use russcip::prelude::*;
+The `bundled` feature will download a precompiled SCIP as part of the build process.
+This is the easiest to get started with russcip, if you want to use a custom SCIP installation check the [section](#custom-scip-installation) below.
 
-fn main() {
-    // Create model
-    let mut model = Model::new()
-    .hide_output()
-    .include_default_plugins()
-    .create_prob("test")
-    .set_obj_sense(ObjSense::Maximize);
 
-    // Add variables
-    let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-    let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-
-    // Add constraints
-    model.add_cons(vec![x1.clone(), x2.clone()], &[2., 1.], -f64::INFINITY, 100., "c1");
-    model.add_cons(vec![x1.clone(), x2.clone()], &[1., 2.], -f64::INFINITY, 80., "c2");
-
-    let solved_model = model.solve();
-
-    let status = solved_model.status();
-    println!("Solved with status {:?}", status);
-
-    let obj_val = solved_model.obj_val();
-    println!("Objective value: {}", obj_val);
-
-    let sol = solved_model.best_sol().unwrap();
-    let vars = solved_model.vars();
-
-    for var in vars {
-        println!("{} = {}", &var.name(), sol.val(var));
-    }
-}
-
+## Custom SCIP installation
+If the `bundled` feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
+to install SCIP using conda run the following command
+```bash
+conda install --channel conda-forge scip
 ```
+Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable.
+
+*russcip* is tested against SCIP 9.0.0 but it might work for other versions depending on which functionality you use. 
+
+
+### Examples
+An [example](examples/create_and_solve.rs) on how to model and solve an integer program can be found in the [examples](examples) directory.
+To run the example, you can use the following command
+```bash
+cargo run --example create_and_solve
+```
+
 
 ## The `raw` feature
 You can enable this feature by specifying the feature in your `Cargo.toml`
