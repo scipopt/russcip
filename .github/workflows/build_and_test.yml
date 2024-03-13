@@ -1,7 +1,7 @@
 name: tests
 
 env:
-  version: 8.0.3
+  version: 9.0.0
   RUST_VERSION: 1.74.0
 
 on:
