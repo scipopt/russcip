@@ -1,9 +1,17 @@
 # CHANGELOG
 
+# Unreleased
 ### Added
 ### Fixed
 ### Changed
 ### Remove
+
+## 0.3.1
+### Added
+### Fixed
+### Changed
+- Update scip-sys to 0.1.9 to use github hosted binaries of SCIP.
+### Removed
 
 ## 0.3.0
 ### Added
