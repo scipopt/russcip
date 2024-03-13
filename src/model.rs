@@ -458,7 +458,9 @@ impl Model<Solved> {
     /// Frees the transformed problem and returns the model the ProblemCreated state where you
     /// can add variables and constraints, useful for iterated solving
     pub fn free_transform(self) -> Model<ProblemCreated> {
-        self.scip.free_transform().unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode) );
+        self.scip
+            .free_transform()
+            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode));
         Model {
             scip: self.scip,
             state: ProblemCreated {
@@ -1775,22 +1777,10 @@ mod tests {
 
         let mut second_model = solved_model.free_transform();
 
-        let x3 = second_model.add_var(
-            0.0,
-            f64::INFINITY,
-            1.0,
-            "x3",
-            VarType::Integer
-        );
+        let x3 = second_model.add_var(0.0, f64::INFINITY, 1.0, "x3", VarType::Integer);
 
         let bound = 2.0;
-        second_model.add_cons(
-            vec![x3],
-            &[1.0],
-            0.0,
-            bound,
-            "x3-cons"
-        );
+        second_model.add_cons(vec![x3], &[1.0], 0.0, bound, "x3-cons");
 
         let second_solved = second_model.solve();
         let expected_obj = obj_val + bound;

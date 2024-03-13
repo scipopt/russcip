@@ -985,9 +985,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn free_transform(&self) -> Result<(), Retcode> {
-        scip_call!(
-            ffi::SCIPfreeTransform(self.raw)
-        );
+        scip_call!(ffi::SCIPfreeTransform(self.raw));
         Ok(())
     }
 }
