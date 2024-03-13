@@ -454,6 +454,21 @@ impl Model<Solved> {
     pub fn n_lp_iterations(&self) -> usize {
         self.scip.n_lp_iterations()
     }
+
+    /// Frees the transformed problem and returns the model the ProblemCreated state where you
+    /// can add variables and constraints, useful for iterated solving
+    pub fn free_transform(self) -> Model<ProblemCreated> {
+        self.scip
+            .free_transform()
+            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode));
+        Model {
+            scip: self.scip,
+            state: ProblemCreated {
+                vars: self.state.vars,
+                conss: self.state.conss,
+            },
+        }
+    }
 }
 
 /// A trait for optimization models with a problem created.
@@ -1752,5 +1767,24 @@ mod tests {
             .solve()
             .set_int_param("display/verblevel", 0)
             .unwrap();
+    }
+
+    #[test]
+    fn free_transform() {
+        let model = create_model();
+        let solved_model = model.solve();
+        let obj_val = solved_model.obj_val();
+
+        let mut second_model = solved_model.free_transform();
+
+        let x3 = second_model.add_var(0.0, f64::INFINITY, 1.0, "x3", VarType::Integer);
+
+        let bound = 2.0;
+        second_model.add_cons(vec![x3], &[1.0], 0.0, bound, "x3-cons");
+
+        let second_solved = second_model.solve();
+        let expected_obj = obj_val + bound;
+        assert_eq!(second_solved.status(), Status::Optimal);
+        assert!((second_solved.obj_val() - expected_obj).abs() <= 1e-6);
     }
 }

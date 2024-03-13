@@ -983,6 +983,11 @@ impl ScipPtr {
         let stored = unsafe { stored.assume_init() };
         Ok(stored != 0)
     }
+
+    pub(crate) fn free_transform(&self) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPfreeTransform(self.raw));
+        Ok(())
+    }
 }
 
 impl Drop for ScipPtr {

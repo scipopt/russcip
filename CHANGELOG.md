@@ -2,6 +2,7 @@
 
 # Unreleased
 ### Added
+- Support `SCIPfreeTransform` to allow for iterated solving.  
 ### Fixed
 ### Changed
 ### Remove
