@@ -11,9 +11,10 @@ exclude = ["data/test/*"]
 [features]
 raw = []
 bundled = ["scip-sys/bundled"]
+from-source = ["scip-sys/from-source"]
 
 [dependencies]
-scip-sys =  "0.1.9"
+scip-sys =  "0.1.11"
 
 [dev-dependencies]
 rayon = "1.5.1"

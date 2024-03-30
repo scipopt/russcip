@@ -17,22 +17,24 @@ A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). Th
 The project is currently actively developed, issues/pull-requests are very welcome.
 
 ## Installation
+
 By running
 ```bash
 cargo add russcip --features bundled
 ```
-or to get the most recent version, add the following to your `Cargo.toml`
-```toml
-[dependencies]
-russcip = { git = "https://github.com/scipopt/russcip", features = ["bundled"] }
-```
 
 The `bundled` feature will download a precompiled SCIP as part of the build process.
-This is the easiest to get started with russcip, if you want to use a custom SCIP installation check the [section](#custom-scip-installation) below.
+This is the easiest to get started with russcip, instead you could try the [from-source](#from-source-feature) 
+or if you want to link against your custom SCIP installation check the [section](#custom-scip-installation) below.
 
+### `from-source` feature
+To build SCIP from source, you can enable the `from-source` feature. This will download the SCIP source code and build it as part of the build process. 
+```bash
+cargo add russcip --features from-source
+```
 
-## Custom SCIP installation
-If the `bundled` feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
+### Custom SCIP installation
+If no feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
 to install SCIP using conda run the following command
 ```bash
 conda install --channel conda-forge scip
