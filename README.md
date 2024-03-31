@@ -72,7 +72,7 @@ Some of SCIP's plugins are imported to the rust interface as traits. Currently t
 
 To add a custom plugin to a SCIP `Model` instance, you should implement its trait and call the corresponding `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the corresponding files. 
 
-## Contibuting
+## Contributing
 Thinking about contributing to _russcip_? First of all thank you! You can check our issues [page](https://github.com/scipopt/russcip/issues), there's a bunch of [_good_first_issues_](https://github.com/scipopt/russcip/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), or you can check our contribution [guide](CONTRIBUTING.md). If you'd like to contribute and unsure what to do, or thinking about a big feature and want to discuss if it makes sense and what is the best way to do it? you could open a new [issue](https://github.com/scipopt/russcip/issues/new/choose)/[discussion](https://github.com/scipopt/russcip/discussions/new/choose) or send me a quick email [@mmghannam](https://github.com/mmghannam).
 
 ## About SCIP
