@@ -11,12 +11,13 @@ use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
-    uses: Rc<RefCell<usize>>,
+    uses: Arc<RwLock<usize>>,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -27,14 +28,14 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
-            uses: Rc::new(RefCell::new(1)),
+            uses: Arc::new(RwLock::new(1)),
             vars_added_in_solving: Vec::new(),
         }
     }
 
     pub(crate) fn clone(&self) -> Self {
         let uses = self.uses.clone();
-        *uses.borrow_mut() += 1;
+        *uses.write().unwrap() += 1;
         ScipPtr {
             raw: self.raw,
             uses,
@@ -995,8 +996,8 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        *self.uses.borrow_mut() -= 1;
-        if *self.uses.borrow() > 0 {
+        *self.uses.write().unwrap() -= 1;
+        if *self.uses.read().unwrap() > 0 {
             return;
         }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
