@@ -1790,7 +1790,7 @@ mod tests {
 
     #[test]
     fn solution_after_model_drop() {
-        let mut model = create_model();
+        let model = create_model();
         let sol = model.solve().best_sol().unwrap(); // Temporary value returned from `model.solve()` is dropped.
         dbg!(sol);
     }
