@@ -3,28 +3,29 @@ use std::rc::Rc;
 
 use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
+use crate::scip::ScipPtr;
 
 /// A wrapper for a SCIP solution.
-#[derive(PartialEq, Eq)]
+
 pub struct Solution {
-    pub(crate) scip_ptr: *mut ffi::SCIP,
+    pub(crate) scip_ptr: ScipPtr,
     pub(crate) raw: *mut ffi::SCIP_SOL,
 }
 
 impl Solution {
     /// Returns the objective value of the solution.
     pub fn obj_val(&self) -> f64 {
-        unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr, self.raw) }
+        unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr.raw, self.raw) }
     }
 
     /// Returns the value of a variable in the solution.
     pub fn val(&self, var: Rc<Variable>) -> f64 {
-        unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var.raw) }
+        unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var.raw) }
     }
 
     /// Sets the value of a variable in the solution.
     pub fn set_val(&self, var: Rc<Variable>, val: f64) {
-        scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr, self.raw, var.raw, val));
+        scip_call_panic!(ffi::SCIPsetSolVal(self.scip_ptr.raw, self.raw, var.raw, val));
     }
 }
 
@@ -33,12 +34,12 @@ impl fmt::Debug for Solution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let obj_val = self.obj_val();
         writeln!(f, "Solution with obj val: {obj_val}")?;
-        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr) };
-        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr) };
+        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr.raw) };
+        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr.raw) };
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
-            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr, self.raw, var) };
-            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
             if val > eps || val < -eps {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
                 // from CString

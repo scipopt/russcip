@@ -1787,4 +1787,11 @@ mod tests {
         assert_eq!(second_solved.status(), Status::Optimal);
         assert!((second_solved.obj_val() - expected_obj).abs() <= 1e-6);
     }
+
+    #[test]
+    fn solution_after_model_drop() {
+        let mut model = create_model();
+        let sol = model.solve().best_sol().unwrap(); // Temporary value returned from `model.solve()` is dropped.
+        dbg!(sol);
+    }
 }

@@ -6,6 +6,7 @@ use crate::{
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -15,7 +16,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
-    consumed: bool,
+    uses: Rc<RefCell<usize>>,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -26,15 +27,17 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
-            consumed: false,
+            uses: Rc::new(RefCell::new(1)),
             vars_added_in_solving: Vec::new(),
         }
     }
 
     pub(crate) fn clone(&self) -> Self {
+        let uses = self.uses.clone();
+        *uses.borrow_mut() += 1;
         ScipPtr {
             raw: self.raw,
-            consumed: true,
+            uses,
             vars_added_in_solving: Vec::new(),
         }
     }
@@ -184,7 +187,7 @@ impl ScipPtr {
         let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
 
         Solution {
-            scip_ptr: self.raw,
+            scip_ptr: self.clone(),
             raw: sol,
         }
     }
@@ -489,7 +492,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         let sol = unsafe { sol.assume_init() };
         Ok(Solution {
-            scip_ptr: self.raw,
+            scip_ptr: self.clone(),
             raw: sol,
         })
     }
@@ -992,7 +995,8 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        if self.consumed {
+        *self.uses.borrow_mut() -= 1;
+        if *self.uses.borrow() > 0 {
             return;
         }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
