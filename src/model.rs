@@ -1739,18 +1739,18 @@ mod tests {
         assert_eq!(model.status(), Status::TimeLimit);
     }
 
-    // #[test]
-    // fn test_thread_safety() {
-    //     let statuses = (0..1000)
-    //         .into_par_iter()
-    //         .map(|_| {
-    //             let model = create_model().hide_output().solve();
-    //             model.status()
-    //         })
-    //         .collect::<Vec<_>>();
-    //
-    //     assert!(statuses.iter().all(|&s| s == Status::Optimal));
-    // }
+    #[test]
+    fn test_thread_safety() {
+        let statuses = (0..1000)
+            .into_par_iter()
+            .map(|_| {
+                let model = create_model().hide_output().solve();
+                model.status()
+            })
+            .collect::<Vec<_>>();
+
+        assert!(statuses.iter().all(|&s| s == Status::Optimal));
+    }
 
     #[test]
     fn set_param_all_states() {
