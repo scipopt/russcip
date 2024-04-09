@@ -1043,3 +1043,21 @@ impl Drop for ScipPtr {
         unsafe { ffi::SCIPfree(&mut self.raw) };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uses() {
+        let mut scip = ScipPtr::new();
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 1);
+        let scip2 = scip.clone();
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 2);
+        drop(scip2);
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 1);
+        let uses = scip.uses.clone();
+        drop(scip);
+        assert_eq!(uses.load(Ordering::Relaxed), 0);
+    }
+}
