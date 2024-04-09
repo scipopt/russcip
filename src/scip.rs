@@ -11,13 +11,14 @@ use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
-    uses: Arc<RwLock<usize>>,
+    uses: Arc<AtomicUsize>,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -28,14 +29,14 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
-            uses: Arc::new(RwLock::new(1)),
+            uses: Arc::new(AtomicUsize::new(1)),
             vars_added_in_solving: Vec::new(),
         }
     }
 
     pub(crate) fn clone(&self) -> Self {
         let uses = self.uses.clone();
-        *uses.write().unwrap() += 1;
+        uses.fetch_add(1, Ordering::Relaxed);
         ScipPtr {
             raw: self.raw,
             uses,
@@ -996,8 +997,8 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        *self.uses.write().unwrap() -= 1;
-        if *self.uses.read().unwrap() > 0 {
+        self.uses.fetch_sub(1, Ordering::Relaxed);
+        if self.uses.load(Ordering::Relaxed) > 0 {
             return;
         }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
