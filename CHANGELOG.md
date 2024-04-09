@@ -3,6 +3,7 @@
 # Unreleased
 ### Added
 ### Fixed
+- Reference counted ScipPtr.
 ### Changed
 ### Remove
 

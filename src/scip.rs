@@ -6,16 +6,19 @@ use crate::{
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
+
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
-    consumed: bool,
+    uses: Arc<AtomicUsize>,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -26,15 +29,17 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
-            consumed: false,
+            uses: Arc::new(AtomicUsize::new(1)),
             vars_added_in_solving: Vec::new(),
         }
     }
 
     pub(crate) fn clone(&self) -> Self {
+        let uses = self.uses.clone();
+        uses.fetch_add(1, Ordering::Relaxed);
         ScipPtr {
             raw: self.raw,
-            consumed: true,
+            uses,
             vars_added_in_solving: Vec::new(),
         }
     }
@@ -115,7 +120,7 @@ impl ScipPtr {
 
     pub(crate) fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
-        status.try_into().expect("Unknown SCIP status")
+        status.into()
     }
 
     pub(crate) fn print_version(&self) {
@@ -184,7 +189,7 @@ impl ScipPtr {
         let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
 
         Solution {
-            scip_ptr: self.raw,
+            scip_ptr: self.clone(),
             raw: sol,
         }
     }
@@ -489,7 +494,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         let sol = unsafe { sol.assume_init() };
         Ok(Solution {
-            scip_ptr: self.raw,
+            scip_ptr: self.clone(),
             raw: sol,
         })
     }
@@ -992,7 +997,8 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        if self.consumed {
+        self.uses.fetch_sub(1, Ordering::Relaxed);
+        if self.uses.load(Ordering::Relaxed) > 0 {
             return;
         }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
@@ -1035,5 +1041,23 @@ impl Drop for ScipPtr {
 
         // free SCIP instance
         unsafe { ffi::SCIPfree(&mut self.raw) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uses() {
+        let mut scip = ScipPtr::new();
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 1);
+        let scip2 = scip.clone();
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 2);
+        drop(scip2);
+        assert_eq!(scip.uses.load(Ordering::Relaxed), 1);
+        let uses = scip.uses.clone();
+        drop(scip);
+        assert_eq!(uses.load(Ordering::Relaxed), 0);
     }
 }
