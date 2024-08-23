@@ -536,13 +536,13 @@ impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving>)
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
     /// Creates a new solution initialized to zero.
-    fn create_sol(&mut self) -> Solution;
+    fn create_sol(&self) -> Solution;
 
     /// Adds a solution to the model
     ///
     /// # Returns
     /// A `Result` indicating whether the solution was added successfully.
-    fn add_sol(&self, sol: Solution) -> Result<(), SolError>;
+    fn add_sol(&self, sol: Solution<'_>) -> Result<(), SolError>;
 
     /// Adds a binary variable to the given set partitioning constraint.
     ///
@@ -724,7 +724,7 @@ macro_rules! impl_ProblemOrSolving {
         $(impl ProblemOrSolving for $t {
 
             /// Creates a new solution initialized to zero.
-            fn create_sol(&mut self) -> Solution {
+            fn create_sol(&self) -> Solution {
                 self.scip
                     .create_sol()
                     .expect("Failed to create solution in state ProblemCreated")
