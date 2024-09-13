@@ -847,8 +847,10 @@ impl ScipPtr {
                 if new_n_sols <= current_n_sols {
                     let heur_name =
                         unsafe { CStr::from_ptr(ffi::SCIPheurGetName(heur)).to_str().unwrap() };
-                    eprintln!("Heuristic {} returned result {:?}, but no solutions were added",
-                              heur_name, heur_res);
+                    eprintln!(
+                        "Heuristic {} returned result {:?}, but no solutions were added",
+                        heur_name, heur_res
+                    );
                     return Retcode::Error.into();
                 }
             }
