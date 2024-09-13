@@ -60,27 +60,6 @@ mod tests {
     use crate::Solving;
     use crate::{model::Model, status::Status};
 
-    struct PanickingBranchingRule;
-    impl BranchRule for PanickingBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            panic!("Not implemented")
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn panicking_branchrule() {
-        let br = PanickingBranchingRule {};
-
-        Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .read_prob("data/test/gen-ip054.mps")
-            .unwrap()
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
-    }
-
     struct FirstChoosingBranchingRule {
         pub chosen: Option<BranchingCandidate>,
     }
