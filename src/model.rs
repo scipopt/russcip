@@ -1157,6 +1157,12 @@ impl<T> Model<T> {
         Ok(self)
     }
 
+    /// Sets a SCIP boolean parameter and returns a new `Model` instance with the parameter set.
+    pub fn set_bool_param(mut self, param: &str, value: bool) -> Result<Self, Retcode> {
+        self.scip.set_bool_param(param, value)?;
+        Ok(self)
+    }
+
     /// Sets a SCIP integer parameter and returns a new `Model` instance with the parameter set.
     pub fn set_int_param(mut self, param: &str, value: i32) -> Result<Self, Retcode> {
         self.scip.set_int_param(param, value)?;
@@ -1713,6 +1719,14 @@ mod tests {
     #[test]
     fn print_version() {
         Model::new().print_version();
+    }
+
+    #[test]
+    fn set_bool_param() {
+        Model::new()
+            .hide_output()
+            .set_bool_param("display/allviols", true)
+            .unwrap();
     }
 
     #[test]

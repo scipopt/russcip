@@ -46,6 +46,12 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn set_bool_param(&mut self, param: &str, value: bool) -> Result<(), Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
+        Ok(())
+    }
+
     pub(crate) fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
@@ -743,7 +749,9 @@ impl ScipPtr {
 
             if pricing_res.state == PricerResultState::FoundColumns {
                 let n_vars_after = unsafe { ffi::SCIPgetNVars(scip) };
-                assert!(n_vars_before < n_vars_after);
+                if n_vars_before >= n_vars_after {
+                    return Retcode::Error.into();
+                }
             }
 
             unsafe { *result = pricing_res.state.into() };
@@ -847,10 +855,11 @@ impl ScipPtr {
                 if new_n_sols <= current_n_sols {
                     let heur_name =
                         unsafe { CStr::from_ptr(ffi::SCIPheurGetName(heur)).to_str().unwrap() };
-                    panic!(
+                    eprintln!(
                         "Heuristic {} returned result {:?}, but no solutions were added",
                         heur_name, heur_res
                     );
+                    return Retcode::Error.into();
                 }
             }
 
