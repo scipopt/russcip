@@ -6,12 +6,13 @@ use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
 #[derive(PartialEq, Eq)]
-pub struct Solution {
+pub struct Solution<'a> {
     pub(crate) scip_ptr: *mut ffi::SCIP,
     pub(crate) raw: *mut ffi::SCIP_SOL,
+    pub(crate) pd: std::marker::PhantomData<fn() -> &'a ()>, //covariant
 }
 
-impl Solution {
+impl Solution<'_> {
     /// Returns the objective value of the solution.
     pub fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr, self.raw) }
@@ -28,7 +29,7 @@ impl Solution {
     }
 }
 
-impl fmt::Debug for Solution {
+impl fmt::Debug for Solution<'_> {
     /// Formats the solution for debugging purposes.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let obj_val = self.obj_val();

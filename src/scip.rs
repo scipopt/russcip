@@ -186,12 +186,13 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
-    pub(crate) fn best_sol(&self) -> Solution {
+    pub(crate) fn best_sol(&self) -> Solution<'_> {
         let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
 
         Solution {
             scip_ptr: self.raw,
             raw: sol,
+            pd: Default::default(),
         }
     }
 
@@ -497,6 +498,7 @@ impl ScipPtr {
         Ok(Solution {
             scip_ptr: self.raw,
             raw: sol,
+            pd: Default::default(),
         })
     }
 
