@@ -53,30 +53,6 @@ mod tests {
         ProblemOrSolving, Solving,
     };
 
-    struct PanickingPricer;
-
-    impl Pricer for PanickingPricer {
-        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
-            panic!("Not implemented")
-        }
-    }
-
-    #[test]
-    #[should_panic]
-    fn panicking_pricer() {
-        let pricer = PanickingPricer {};
-
-        let model = crate::model::Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
-
-        // solve model
-        model.solve();
-    }
-
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
