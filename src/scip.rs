@@ -46,6 +46,12 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn set_bool_param(&mut self, param: &str, value: bool) -> Result<(), Retcode> {
+        let param = CString::new(param).unwrap();
+        scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
+        Ok(())
+    }
+
     pub(crate) fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
