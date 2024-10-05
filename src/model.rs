@@ -1809,4 +1809,13 @@ mod tests {
         assert_eq!(second_solved.status(), Status::Optimal);
         assert!((second_solved.obj_val() - expected_obj).abs() <= 1e-6);
     }
+
+    #[test]
+    fn best_bound() {
+        let model= create_model();
+        let solved_model = model.solve();
+        let best_bound = solved_model.best_bound();
+        let obj_val = solved_model.obj_val();
+        assert!((best_bound- obj_val) < 1e-6);
+    }
 }
