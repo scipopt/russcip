@@ -1812,10 +1812,10 @@ mod tests {
 
     #[test]
     fn best_bound() {
-        let model= create_model();
+        let model = create_model();
         let solved_model = model.solve();
         let best_bound = solved_model.best_bound();
         let obj_val = solved_model.obj_val();
-        assert!((best_bound- obj_val) < 1e-6);
+        assert!((best_bound - obj_val) < 1e-6);
     }
 }
