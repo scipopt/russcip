@@ -1046,6 +1046,9 @@ pub trait WithSolvingStats {
     /// Returns the objective value of the best solution found by the optimization model.
     fn obj_val(&self) -> f64;
 
+    /// Returns the best bound (dualbound) proven so far.
+    fn best_bound(&self) -> f64;
+
     /// Returns the number of nodes explored by the optimization model.
     fn n_nodes(&self) -> usize;
 
@@ -1063,6 +1066,11 @@ macro_rules! impl_WithSolvingStats {
             /// Returns the objective value of the best solution found by the optimization model.
             fn obj_val(&self) -> f64 {
                 self.scip.obj_val()
+            }
+
+            /// Returns the best bound (dualbound) proven so far.
+            fn best_bound(&self) -> f64 {
+                self.scip.best_bound()
             }
 
             /// Returns the number of nodes explored by the optimization model.
