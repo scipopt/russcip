@@ -200,6 +200,10 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetPrimalbound(self.raw) }
     }
 
+    pub(crate) fn best_bound(&self) -> f64 {
+        unsafe { ffi::SCIPgetDualbound(self.raw) }
+    }
+
     pub(crate) fn create_var(
         &mut self,
         lb: f64,
