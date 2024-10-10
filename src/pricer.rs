@@ -67,14 +67,15 @@ mod tests {
     #[test]
     #[should_panic]
     fn nothing_pricer() {
-        let pricer = LyingPricer {};
+        let mut pricer = LyingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
+            .unwrap();
+
+        model.include_pricer("", "", 9999999, false, &mut pricer);
 
         model.solve();
     }
@@ -94,14 +95,15 @@ mod tests {
     #[should_panic]
     /// Stops pricing early then throws an error that no branching can be performed
     fn early_stopping_pricer() {
-        let pricer = EarlyStoppingPricer {};
+        let mut pricer = EarlyStoppingPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
+            .unwrap();
+
+        model.include_pricer("", "", 9999999, false, &mut pricer);
 
         model.solve();
     }
@@ -119,14 +121,15 @@ mod tests {
 
     #[test]
     fn optimal_pricer() {
-        let pricer = OptimalPricer {};
+        let mut pricer = OptimalPricer {};
 
         let model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
+            .unwrap();
+
+        model.include_pricer("", "", 9999999, false, &mut pricer);
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
@@ -139,13 +142,13 @@ mod tests {
         c: Option<isize>,
     }
 
-    struct AddSameColumnPricer {
+    struct AddSameColumnPricer<'a> {
         added: bool,
-        model: Model<Solving>,
+        model: Model<Solving<'a>>,
         data: ComplexData,
     }
 
-    impl Pricer for AddSameColumnPricer {
+    impl Pricer for AddSameColumnPricer<'_> {
         fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
             assert!(self.data.a == (0..1000).collect::<Vec<usize>>());
             if self.added {
@@ -186,7 +189,7 @@ mod tests {
             model.set_cons_modifiable(c, true);
         }
 
-        let pricer = AddSameColumnPricer {
+        let mut pricer = AddSameColumnPricer {
             added: false,
             model: model.clone_for_plugins(),
             data: ComplexData {
@@ -196,9 +199,8 @@ mod tests {
             },
         };
 
-        let solved = model
-            .include_pricer("", "", 9999999, false, Box::new(pricer))
-            .solve();
+        model.include_pricer("", "", 9999999, false, &mut pricer);
+        let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
     }
 }

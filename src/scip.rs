@@ -636,21 +636,24 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn include_branch_rule(
-        &self,
+    pub(crate) fn include_branch_rule<'a, BR>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: Box<dyn BranchRule>,
-    ) -> Result<(), Retcode> {
+        rule: &'a mut BR,
+    ) -> Result<(), Retcode>
+    where
+        BR: BranchRule,
+    {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
         // TODO: Add rest of branching rule plugin callbacks
 
-        extern "C" fn branchexeclp(
+        extern "C" fn branchexeclp<BR: BranchRule>(
             scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
             _: u32,
@@ -658,7 +661,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
+            let rule_ptr = data_ptr as *mut BR;
             let cands = ScipPtr::lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
@@ -677,17 +680,7 @@ impl ScipPtr {
             Retcode::Okay.into()
         }
 
-        extern "C" fn branchfree(
-            _scip: *mut ffi::SCIP,
-            branchrule: *mut ffi::SCIP_BRANCHRULE,
-        ) -> ffi::SCIP_Retcode {
-            let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
-            assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn BranchRule>) });
-            Retcode::Okay.into()
-        }
-
-        let rule_ptr = Box::into_raw(Box::new(rule));
+        let rule_ptr = rule as *mut BR;
         let branchrule_faker = rule_ptr as *mut ffi::SCIP_BranchruleData;
 
         scip_call!(ffi::SCIPincludeBranchrule(
@@ -698,12 +691,12 @@ impl ScipPtr {
             maxdepth,
             maxbounddist,
             None,
-            Some(branchfree),
             None,
             None,
             None,
             None,
-            Some(branchexeclp),
+            None,
+            Some(branchexeclp::<BR>),
             None,
             None,
             branchrule_faker,
@@ -712,28 +705,34 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn include_pricer(
-        &self,
+    pub(crate) fn include_pricer<'a, P>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: Box<dyn Pricer>,
-    ) -> Result<(), Retcode> {
+        pricer: &'a mut P,
+    ) -> Result<(), Retcode>
+    where
+        P: Pricer,
+    {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
-        pub(crate) fn call_pricer(
+        pub(crate) fn call_pricer<P>(
             scip: *mut ffi::SCIP,
             pricer: *mut ffi::SCIP_PRICER,
             lowerbound: *mut f64,
             stopearly: *mut ::std::os::raw::c_uint,
             result: *mut ffi::SCIP_RESULT,
             farkas: bool,
-        ) -> ffi::SCIP_Retcode {
+        ) -> ffi::SCIP_Retcode
+        where
+            P: Pricer,
+        {
             let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
             assert!(!data_ptr.is_null());
-            let pricer_ptr = data_ptr as *mut Box<dyn Pricer>;
+            let pricer_ptr = data_ptr as *mut P;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
@@ -762,22 +761,28 @@ impl ScipPtr {
             Retcode::Okay.into()
         }
 
-        unsafe extern "C" fn pricerredcost(
+        unsafe extern "C" fn pricerredcost<P>(
             scip: *mut ffi::SCIP,
             pricer: *mut ffi::SCIP_PRICER,
             lowerbound: *mut f64,
             stopearly: *mut ::std::os::raw::c_uint,
             result: *mut ffi::SCIP_RESULT,
-        ) -> ffi::SCIP_Retcode {
-            call_pricer(scip, pricer, lowerbound, stopearly, result, false)
+        ) -> ffi::SCIP_Retcode
+        where
+            P: Pricer,
+        {
+            call_pricer::<P>(scip, pricer, lowerbound, stopearly, result, false)
         }
 
-        unsafe extern "C" fn pricerfakas(
+        unsafe extern "C" fn pricerfakas<P>(
             scip: *mut ffi::SCIP,
             pricer: *mut ffi::SCIP_PRICER,
             result: *mut ffi::SCIP_RESULT,
-        ) -> ffi::SCIP_Retcode {
-            call_pricer(
+        ) -> ffi::SCIP_Retcode
+        where
+            P: Pricer,
+        {
+            call_pricer::<P>(
                 scip,
                 pricer,
                 std::ptr::null_mut(),
@@ -787,17 +792,7 @@ impl ScipPtr {
             )
         }
 
-        unsafe extern "C" fn pricerfree(
-            _scip: *mut ffi::SCIP,
-            pricer: *mut ffi::SCIP_PRICER,
-        ) -> ffi::SCIP_Retcode {
-            let data_ptr = unsafe { ffi::SCIPpricerGetData(pricer) };
-            assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Pricer>) });
-            Retcode::Okay.into()
-        }
-
-        let pricer_ptr = Box::into_raw(Box::new(pricer));
+        let pricer_ptr = pricer as *mut P;
         let pricer_faker = pricer_ptr as *mut ffi::SCIP_PricerData;
 
         scip_call!(ffi::SCIPincludePricer(
@@ -807,13 +802,13 @@ impl ScipPtr {
             priority,
             delay.into(),
             None,
-            Some(pricerfree),
             None,
             None,
             None,
             None,
-            Some(pricerredcost),
-            Some(pricerfakas),
+            None,
+            Some(pricerredcost::<P>),
+            Some(pricerfakas::<P>),
             pricer_faker,
         ));
 
@@ -824,8 +819,8 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn include_heur(
-        &self,
+    pub(crate) fn include_heur<'a, H>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
@@ -835,21 +830,27 @@ impl ScipPtr {
         maxdepth: i32,
         timing: HeurTiming,
         usessubscip: bool,
-        heur: Box<dyn Heuristic>,
-    ) -> Result<(), Retcode> {
+        heur: &'a mut H,
+    ) -> Result<(), Retcode>
+    where
+        H: Heuristic,
+    {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
-        extern "C" fn heurexec(
+        extern "C" fn heurexec<H>(
             scip: *mut ffi::SCIP,
             heur: *mut ffi::SCIP_HEUR,
             heurtiming: ffi::SCIP_HEURTIMING,
             nodeinfeasible: ::std::os::raw::c_uint,
             result: *mut ffi::SCIP_RESULT,
-        ) -> ffi::SCIP_RETCODE {
+        ) -> ffi::SCIP_RETCODE
+        where
+            H: Heuristic,
+        {
             let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut Box<dyn Heuristic>;
+            let rule_ptr = data_ptr as *mut H;
 
             let current_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
             let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0) };
@@ -871,17 +872,7 @@ impl ScipPtr {
             Retcode::Okay.into()
         }
 
-        extern "C" fn heurfree(
-            _scip: *mut ffi::SCIP,
-            heur: *mut ffi::SCIP_HEUR,
-        ) -> ffi::SCIP_Retcode {
-            let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
-            assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heuristic>) });
-            Retcode::Okay.into()
-        }
-
-        let ptr = Box::into_raw(Box::new(heur));
+        let ptr = heur as *mut H;
         let heur_faker = ptr as *mut ffi::SCIP_HEURDATA;
 
         scip_call!(ffi::SCIPincludeHeur(
@@ -896,12 +887,12 @@ impl ScipPtr {
             timing.into(),
             usessubscip.into(),
             None,
-            Some(heurfree),
             None,
             None,
             None,
             None,
-            Some(heurexec),
+            None,
+            Some(heurexec::<H>),
             heur_faker,
         ));
 
@@ -975,7 +966,7 @@ impl ScipPtr {
         }
     }
 
-    pub(crate) fn create_child(&mut self) -> Result<Node, Retcode> {
+    pub(crate) fn create_child(&self) -> Result<Node, Retcode> {
         let mut node_ptr = MaybeUninit::uninit();
         scip_call!(ffi::SCIPcreateChild(
             self.raw,
