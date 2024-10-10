@@ -38,7 +38,8 @@ pub struct ProblemCreated {
 
 /// Represents the state of an optimization model during the solving process (to be used in plugins).
 #[derive(Debug)]
-pub struct Solving {
+pub struct Solving<'a> {
+    pd: std::marker::PhantomData<&'a ()>,
     pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
     pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
 }
@@ -135,6 +136,7 @@ impl Model<ProblemCreated> {
         Model {
             scip: self.scip.clone(),
             state: Solving {
+                pd: Default::default(),
                 vars: self.state.vars.clone(),
                 conss: self.state.conss.clone(),
             },
@@ -209,19 +211,18 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method will panic if the inclusion of the branching rule fails. This can happen if another branching rule with the same name already exists.
-    pub fn include_branch_rule(
-        self,
+    pub fn include_branch_rule<'a, BR: BranchRule>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: Box<dyn BranchRule>,
-    ) -> Self {
+        rule: &'a mut BR,
+    ) {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
-        self
     }
 
     /// Include a new primal heuristic in the model.
@@ -242,8 +243,8 @@ impl Model<ProblemCreated> {
     /// # Returns
     ///
     /// This function returns the `Model` instance for which the heuristic was included. This allows for method chaining.
-    pub fn include_heur(
-        self,
+    pub fn include_heur<'a, H>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
@@ -253,8 +254,10 @@ impl Model<ProblemCreated> {
         maxdepth: i32,
         timing: HeurTiming,
         usessubscip: bool,
-        heur: Box<dyn Heuristic>,
-    ) -> Self {
+        heur: &'a mut H,
+    ) where
+        H: Heuristic,
+    {
         self.scip
             .include_heur(
                 name,
@@ -269,7 +272,6 @@ impl Model<ProblemCreated> {
                 heur,
             )
             .expect("Failed to include heuristic at state ProblemCreated");
-        self
     }
 
     /// Includes a new event handler in the model.
@@ -307,18 +309,19 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method will panic if the inclusion of the pricer fails. This can happen if another pricer with the same name already exists.
-    pub fn include_pricer(
-        self,
+    pub fn include_pricer<'a, P>(
+        &'a self,
         name: &str,
         desc: &str,
         priority: i32,
         delay: bool,
-        pricer: Box<dyn Pricer>,
-    ) -> Self {
+        pricer: &'a mut P,
+    ) where
+        P: Pricer,
+    {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)
             .expect("Failed to include pricer at state ProblemCreated");
-        self
     }
 
     /// Solves the model and returns a new `Model` instance with a `Solved` state.
@@ -344,7 +347,7 @@ impl Model<ProblemCreated> {
     }
 }
 
-impl Model<Solving> {
+impl Model<Solving<'_>> {
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -396,7 +399,7 @@ impl Model<Solving> {
     /// # Panics
     ///
     /// This method panics if not called from plugins implementations.
-    pub fn create_child(&mut self) -> Node {
+    pub fn create_child(&self) -> Node {
         self.scip
             .create_child()
             .expect("Failed to create child node in state ProblemCreated")
@@ -531,7 +534,7 @@ macro_rules! impl_ModelWithProblem {
     }
 }
 
-impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving>);
+impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving<'_>>);
 
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
@@ -1006,7 +1009,7 @@ macro_rules! impl_ProblemOrSolving {
     }
 }
 
-impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving>);
+impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving<'_>>);
 
 /// A trait for optimization models with any state that might have solutions.
 pub trait WithSolutions {
@@ -1039,7 +1042,7 @@ macro_rules! impl_WithSolutions {
     }
 }
 
-impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+impl_WithSolutions!(for Model<Solved>, Model<Solving<'_>>, Model<ProblemCreated>);
 
 /// A trait for optimization models with any state that might have solving statistics.
 pub trait WithSolvingStats {
@@ -1092,7 +1095,7 @@ macro_rules! impl_WithSolvingStats {
     }
 }
 
-impl_WithSolvingStats!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+impl_WithSolvingStats!(for Model<Solved>, Model<Solving<'_>>, Model<ProblemCreated>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.

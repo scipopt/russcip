@@ -45,11 +45,11 @@ mod tests {
         model::{Model, Solving},
     };
 
-    struct NodeDataBranchRule {
-        model: Model<Solving>,
+    struct NodeDataBranchRule<'a> {
+        model: Model<Solving<'a>>,
     }
 
-    impl BranchRule for NodeDataBranchRule {
+    impl BranchRule for NodeDataBranchRule<'_> {
         fn execute(
             &mut self,
             candidates: Vec<crate::branchrule::BranchingCandidate>,
@@ -78,12 +78,11 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let br = NodeDataBranchRule {
+        let mut br = NodeDataBranchRule {
             model: model.clone_for_plugins(),
         };
 
-        model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+        model.include_branch_rule("", "", 100000, 1000, 1., &mut br);
+        model.solve();
     }
 }
