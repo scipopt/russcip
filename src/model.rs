@@ -549,7 +549,7 @@ pub trait ProblemOrSolving {
     ///
     /// # Returns
     /// A `Result` indicating whether the solution was added successfully.
-    fn add_sol(&self, sol: Solution<'_>) -> Result<(), SolError>;
+    fn add_sol(&self, sol: Solution) -> Result<(), SolError>;
 
     /// Adds a binary variable to the given set partitioning constraint.
     ///
@@ -732,9 +732,13 @@ macro_rules! impl_ProblemOrSolving {
 
             /// Creates a new solution initialized to zero.
             fn create_sol(&self) -> Solution {
-                self.scip
+                let sol_ptr = self.scip
                     .create_sol()
-                    .expect("Failed to create solution in state ProblemCreated")
+                    .expect("Failed to create solution in state ProblemCreated");
+                Solution {
+                    scip_ptr: self.scip.clone(),
+                    raw: sol_ptr,
+                }
             }
 
             /// Adds a solution to the model
@@ -1031,7 +1035,11 @@ macro_rules! impl_WithSolutions {
             /// Returns the best solution for the optimization model, if one exists.
             fn best_sol(&self) -> Option<Solution> {
                 if self.n_sols() > 0 {
-                    Some(self.scip.best_sol())
+                    let sol = Solution {
+                        scip_ptr: self.scip.clone(),
+                        raw: self.scip.best_sol(),
+                    };
+                    Some(sol)
                 } else {
                     None
                 }

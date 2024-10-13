@@ -10,6 +10,7 @@ use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
+use scip_sys::SCIP_SOL;
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -176,14 +177,8 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
-    pub(crate) fn best_sol(&self) -> Solution<'_> {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
-
-        Solution {
-            scip_ptr: self.raw,
-            raw: sol,
-            pd: Default::default(),
-        }
+    pub(crate) fn best_sol(&self) -> *mut SCIP_SOL {
+        unsafe { ffi::SCIPgetBestSol(self.raw) }
     }
 
     pub(crate) fn obj_val(&self) -> f64 {
@@ -485,15 +480,11 @@ impl ScipPtr {
     }
 
     /// Create solution
-    pub(crate) fn create_sol(&self) -> Result<Solution, Retcode> {
+    pub(crate) fn create_sol(&self) -> Result<*mut SCIP_SOL, Retcode> {
         let mut sol = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         let sol = unsafe { sol.assume_init() };
-        Ok(Solution {
-            scip_ptr: self.raw,
-            raw: sol,
-            pd: Default::default(),
-        })
+        Ok(sol)
     }
 
     /// Add coefficient to set packing/partitioning/covering constraint
