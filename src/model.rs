@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -17,7 +18,7 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct Model<State> {
-    scip: ScipPtr,
+    scip: Arc<ScipPtr>,
     state: State,
 }
 
@@ -62,7 +63,7 @@ impl Model<Unsolved> {
     pub fn try_new() -> Result<Self, Retcode> {
         let scip_ptr = ScipPtr::new();
         Ok(Model {
-            scip: scip_ptr,
+            scip: Arc::new(scip_ptr),
             state: Unsolved {},
         })
     }
@@ -78,12 +79,13 @@ impl Model<PluginsIncluded> {
     /// # Panics
     ///
     /// This method panics if the problem cannot be created in the current state.
+    #[allow(unused_mut)]
     pub fn create_prob(mut self, name: &str) -> Model<ProblemCreated> {
-        self.scip
-            .create_prob(name)
+        let mut scip = self.scip.clone();
+        scip.create_prob(name)
             .expect("Failed to create problem in state PluginsIncluded");
         Model {
-            scip: self.scip,
+            scip,
             state: ProblemCreated {
                 vars: Rc::new(RefCell::new(BTreeMap::new())),
                 conss: Rc::new(RefCell::new(Vec::new())),
@@ -100,8 +102,10 @@ impl Model<PluginsIncluded> {
     /// # Errors
     ///
     /// This method returns a `Retcode` error if the problem cannot be read from the file.
+    #[allow(unused_mut)]
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
-        self.scip.read_prob(filename)?;
+        let scip = self.scip.clone();
+        scip.read_prob(filename)?;
         let vars = Rc::new(RefCell::new(self.scip.vars()));
         let conss = Rc::new(RefCell::new(self.scip.conss()));
         let new_model = Model {
@@ -123,9 +127,10 @@ impl Model<ProblemCreated> {
     ///
     /// This method panics if the objective sense cannot be set in the current state.
     pub fn set_obj_sense(mut self, sense: ObjSense) -> Self {
-        self.scip
-            .set_obj_sense(sense)
+        let scip = self.scip.clone();
+        scip.set_obj_sense(sense)
             .expect("Failed to set objective sense in state ProblemCreated");
+        self.scip = scip;
         self
     }
 
@@ -149,6 +154,7 @@ impl Model<ProblemCreated> {
     }
 
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
+    #[allow(unused_mut)]
     pub fn set_obj_integral(mut self) -> Self {
         self.scip
             .set_obj_integral()
@@ -330,6 +336,7 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method panics if the problem cannot be solved in the current state.
+    #[allow(unused_mut)]
     pub fn solve(mut self) -> Model<Solved> {
         self.scip
             .solve()
@@ -1117,6 +1124,7 @@ impl<T> Model<T> {
     }
 
     /// Hides the output of the optimization model by setting the `display/verblevel` parameter to 0.
+    #[allow(unused_mut)]
     pub fn hide_output(mut self) -> Self {
         self.scip
             .set_int_param("display/verblevel", 0)
@@ -1129,6 +1137,7 @@ impl<T> Model<T> {
     /// # Arguments
     ///
     /// * `time_limit` - The time limit in seconds.
+    #[allow(unused_mut)]
     pub fn set_time_limit(mut self, time_limit: usize) -> Self {
         self.scip
             .set_real_param("limits/time", time_limit as f64)
@@ -1141,6 +1150,7 @@ impl<T> Model<T> {
     /// # Arguments
     ///
     /// * `memory_limit` - The memory limit in MB.
+    #[allow(unused_mut)]
     pub fn set_memory_limit(mut self, memory_limit: usize) -> Self {
         self.scip
             .set_real_param("limits/memory", memory_limit as f64)
@@ -1149,6 +1159,7 @@ impl<T> Model<T> {
     }
 
     /// Includes all default plugins in the SCIP instance and returns a new `Model` instance with a `PluginsIncluded` state.
+    #[allow(unused_mut)]
     pub fn include_default_plugins(mut self) -> Model<PluginsIncluded> {
         self.scip
             .include_default_plugins()
@@ -1160,36 +1171,42 @@ impl<T> Model<T> {
     }
 
     /// Sets a SCIP string parameter and returns a new `Model` instance with the parameter set.
+    #[allow(unused_mut)]
     pub fn set_str_param(mut self, param: &str, value: &str) -> Result<Self, Retcode> {
         self.scip.set_str_param(param, value)?;
         Ok(self)
     }
 
     /// Sets a SCIP boolean parameter and returns a new `Model` instance with the parameter set.
+    #[allow(unused_mut)]
     pub fn set_bool_param(mut self, param: &str, value: bool) -> Result<Self, Retcode> {
         self.scip.set_bool_param(param, value)?;
         Ok(self)
     }
 
     /// Sets a SCIP integer parameter and returns a new `Model` instance with the parameter set.
+    #[allow(unused_mut)]
     pub fn set_int_param(mut self, param: &str, value: i32) -> Result<Self, Retcode> {
         self.scip.set_int_param(param, value)?;
         Ok(self)
     }
 
     /// Sets a SCIP long integer parameter and returns a new `Model` instance with the parameter set.
+    #[allow(unused_mut)]
     pub fn set_longint_param(mut self, param: &str, value: i64) -> Result<Self, Retcode> {
         self.scip.set_longint_param(param, value)?;
         Ok(self)
     }
 
     /// Sets a SCIP real parameter and returns a new `Model` instance with the parameter set.
+    #[allow(unused_mut)]
     pub fn set_real_param(mut self, param: &str, value: f64) -> Result<Self, Retcode> {
         self.scip.set_real_param(param, value)?;
         Ok(self)
     }
 
     /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
+    #[allow(unused_mut)]
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
         self.scip
             .set_presolving(presolving)
@@ -1198,6 +1215,7 @@ impl<T> Model<T> {
     }
 
     /// Sets the separating parameter of the SCIP instance and returns the same `Model` instance.
+    #[allow(unused_mut)]
     pub fn set_separating(mut self, separating: ParamSetting) -> Self {
         self.scip
             .set_separating(separating)
@@ -1206,6 +1224,7 @@ impl<T> Model<T> {
     }
 
     /// Sets the heuristics parameter of the SCIP instance and returns the same `Model` instance.
+    #[allow(unused_mut)]
     pub fn set_heuristics(mut self, heuristics: ParamSetting) -> Self {
         self.scip
             .set_heuristics(heuristics)
