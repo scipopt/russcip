@@ -6,11 +6,11 @@ use crate::{
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
+use scip_sys::SCIP_SOL;
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
-use scip_sys::SCIP_SOL;
 
 #[non_exhaustive]
 #[derive(Debug)]
