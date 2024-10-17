@@ -112,7 +112,7 @@ impl ScipPtr {
 
     pub(crate) fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
-        status.try_into().expect("Unknown SCIP status")
+        status.into()
     }
 
     pub(crate) fn print_version(&self) {
