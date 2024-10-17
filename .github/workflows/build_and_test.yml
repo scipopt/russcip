@@ -63,7 +63,7 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly  
-          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
 
 # TODO: make this work with a manual run of the action
 #  publish-crate:
