@@ -1037,7 +1037,7 @@ macro_rules! impl_WithSolutions {
                 if self.n_sols() > 0 {
                     let sol = Solution {
                         scip_ptr: self.scip.clone(),
-                        raw: self.scip.best_sol(),
+                        raw: self.scip.best_sol().unwrap(),
                     };
                     Some(sol)
                 } else {

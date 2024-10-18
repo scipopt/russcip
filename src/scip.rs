@@ -177,8 +177,11 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
-    pub(crate) fn best_sol(&self) -> *mut SCIP_SOL {
-        unsafe { ffi::SCIPgetBestSol(self.raw) }
+    pub(crate) fn best_sol(&self) -> Option<*mut SCIP_SOL> {
+        if self.n_sols() == 0 {
+            return None;
+        }
+        Some(unsafe { ffi::SCIPgetBestSol(self.raw) })
     }
 
     pub(crate) fn obj_val(&self) -> f64 {
