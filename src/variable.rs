@@ -1,6 +1,8 @@
 use crate::ffi;
 use core::panic;
+use std::sync::Arc;
 use scip_sys::SCIP_Status;
+use crate::scip::ScipPtr;
 
 /// A type alias for a variable ID.
 pub type VarId = usize;
@@ -8,6 +10,7 @@ pub type VarId = usize;
 /// A wrapper for a mutable reference to a SCIP variable.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Variable {
+    pub(crate) scip_ptr: Arc<ScipPtr>,
     pub(crate) raw: *mut ffi::SCIP_VAR,
 }
 

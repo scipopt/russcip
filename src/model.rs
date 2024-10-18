@@ -106,7 +106,18 @@ impl Model<PluginsIncluded> {
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
-        let vars = Rc::new(RefCell::new(self.scip.vars()));
+        let vars = Rc::new(RefCell::new(
+            self.scip.vars().into_iter()
+                .map(|(id, v)|
+                         (id,
+                          Rc::new(
+                              Variable {
+                                  scip_ptr: self.scip.clone(),
+                                  raw: v,
+                              }
+                          )
+                )).collect()
+        ));
         let conss = Rc::new(RefCell::new(self.scip.conss()));
         let new_model = Model {
             scip: self.scip,
@@ -191,8 +202,11 @@ impl Model<ProblemCreated> {
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
+        let var = Rc::new(Variable {
+            scip_ptr: self.scip.clone(),
+            raw: var,
+        });
         let var_id = var.index();
-        let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
@@ -381,8 +395,11 @@ impl Model<Solving> {
             .scip
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
+        let var = Rc::new(Variable {
+            scip_ptr: self.scip.clone(),
+            raw: var,
+        });
         let var_id = var.index();
-        let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
@@ -434,7 +451,10 @@ impl Model<Solving> {
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Rc::new(var);
+        let var = Rc::new(Variable {
+            scip_ptr: self.scip.clone(),
+            raw: var,
+        });
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var

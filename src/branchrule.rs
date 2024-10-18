@@ -45,8 +45,8 @@ impl From<BranchingResult> for SCIP_Result {
 /// A candidate for branching.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BranchingCandidate {
-    /// The variable to branch on.
-    pub var: Rc<Variable>,
+    /// The id of a variable to branch on.
+    pub var_id: usize,
     /// The LP solution value of the variable.
     pub lp_sol_val: f64,
     /// The fractional part of the LP solution value of the variable.
