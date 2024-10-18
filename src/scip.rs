@@ -620,21 +620,21 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn include_branch_rule(
+    pub(crate) fn include_branch_rule<T: BranchRule>(
         &self,
         name: &str,
         desc: &str,
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: Box<dyn BranchRule>,
+        rule: T,
     ) -> Result<(), Retcode> {
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
         // TODO: Add rest of branching rule plugin callbacks
 
-        extern "C" fn branchexeclp(
+        extern "C" fn branchexeclp<T: BranchRule>(
             scip: *mut ffi::SCIP,
             branchrule: *mut ffi::SCIP_BRANCHRULE,
             _: u32,
@@ -642,7 +642,7 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
+            let rule_ptr = data_ptr as *mut T;
             let cands = ScipPtr::lp_branching_cands(scip);
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
@@ -687,7 +687,7 @@ impl ScipPtr {
             None,
             None,
             None,
-            Some(branchexeclp),
+            Some(branchexeclp::<T>),
             None,
             None,
             branchrule_faker,

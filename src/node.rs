@@ -83,7 +83,7 @@ mod tests {
         };
 
         model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
+            .include_branch_rule("", "", 100000, 1000, 1., br)
             .solve();
     }
 }

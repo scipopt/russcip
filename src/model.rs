@@ -215,14 +215,14 @@ impl Model<ProblemCreated> {
     /// # Panics
     ///
     /// This method will panic if the inclusion of the branching rule fails. This can happen if another branching rule with the same name already exists.
-    pub fn include_branch_rule(
+    pub fn include_branch_rule<T: BranchRule>(
         self,
         name: &str,
         desc: &str,
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
-        rule: Box<dyn BranchRule>,
+        rule: T,
     ) -> Self {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
