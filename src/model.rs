@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -18,7 +17,7 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct Model<State> {
-    scip: Arc<ScipPtr>,
+    scip: Rc<ScipPtr>,
     state: State,
 }
 
@@ -63,7 +62,7 @@ impl Model<Unsolved> {
     pub fn try_new() -> Result<Self, Retcode> {
         let scip_ptr = ScipPtr::new();
         Ok(Model {
-            scip: Arc::new(scip_ptr),
+            scip: Rc::new(scip_ptr),
             state: Unsolved {},
         })
     }

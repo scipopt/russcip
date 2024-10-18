@@ -1,6 +1,5 @@
 use std::fmt;
 use std::rc::Rc;
-use std::sync::Arc;
 
 use crate::scip::ScipPtr;
 use crate::variable::Variable;
@@ -8,7 +7,7 @@ use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
 pub struct Solution {
-    pub(crate) scip_ptr: Arc<ScipPtr>,
+    pub(crate) scip_ptr: Rc<ScipPtr>,
     pub(crate) raw: *mut ffi::SCIP_SOL,
 }
 
