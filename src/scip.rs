@@ -9,7 +9,7 @@ use core::panic;
 use scip_sys::SCIP_SOL;
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
-use std::mem::MaybeUninit;
+use std::mem::{forget, MaybeUninit};
 use std::rc::Rc;
 
 #[non_exhaustive]
@@ -642,10 +642,11 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
-            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
             let cands = ScipPtr::lp_branching_cands(scip);
-            let branching_res = unsafe { (*rule_ptr).execute(cands) };
-
+            let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
+            let mut rule_box = unsafe { Box::from_raw(rule_ptr) };
+            let branching_res = rule_box.execute(cands) ;
+            forget(rule_box);
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
                 ScipPtr::branch_var_val(scip, cand.var.raw, cand.lp_sol_val).unwrap();
             };
