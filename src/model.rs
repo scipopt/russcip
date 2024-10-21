@@ -106,7 +106,18 @@ impl Model<PluginsIncluded> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
         let vars = Rc::new(RefCell::new(self.scip.vars()));
-        let conss = Rc::new(RefCell::new(self.scip.conss()));
+        let conss = Rc::new(RefCell::new(
+            self.scip
+                .conss()
+                .iter()
+                .map(|c| {
+                    Rc::new(Constraint {
+                        raw: *c,
+                        scip: self.scip.clone(),
+                    })
+                })
+                .collect(),
+        ));
         let new_model = Model {
             scip: self.scip,
             state: ProblemCreated { vars, conss },
@@ -835,7 +846,12 @@ macro_rules! impl_ProblemOrSolving {
                         name,
                     )
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new(
+                    Constraint {
+                        raw: cons,
+                        scip: self.scip.clone(),
+                    }
+                );
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -872,7 +888,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons(vars, coefs, lhs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -897,7 +916,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_set_part(vars, name)
                     .expect("Failed to add constraint set partition in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -922,7 +944,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_set_cover(vars, name)
                     .expect("Failed to add constraint set cover in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -947,7 +972,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -972,7 +1000,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_cardinality(vars, cardinality, name)
                     .expect("Failed to add cardinality constraint");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }
@@ -1008,7 +1039,10 @@ macro_rules! impl_ProblemOrSolving {
                     .scip
                     .create_cons_indicator(bin_var, vars, coefs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
-                let cons = Rc::new(cons);
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip.clone(),
+                });
                 self.state.conss.borrow_mut().push(cons.clone());
                 cons
             }

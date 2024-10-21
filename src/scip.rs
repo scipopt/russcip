@@ -6,7 +6,7 @@ use crate::{
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
-use scip_sys::SCIP_SOL;
+use scip_sys::{SCIP_Cons, SCIP_SOL};
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -152,7 +152,7 @@ impl ScipPtr {
         vars
     }
 
-    pub(crate) fn conss(&self) -> Vec<Rc<Constraint>> {
+    pub(crate) fn conss(&self) -> Vec<*mut SCIP_Cons> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.n_conss();
         let mut conss = Vec::with_capacity(n_conss);
@@ -162,8 +162,7 @@ impl ScipPtr {
             unsafe {
                 ffi::SCIPcaptureCons(self.raw, scip_cons);
             }
-            let cons = Rc::new(Constraint { raw: scip_cons });
-            conss.push(cons);
+            conss.push(scip_cons);
         }
         conss
     }
@@ -279,7 +278,7 @@ impl ScipPtr {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
@@ -298,7 +297,7 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     /// Create set partitioning constraint
@@ -306,7 +305,7 @@ impl ScipPtr {
         &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicSetpart(
@@ -321,7 +320,7 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     /// Create set cover constraint
@@ -329,7 +328,7 @@ impl ScipPtr {
         &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicSetcover(
@@ -344,7 +343,7 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     pub(crate) fn create_cons_quadratic(
@@ -357,7 +356,7 @@ impl ScipPtr {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         assert_eq!(lin_vars.len(), lin_coefs.len());
         assert!(
             lin_vars.len() <= c_int::MAX as usize,
@@ -398,7 +397,7 @@ impl ScipPtr {
 
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     /// Create set packing constraint
@@ -406,7 +405,7 @@ impl ScipPtr {
         &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicSetpack(
@@ -421,7 +420,7 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     /// Create cardinality constraint
@@ -430,7 +429,7 @@ impl ScipPtr {
         vars: Vec<Rc<Variable>>,
         cardinality: usize,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateConsBasicCardinality(
@@ -449,7 +448,7 @@ impl ScipPtr {
         }
         scip_call! { ffi:: SCIPchgCardvalCardinality(self.raw, scip_cons, cardinality as i32) };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     pub(crate) fn create_cons_indicator(
@@ -459,7 +458,7 @@ impl ScipPtr {
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
-    ) -> Result<Constraint, Retcode> {
+    ) -> Result<*mut SCIP_Cons, Retcode> {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
@@ -479,7 +478,7 @@ impl ScipPtr {
 
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-        Ok(Constraint { raw: scip_cons })
+        Ok(scip_cons)
     }
 
     /// Create solution
