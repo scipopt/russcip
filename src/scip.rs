@@ -6,6 +6,7 @@ use crate::{
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
+use scip_sys::SCIP_SOL;
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -15,7 +16,6 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub(crate) struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
-    consumed: bool,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -26,72 +26,63 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
-            consumed: false,
             vars_added_in_solving: Vec::new(),
         }
     }
 
-    pub(crate) fn clone(&self) -> Self {
-        ScipPtr {
-            raw: self.raw,
-            consumed: true,
-            vars_added_in_solving: Vec::new(),
-        }
-    }
-
-    pub(crate) fn set_str_param(&mut self, param: &str, value: &str) -> Result<(), Retcode> {
+    pub(crate) fn set_str_param(&self, param: &str, value: &str) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         let value = CString::new(value).unwrap();
         scip_call! { ffi::SCIPsetStringParam(self.raw, param.as_ptr(), value.as_ptr()) };
         Ok(())
     }
 
-    pub(crate) fn set_bool_param(&mut self, param: &str, value: bool) -> Result<(), Retcode> {
+    pub(crate) fn set_bool_param(&self, param: &str, value: bool) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
         Ok(())
     }
 
-    pub(crate) fn set_int_param(&mut self, param: &str, value: i32) -> Result<(), Retcode> {
+    pub(crate) fn set_int_param(&self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
-    pub(crate) fn set_longint_param(&mut self, param: &str, value: i64) -> Result<(), Retcode> {
+    pub(crate) fn set_longint_param(&self, param: &str, value: i64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
-    pub(crate) fn set_real_param(&mut self, param: &str, value: f64) -> Result<(), Retcode> {
+    pub(crate) fn set_real_param(&self, param: &str, value: f64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
 
-    pub(crate) fn set_presolving(&mut self, presolving: ParamSetting) -> Result<(), Retcode> {
+    pub(crate) fn set_presolving(&self, presolving: ParamSetting) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPsetPresolving(self.raw, presolving.into(), true.into()) };
         Ok(())
     }
 
-    pub(crate) fn set_separating(&mut self, separating: ParamSetting) -> Result<(), Retcode> {
+    pub(crate) fn set_separating(&self, separating: ParamSetting) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPsetSeparating(self.raw, separating.into(), true.into()) };
         Ok(())
     }
 
-    pub(crate) fn set_heuristics(&mut self, heuristics: ParamSetting) -> Result<(), Retcode> {
+    pub(crate) fn set_heuristics(&self, heuristics: ParamSetting) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPsetHeuristics(self.raw, heuristics.into(), true.into()) };
         Ok(())
     }
 
-    pub(crate) fn create_prob(&mut self, name: &str) -> Result<(), Retcode> {
+    pub(crate) fn create_prob(&self, name: &str) -> Result<(), Retcode> {
         let name = CString::new(name).unwrap();
         scip_call!(ffi::SCIPcreateProbBasic(self.raw, name.as_ptr()));
         Ok(())
     }
 
-    pub(crate) fn read_prob(&mut self, filename: &str) -> Result<(), Retcode> {
+    pub(crate) fn read_prob(&self, filename: &str) -> Result<(), Retcode> {
         let filename = CString::new(filename).unwrap();
         scip_call!(ffi::SCIPreadProb(
             self.raw,
@@ -101,12 +92,12 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn set_obj_sense(&mut self, sense: ObjSense) -> Result<(), Retcode> {
+    pub(crate) fn set_obj_sense(&self, sense: ObjSense) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPsetObjsense(self.raw, sense.into()));
         Ok(())
     }
 
-    pub(crate) fn set_obj_integral(&mut self) -> Result<(), Retcode> {
+    pub(crate) fn set_obj_integral(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPsetObjIntegral(self.raw));
         Ok(())
     }
@@ -121,7 +112,7 @@ impl ScipPtr {
 
     pub(crate) fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
-        status.try_into().expect("Unknown SCIP status")
+        status.into()
     }
 
     pub(crate) fn print_version(&self) {
@@ -140,7 +131,7 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn include_default_plugins(&mut self) -> Result<(), Retcode> {
+    pub(crate) fn include_default_plugins(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPincludeDefaultPlugins(self.raw));
         Ok(())
     }
@@ -177,7 +168,7 @@ impl ScipPtr {
         conss
     }
 
-    pub(crate) fn solve(&mut self) -> Result<(), Retcode> {
+    pub(crate) fn solve(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPsolve(self.raw));
         Ok(())
     }
@@ -186,14 +177,11 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }
 
-    pub(crate) fn best_sol(&self) -> Solution<'_> {
-        let sol = unsafe { ffi::SCIPgetBestSol(self.raw) };
-
-        Solution {
-            scip_ptr: self.raw,
-            raw: sol,
-            pd: Default::default(),
+    pub(crate) fn best_sol(&self) -> Option<*mut SCIP_SOL> {
+        if self.n_sols() == 0 {
+            return None;
         }
+        Some(unsafe { ffi::SCIPgetBestSol(self.raw) })
     }
 
     pub(crate) fn obj_val(&self) -> f64 {
@@ -205,7 +193,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_var(
-        &mut self,
+        &self,
         lb: f64,
         ub: f64,
         obj: f64,
@@ -229,7 +217,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_var_solving(
-        &mut self,
+        &self,
         lb: f64,
         ub: f64,
         obj: f64,
@@ -257,7 +245,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_priced_var(
-        &mut self,
+        &self,
         lb: f64,
         ub: f64,
         obj: f64,
@@ -285,7 +273,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_cons(
-        &mut self,
+        &self,
         vars: Vec<Rc<Variable>>,
         coefs: &[f64],
         lhs: f64,
@@ -315,7 +303,7 @@ impl ScipPtr {
 
     /// Create set partitioning constraint
     pub(crate) fn create_cons_set_part(
-        &mut self,
+        &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
@@ -338,7 +326,7 @@ impl ScipPtr {
 
     /// Create set cover constraint
     pub(crate) fn create_cons_set_cover(
-        &mut self,
+        &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
@@ -360,7 +348,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_cons_quadratic(
-        &mut self,
+        &self,
         lin_vars: Vec<Rc<Variable>>,
         lin_coefs: &mut [f64],
         quad_vars_1: Vec<Rc<Variable>>,
@@ -415,7 +403,7 @@ impl ScipPtr {
 
     /// Create set packing constraint
     pub(crate) fn create_cons_set_pack(
-        &mut self,
+        &self,
         vars: Vec<Rc<Variable>>,
         name: &str,
     ) -> Result<Constraint, Retcode> {
@@ -438,7 +426,7 @@ impl ScipPtr {
 
     /// Create cardinality constraint
     pub(crate) fn create_cons_cardinality(
-        &mut self,
+        &self,
         vars: Vec<Rc<Variable>>,
         cardinality: usize,
         name: &str,
@@ -465,7 +453,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn create_cons_indicator(
-        &mut self,
+        &self,
         bin_var: Rc<Variable>,
         vars: Vec<Rc<Variable>>,
         coefs: &mut [f64],
@@ -495,20 +483,16 @@ impl ScipPtr {
     }
 
     /// Create solution
-    pub(crate) fn create_sol(&self) -> Result<Solution, Retcode> {
+    pub(crate) fn create_sol(&self) -> Result<*mut SCIP_SOL, Retcode> {
         let mut sol = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         let sol = unsafe { sol.assume_init() };
-        Ok(Solution {
-            scip_ptr: self.raw,
-            raw: sol,
-            pd: Default::default(),
-        })
+        Ok(sol)
     }
 
     /// Add coefficient to set packing/partitioning/covering constraint
     pub(crate) fn add_cons_coef_setppc(
-        &mut self,
+        &self,
         cons: Rc<Constraint>,
         var: Rc<Variable>,
     ) -> Result<(), Retcode> {
@@ -909,7 +893,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn add_cons_coef(
-        &mut self,
+        &self,
         cons: Rc<Constraint>,
         var: Rc<Variable>,
         coef: f64,
@@ -945,7 +929,7 @@ impl ScipPtr {
     }
 
     pub(crate) fn set_cons_modifiable(
-        &mut self,
+        &self,
         cons: Rc<Constraint>,
         modifiable: bool,
     ) -> Result<(), Retcode> {
@@ -975,7 +959,7 @@ impl ScipPtr {
         }
     }
 
-    pub(crate) fn create_child(&mut self) -> Result<Node, Retcode> {
+    pub(crate) fn create_child(&self) -> Result<Node, Retcode> {
         let mut node_ptr = MaybeUninit::uninit();
         scip_call!(ffi::SCIPcreateChild(
             self.raw,
@@ -1007,9 +991,6 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
-        if self.consumed {
-            return;
-        }
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
         // so we need to release them before freeing the SCIP instance
 
