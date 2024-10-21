@@ -1,6 +1,6 @@
-use std::rc::Rc;
 use crate::ffi;
 use crate::scip::ScipPtr;
+use std::rc::Rc;
 
 /// A constraint in an optimization problem.
 #[derive(Debug)]
@@ -28,8 +28,6 @@ impl Constraint {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
@@ -42,7 +40,6 @@ mod tests {
             .include_default_plugins()
             .create_prob("test")
             .set_obj_sense(ObjSense::Maximize);
-
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let cons = model.add_cons(vec![x1], &[1.], 4., 4., "cons");

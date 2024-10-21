@@ -106,14 +106,22 @@ impl Model<PluginsIncluded> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
         let vars = Rc::new(RefCell::new(self.scip.vars()));
-        let conss = Rc::new(RefCell::new(self.scip.conss().iter().map(|c| Rc::new( Constraint {
-            raw: *c,
-            scip: self.scip.clone(),
-        })).collect()));
+        let conss = Rc::new(RefCell::new(
+            self.scip
+                .conss()
+                .iter()
+                .map(|c| {
+                    Rc::new(Constraint {
+                        raw: *c,
+                        scip: self.scip.clone(),
+                    })
+                })
+                .collect(),
+        ));
         let new_model = Model {
             scip: self.scip,
-            state: ProblemCreated { vars, conss}
-            };
+            state: ProblemCreated { vars, conss },
+        };
         Ok(new_model)
     }
 }
