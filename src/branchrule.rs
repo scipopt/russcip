@@ -175,10 +175,8 @@ mod tests {
         assert!(solved.n_nodes() > 1);
     }
 
-
-
     struct HighestBoundBranchRule {
-        model: Model<Solving>
+        model: Model<Solving>,
     }
 
     impl BranchRule for HighestBoundBranchRule {

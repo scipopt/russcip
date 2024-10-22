@@ -106,8 +106,20 @@ impl Model<PluginsIncluded> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
         let vars = Rc::new(RefCell::new(
-            self.scip.vars().into_iter().map(|(i, v)| (i, Rc::new(Variable { raw: v, scip: scip.clone() }))).collect(),
-            ));
+            self.scip
+                .vars()
+                .into_iter()
+                .map(|(i, v)| {
+                    (
+                        i,
+                        Rc::new(Variable {
+                            raw: v,
+                            scip: scip.clone(),
+                        }),
+                    )
+                })
+                .collect(),
+        ));
         let conss = Rc::new(RefCell::new(
             self.scip
                 .conss()
@@ -464,7 +476,6 @@ impl Model<Solving> {
         var
     }
 
-
     /// Gets the variable in current problem given its index (in the problem).
     ///
     /// # Arguments
@@ -473,12 +484,10 @@ impl Model<Solving> {
     /// # Returns
     /// A reference-counted pointer to the variable.
     pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
-        ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v|
-            Variable {
-                raw: v,
-                scip: self.scip.clone(),
-            }
-        )
+        ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
+            raw: v,
+            scip: self.scip.clone(),
+        })
     }
 }
 

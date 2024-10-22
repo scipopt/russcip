@@ -1,8 +1,8 @@
 use crate::ffi;
-use core::panic;
-use std::rc::Rc;
-use scip_sys::SCIP_Status;
 use crate::scip::ScipPtr;
+use core::panic;
+use scip_sys::SCIP_Status;
+use std::rc::Rc;
 
 /// A type alias for a variable ID.
 pub type VarId = usize;

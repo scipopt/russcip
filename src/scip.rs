@@ -1,9 +1,12 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense, ParamSetting, Retcode, Solution, Status, VarType, Variable};
+use crate::{
+    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
+    ParamSetting, Retcode, Solution, Status, VarType, Variable,
+};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
-use scip_sys::{Scip, SCIP_Cons, SCIP_SOL, SCIP_Var};
+use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -534,11 +537,7 @@ impl ScipPtr {
             let var = var_ptr;
             let lp_sol_val = unsafe { *lpcandssol.add(i as usize) };
             let frac = lp_sol_val.fract();
-            cands.push((
-                var,
-                lp_sol_val,
-                frac,
-            ));
+            cands.push((var, lp_sol_val, frac));
         }
         cands
     }
@@ -649,13 +648,14 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPbranchruleGetData(branchrule) };
             assert!(!data_ptr.is_null());
             let rule_ptr = data_ptr as *mut Box<dyn BranchRule>;
-            let cands = ScipPtr::lp_branching_cands(scip).into_iter().map(|(scip_var, lp_sol_val, frac)| {
-                BranchingCandidate {
+            let cands = ScipPtr::lp_branching_cands(scip)
+                .into_iter()
+                .map(|(scip_var, lp_sol_val, frac)| BranchingCandidate {
                     var_prob_id: unsafe { ffi::SCIPvarGetProbindex(scip_var) } as usize,
                     lp_sol_val,
                     frac,
-                }
-            }).collect::<Vec<_>>();
+                })
+                .collect::<Vec<_>>();
             let branching_res = unsafe { (*rule_ptr).execute(cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
