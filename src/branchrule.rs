@@ -1,7 +1,5 @@
 use crate::ffi;
-use crate::variable::Variable;
 use scip_sys::SCIP_Result;
-use std::rc::Rc;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
@@ -45,8 +43,8 @@ impl From<BranchingResult> for SCIP_Result {
 /// A candidate for branching.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BranchingCandidate {
-    /// The variable to branch on.
-    pub var: Rc<Variable>,
+    /// The index of the variable to branch on in the current subproblem.
+    pub var_prob_id: usize,
     /// The LP solution value of the variable.
     pub lp_sol_val: f64,
     /// The fractional part of the LP solution value of the variable.

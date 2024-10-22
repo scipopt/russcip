@@ -1,15 +1,27 @@
 use crate::ffi;
 use core::panic;
+use std::rc::Rc;
 use scip_sys::SCIP_Status;
+use crate::scip::ScipPtr;
 
 /// A type alias for a variable ID.
 pub type VarId = usize;
 
 /// A wrapper for a mutable reference to a SCIP variable.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
+#[allow(dead_code)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
+    pub(crate) scip: Rc<ScipPtr>,
 }
+
+impl PartialEq for Variable {
+    fn eq(&self, other: &Self) -> bool {
+        self.index() == other.index()
+    }
+}
+
+impl Eq for Variable {}
 
 impl Variable {
     #[cfg(feature = "raw")]
@@ -133,7 +145,7 @@ impl From<SCIP_Status> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Model;
+    use crate::{Model, ObjSense};
 
     #[test]
     fn var_data() {
@@ -150,5 +162,20 @@ mod tests {
 
         #[cfg(feature = "raw")]
         assert!(!var.inner().is_null());
+    }
+
+    #[test]
+    fn var_memory_safety() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
+
+        drop(model);
+
+        assert_eq!(x1.name(), "x1");
     }
 }
