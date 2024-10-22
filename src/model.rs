@@ -463,6 +463,23 @@ impl Model<Solving> {
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
     }
+
+
+    /// Gets the variable in current problem given its index (in the problem).
+    ///
+    /// # Arguments
+    /// * `var_prob_id` - The index of the variable in the problem.
+    ///
+    /// # Returns
+    /// A reference-counted pointer to the variable.
+    pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
+        ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v|
+            Variable {
+                raw: v,
+                scip: self.scip.clone(),
+            }
+        )
+    }
 }
 
 impl Model<Solved> {
