@@ -17,7 +17,7 @@ pub struct Variable {
 
 impl PartialEq for Variable {
     fn eq(&self, other: &Self) -> bool {
-        self.index() == other.index()
+        self.index() == other.index() && self.raw == other.raw
     }
 }
 
