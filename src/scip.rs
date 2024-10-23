@@ -489,8 +489,9 @@ impl ScipPtr {
     }
 
     pub(crate) unsafe fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
-        let var = unsafe { *ffi::SCIPgetVars(scip).add(var_prob_id) };
-        if var.is_null() {
+        let n_vars = ffi::SCIPgetNVars(scip) as usize;
+        let var = *ffi::SCIPgetVars(scip).add(var_prob_id);
+        if var_prob_id >= n_vars {
             None
         } else {
             Some(var)
@@ -586,9 +587,12 @@ impl ScipPtr {
         var_prob_id: usize,
         val: f64,
     ) -> Result<(), Retcode> {
-        let var = ScipPtr::var_from_id(scip, var_prob_id).unwrap();
+        let var = ScipPtr::var_from_id(scip, var_prob_id);
+        if var.is_none() {
+            return Err(Retcode::Error);
+        }
+        let var = var.unwrap();
         scip_call! { ffi::SCIPbranchVarVal(scip, var, val, std::ptr::null_mut(), std::ptr::null_mut(),std::ptr::null_mut()) }
-        ;
         Ok(())
     }
 
@@ -977,7 +981,7 @@ impl ScipPtr {
         };
 
         scip_call! { ffi::SCIPaddCoefLinear(self.raw, cons_ptr, var_ptr, coef) }
-        ;
+
         Ok(())
     }
 
