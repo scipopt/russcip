@@ -47,10 +47,7 @@ impl From<PricerResultState> for SCIP_Result {
 mod tests {
     use super::*;
     use crate::{
-        model::{Model, ModelWithProblem},
-        status::Status,
-        variable::VarType,
-        ProblemOrSolving, Solving,
+        model::ModelWithProblem, status::Status, variable::VarType, ModelSolving, ProblemOrSolving,
     };
 
     struct LyingPricer;
@@ -141,7 +138,7 @@ mod tests {
 
     struct AddSameColumnPricer {
         added: bool,
-        model: Model<Solving>,
+        model: ModelSolving,
         data: ComplexData,
     }
 

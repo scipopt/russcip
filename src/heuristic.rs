@@ -101,7 +101,7 @@ impl From<HeurResult> for SCIP_Result {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Model, ModelWithProblem, ProblemOrSolving, Solving};
+    use crate::{Model, ModelSolving, ModelWithProblem, ProblemOrSolving};
 
     use super::*;
 
@@ -241,7 +241,7 @@ mod tests {
     }
 
     struct FoundSolHeur {
-        model: Model<Solving>,
+        model: ModelSolving,
     }
 
     impl Heuristic for FoundSolHeur {

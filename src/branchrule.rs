@@ -55,7 +55,7 @@ pub struct BranchingCandidate {
 mod tests {
     use super::*;
     use crate::model::ModelWithProblem;
-    use crate::Solving;
+    use crate::ModelSolving;
     use crate::{model::Model, status::Status};
 
     struct FirstChoosingBranchingRule {
@@ -114,7 +114,7 @@ mod tests {
     }
 
     struct FirstBranchingRule {
-        model: Model<Solving>,
+        model: ModelSolving,
     }
 
     impl BranchRule for FirstBranchingRule {
@@ -145,7 +145,7 @@ mod tests {
     }
 
     struct CustomBranchingRule {
-        model: Model<Solving>,
+        model: ModelSolving,
     }
 
     impl BranchRule for CustomBranchingRule {
@@ -176,7 +176,7 @@ mod tests {
     }
 
     struct HighestBoundBranchRule {
-        model: Model<Solving>,
+        model: ModelSolving,
     }
 
     impl BranchRule for HighestBoundBranchRule {
