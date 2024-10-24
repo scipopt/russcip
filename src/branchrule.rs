@@ -1,7 +1,5 @@
 use crate::ffi;
-use crate::variable::Variable;
 use scip_sys::SCIP_Result;
-use std::rc::Rc;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
@@ -45,8 +43,8 @@ impl From<BranchingResult> for SCIP_Result {
 /// A candidate for branching.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BranchingCandidate {
-    /// The variable to branch on.
-    pub var: Rc<Variable>,
+    /// The index of the variable to branch on in the current subproblem.
+    pub var_prob_id: usize,
     /// The LP solution value of the variable.
     pub lp_sol_val: f64,
     /// The fractional part of the LP solution value of the variable.
@@ -168,6 +166,51 @@ mod tests {
             .unwrap();
 
         let br = CustomBranchingRule {
+            model: model.clone_for_plugins(),
+        };
+        let solved = model
+            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
+            .solve();
+
+        assert!(solved.n_nodes() > 1);
+    }
+
+    struct HighestBoundBranchRule {
+        model: Model<Solving>,
+    }
+
+    impl BranchRule for HighestBoundBranchRule {
+        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+            let mut max_bound = f64::NEG_INFINITY;
+            let mut max_candidate = None;
+            for candidate in candidates {
+                let var = self.model.var_in_prob(candidate.var_prob_id).unwrap();
+                let bound = var.ub();
+                if bound > max_bound {
+                    max_bound = bound;
+                    max_candidate = Some(candidate);
+                }
+            }
+
+            if let Some(candidate) = max_candidate {
+                BranchingResult::BranchOn(candidate)
+            } else {
+                BranchingResult::DidNotRun
+            }
+        }
+    }
+
+    #[test]
+    fn highest_bound_branch_rule() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/nodes", 2)
+            .unwrap() // only call brancher once
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+
+        let br = HighestBoundBranchRule {
             model: model.clone_for_plugins(),
         };
         let solved = model

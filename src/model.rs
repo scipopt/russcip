@@ -105,7 +105,21 @@ impl Model<PluginsIncluded> {
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
-        let vars = Rc::new(RefCell::new(self.scip.vars()));
+        let vars = Rc::new(RefCell::new(
+            self.scip
+                .vars()
+                .into_iter()
+                .map(|(i, v)| {
+                    (
+                        i,
+                        Rc::new(Variable {
+                            raw: v,
+                            scip: scip.clone(),
+                        }),
+                    )
+                })
+                .collect(),
+        ));
         let conss = Rc::new(RefCell::new(
             self.scip
                 .conss()
@@ -201,6 +215,10 @@ impl Model<ProblemCreated> {
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
+        let var = Variable {
+            raw: var,
+            scip: self.scip.clone(),
+        };
         let var_id = var.index();
         let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
@@ -391,6 +409,10 @@ impl Model<Solving> {
             .scip
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
+        let var = Variable {
+            raw: var,
+            scip: self.scip.clone(),
+        };
         let var_id = var.index();
         let var = Rc::new(var);
         self.state.vars.borrow_mut().insert(var_id, var.clone());
@@ -444,10 +466,30 @@ impl Model<Solving> {
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
+        let var = Variable {
+            raw: var,
+            scip: self.scip.clone(),
+        };
         let var = Rc::new(var);
         let var_id = var.index();
         self.state.vars.borrow_mut().insert(var_id, var.clone());
         var
+    }
+
+    /// Gets the variable in current problem given its index (in the problem).
+    ///
+    /// # Arguments
+    /// * `var_prob_id` - The index of the variable in the problem.
+    ///
+    /// # Returns
+    /// A reference-counted pointer to the variable.
+    pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
+        unsafe {
+            ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
+                raw: v,
+                scip: self.scip.clone(),
+            })
+        }
     }
 }
 
