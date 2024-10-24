@@ -80,7 +80,6 @@ impl Solving {
     }
 }
 
-
 impl Model<Unsolved> {
     /// Creates a new `Model` instance with an `Unsolved` state.
     pub fn new() -> Self {
