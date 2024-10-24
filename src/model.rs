@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -39,8 +39,8 @@ pub struct ProblemCreated {
 /// Represents the state of an optimization model during the solving process (to be used in plugins).
 #[derive(Debug)]
 pub struct Solving {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+    pub(crate) vars: Weak<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
+    pub(crate) conss: Weak<RefCell<Vec<Rc<Constraint>>>>,
 }
 
 /// Represents the state of an optimization model that has been solved.
@@ -48,6 +48,36 @@ pub struct Solving {
 pub struct Solved {
     pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
     pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
+}
+
+impl ProblemCreated {
+    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
+        self.vars.clone()
+    }
+
+    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
+        self.conss.clone()
+    }
+}
+
+impl Solved {
+    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
+        self.vars.clone()
+    }
+
+    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
+        self.conss.clone()
+    }
+}
+
+impl Solving {
+    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
+        self.vars.upgrade().expect("SCIP instance was dropped")
+    }
+
+    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
+        self.conss.upgrade().expect("SCIP instance was dropped")
+    }
 }
 
 impl Model<Unsolved> {
@@ -140,7 +170,17 @@ impl Model<PluginsIncluded> {
     }
 }
 
+/// Represents a model in the solving state. This is meant to be used in plugins (callbacks).
+pub struct ModelSolving {
+    scip: Weak<ScipPtr>,
+    state: Solving,
+}
+
 impl Model<ProblemCreated> {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.clone()
+    }
+
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -160,12 +200,12 @@ impl Model<ProblemCreated> {
 
     /// Returns a clone of the current model.
     /// The clone is meant for use in implementing custom plugins.
-    pub fn clone_for_plugins(&self) -> Model<Solving> {
-        Model {
-            scip: self.scip.clone(),
+    pub fn clone_for_plugins(&self) -> ModelSolving {
+        ModelSolving {
+            scip: Rc::downgrade(&self.scip.clone()),
             state: Solving {
-                vars: self.state.vars.clone(),
-                conss: self.state.conss.clone(),
+                vars: Rc::downgrade(&self.state.vars().clone()),
+                conss: Rc::downgrade(&self.state.conss().clone()),
             },
         }
     }
@@ -221,7 +261,7 @@ impl Model<ProblemCreated> {
         };
         let var_id = var.index();
         let var = Rc::new(var);
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -349,7 +389,7 @@ impl Model<ProblemCreated> {
         delay: bool,
         pricer: Box<dyn Pricer>,
     ) -> Self {
-        self.scip
+        self.scip()
             .include_pricer(name, desc, priority, delay, pricer)
             .expect("Failed to include pricer at state ProblemCreated");
         self
@@ -372,14 +412,18 @@ impl Model<ProblemCreated> {
         Model {
             scip: self.scip,
             state: Solved {
-                vars: self.state.vars,
-                conss: self.state.conss,
+                vars: self.state.vars(),
+                conss: self.state.conss(),
             },
         }
     }
 }
 
-impl Model<Solving> {
+impl ModelSolving {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.upgrade().expect("SCIP instance was dropped")
+    }
+
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -406,16 +450,16 @@ impl Model<Solving> {
         var_type: VarType,
     ) -> Rc<Variable> {
         let var = self
-            .scip
+            .scip()
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var = Variable {
             raw: var,
-            scip: self.scip.clone(),
+            scip: self.scip().clone(),
         };
         let var_id = var.index();
         let var = Rc::new(var);
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -427,7 +471,7 @@ impl Model<Solving> {
     ///
     /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
     pub fn focus_node(&self) -> Node {
-        self.scip.focus_node()
+        self.scip().focus_node()
     }
 
     /// Creates a new child node of the current node and returns it.
@@ -436,7 +480,7 @@ impl Model<Solving> {
     ///
     /// This method panics if not called from plugins implementations.
     pub fn create_child(&mut self) -> Node {
-        self.scip
+        self.scip()
             .create_child()
             .expect("Failed to create child node in state ProblemCreated")
     }
@@ -463,16 +507,16 @@ impl Model<Solving> {
         var_type: VarType,
     ) -> Rc<Variable> {
         let var = self
-            .scip
+            .scip()
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
         let var = Variable {
             raw: var,
-            scip: self.scip.clone(),
+            scip: self.scip().clone(),
         };
         let var = Rc::new(var);
         let var_id = var.index();
-        self.state.vars.borrow_mut().insert(var_id, var.clone());
+        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -485,15 +529,19 @@ impl Model<Solving> {
     /// A reference-counted pointer to the variable.
     pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
         unsafe {
-            ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
+            ScipPtr::var_from_id(self.scip().raw, var_prob_id).map(|v| Variable {
                 raw: v,
-                scip: self.scip.clone(),
+                scip: self.scip().clone(),
             })
         }
     }
 }
 
 impl Model<Solved> {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.clone()
+    }
+
     /// Returns the objective value of the best solution found by the optimization model.
     pub fn obj_val(&self) -> f64 {
         self.scip.obj_val()
@@ -523,8 +571,8 @@ impl Model<Solved> {
         Model {
             scip: self.scip,
             state: ProblemCreated {
-                vars: self.state.vars,
-                conss: self.state.conss,
+                vars: self.state.vars(),
+                conss: self.state.conss(),
             },
         }
     }
@@ -557,32 +605,32 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn vars(&self) -> Vec<Rc<Variable>> {
-                self.state.vars.borrow().values().map(Rc::clone).collect()
+                self.state.vars().borrow().values().map(Rc::clone).collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
             fn var(&self, var_id: VarId) -> Option<Rc<Variable>> {
-                self.state.vars.borrow().get(&var_id).map(Rc::clone)
+                self.state.vars().borrow().get(&var_id).map(Rc::clone)
             }
 
             /// Returns the number of variables in the optimization model.
             fn n_vars(&self) -> usize {
-                self.scip.n_vars()
+                self.scip().n_vars()
             }
 
             /// Returns the number of constraints in the optimization model.
             fn n_conss(&mut self) -> usize {
-                self.scip.n_conss()
+                self.scip().n_conss()
             }
 
             /// Returns a vector of all constraints in the optimization model.
             fn conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss.borrow().iter().map(Rc::clone).collect()
+                self.state.conss().borrow().iter().map(Rc::clone).collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
             fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
-                self.scip.write(path, ext)?;
+                self.scip().write(path, ext)?;
                 Ok(())
             }
 
@@ -590,7 +638,7 @@ macro_rules! impl_ModelWithProblem {
     }
 }
 
-impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>, Model<Solving>);
+impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>,  ModelSolving);
 
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
@@ -784,11 +832,11 @@ macro_rules! impl_ProblemOrSolving {
 
             /// Creates a new solution initialized to zero.
             fn create_sol(&self) -> Solution {
-                let sol_ptr = self.scip
+                let sol_ptr = self.scip()
                     .create_sol()
                     .expect("Failed to create solution in state ProblemCreated");
                 Solution {
-                    scip_ptr: self.scip.clone(),
+                    scip_ptr: self.scip().clone(),
                     raw: sol_ptr,
                 }
             }
@@ -798,7 +846,7 @@ macro_rules! impl_ProblemOrSolving {
             /// # Returns
             /// A `Result` indicating whether the solution was added successfully.
             fn add_sol(&self, sol: Solution) -> Result<(), SolError> {
-                let succesfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
+                let succesfully_stored = self.scip().add_sol(sol).expect("Failed to add solution");
                 if succesfully_stored {
                     Ok(())
                 } else {
@@ -818,7 +866,7 @@ macro_rules! impl_ProblemOrSolving {
             /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
             fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
                 assert_eq!(var.var_type(), VarType::Binary);
-                self.scip
+                self.scip()
                     .add_cons_coef_setppc(cons, var)
                     .expect("Failed to add constraint coefficient in state ProblemCreated");
             }
@@ -836,7 +884,7 @@ macro_rules! impl_ProblemOrSolving {
             ///
             /// This method panics if the coefficient cannot be added in the current state.
             fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
-                self.scip
+                self.scip()
                     .add_cons_coef(cons, var, coef)
                     .expect("Failed to add constraint coefficient in state ProblemCreated");
             }
@@ -876,7 +924,7 @@ macro_rules! impl_ProblemOrSolving {
                 assert_eq!(quad_vars_1.len(), quad_vars_2.len());
                 assert_eq!(quad_vars_1.len(), quad_coefs.len());
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_quadratic(
                         lin_vars,
                         lin_coefs,
@@ -891,10 +939,10 @@ macro_rules! impl_ProblemOrSolving {
                 let cons = Rc::new(
                     Constraint {
                         raw: cons,
-                        scip: self.scip.clone(),
+                        scip: self.scip().clone(),
                     }
                 );
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -927,14 +975,14 @@ macro_rules! impl_ProblemOrSolving {
             ) -> Rc<Constraint> {
                 assert_eq!(vars.len(), coefs.len());
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons(vars, coefs, lhs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -955,14 +1003,14 @@ macro_rules! impl_ProblemOrSolving {
             fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
                 assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_set_part(vars, name)
                     .expect("Failed to add constraint set partition in state ProblemCreated");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -983,14 +1031,14 @@ macro_rules! impl_ProblemOrSolving {
             fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
                 assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_set_cover(vars, name)
                     .expect("Failed to add constraint set cover in state ProblemCreated");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1011,14 +1059,14 @@ macro_rules! impl_ProblemOrSolving {
             fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
                 assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_set_pack(vars, name)
                     .expect("Failed to add constraint set packing in state ProblemCreated");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1039,14 +1087,14 @@ macro_rules! impl_ProblemOrSolving {
             /// This method panics if the constraint cannot be created in the current state.
             fn add_cons_cardinality(&mut self, vars: Vec<Rc<Variable>>, cardinality: usize, name: &str) -> Rc<Constraint> {
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_cardinality(vars, cardinality, name)
                     .expect("Failed to add cardinality constraint");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1078,21 +1126,21 @@ macro_rules! impl_ProblemOrSolving {
                 assert_eq!(vars.len(), coefs.len());
                 assert_eq!(bin_var.var_type(), VarType::Binary);
                 let cons = self
-                    .scip
+                    .scip()
                     .create_cons_indicator(bin_var, vars, coefs, rhs, name)
                     .expect("Failed to create constraint in state ProblemCreated");
                 let cons = Rc::new( Constraint {
                     raw: cons,
-                    scip: self.scip.clone(),
+                    scip: self.scip().clone(),
                 });
-                self.state.conss.borrow_mut().push(cons.clone());
+                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
         })*
     }
 }
 
-impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving>);
+impl_ProblemOrSolving!(for Model<ProblemCreated>, ModelSolving);
 
 /// A trait for optimization models with any state that might have solutions.
 pub trait WithSolutions {
@@ -1111,8 +1159,8 @@ macro_rules! impl_WithSolutions {
             fn best_sol(&self) -> Option<Solution> {
                 if self.n_sols() > 0 {
                     let sol = Solution {
-                        scip_ptr: self.scip.clone(),
-                        raw: self.scip.best_sol().unwrap(),
+                        scip_ptr: self.scip().clone(),
+                        raw: self.scip().best_sol().unwrap(),
                     };
                     Some(sol)
                 } else {
@@ -1122,14 +1170,14 @@ macro_rules! impl_WithSolutions {
 
             /// Returns the number of solutions found by the optimization model.
             fn n_sols(&self) -> usize {
-                self.scip.n_sols()
+                self.scip().n_sols()
             }
 
         })*
     }
 }
 
-impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+impl_WithSolutions!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
 
 /// A trait for optimization models with any state that might have solving statistics.
 pub trait WithSolvingStats {
@@ -1155,34 +1203,34 @@ macro_rules! impl_WithSolvingStats {
 
             /// Returns the objective value of the best solution found by the optimization model.
             fn obj_val(&self) -> f64 {
-                self.scip.obj_val()
+                self.scip().obj_val()
             }
 
             /// Returns the best bound (dualbound) proven so far.
             fn best_bound(&self) -> f64 {
-                self.scip.best_bound()
+                self.scip().best_bound()
             }
 
             /// Returns the number of nodes explored by the optimization model.
             fn n_nodes(&self) -> usize {
-                self.scip.n_nodes()
+                self.scip().n_nodes()
             }
 
             /// Returns the total solving time of the optimization model.
             fn solving_time(&self) -> f64 {
-                self.scip.solving_time()
+                self.scip().solving_time()
             }
 
             /// Returns the number of LP iterations performed by the optimization model.
             fn n_lp_iterations(&self) -> usize {
-                self.scip.n_lp_iterations()
+                self.scip().n_lp_iterations()
             }
 
         })*
     }
 }
 
-impl_WithSolvingStats!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
+impl_WithSolvingStats!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
 
 impl<T> Model<T> {
     /// Returns a pointer to the underlying SCIP instance.
