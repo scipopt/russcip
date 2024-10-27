@@ -187,7 +187,7 @@ impl Model<ProblemCreated> {
             raw: var,
             scip: self.scip.clone(),
         };
-        
+
         Rc::new(var)
     }
 
@@ -380,7 +380,7 @@ impl ModelSolving {
             raw: var,
             scip: self.scip().clone(),
         };
-        
+
         Rc::new(var)
     }
 
@@ -435,7 +435,7 @@ impl ModelSolving {
             raw: var,
             scip: self.scip().clone(),
         };
-        
+
         Rc::new(var)
     }
 
