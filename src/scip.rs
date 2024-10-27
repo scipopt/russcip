@@ -274,7 +274,7 @@ impl ScipPtr {
 
     pub(crate) fn create_cons(
         &self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
@@ -304,7 +304,7 @@ impl ScipPtr {
     /// Create set partitioning constraint
     pub(crate) fn create_cons_set_part(
         &self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         name: &str,
     ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -327,7 +327,7 @@ impl ScipPtr {
     /// Create set cover constraint
     pub(crate) fn create_cons_set_cover(
         &self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         name: &str,
     ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -349,10 +349,10 @@ impl ScipPtr {
 
     pub(crate) fn create_cons_quadratic(
         &self,
-        lin_vars: Vec<Rc<Variable>>,
+        lin_vars: Vec<&Variable>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
+        quad_vars_1: Vec<&Variable>,
+        quad_vars_2: Vec<&Variable>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
@@ -373,7 +373,7 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let mut scip_cons = MaybeUninit::uninit();
 
-        let get_ptrs = |vars: Vec<Rc<Variable>>| {
+        let get_ptrs = |vars: Vec<&Variable>| {
             vars.into_iter()
                 .map(|var_rc| var_rc.raw)
                 .collect::<Vec<_>>()
@@ -404,7 +404,7 @@ impl ScipPtr {
     /// Create set packing constraint
     pub(crate) fn create_cons_set_pack(
         &self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         name: &str,
     ) -> Result<*mut SCIP_Cons, Retcode> {
         let c_name = CString::new(name).unwrap();
@@ -427,7 +427,7 @@ impl ScipPtr {
     /// Create cardinality constraint
     pub(crate) fn create_cons_cardinality(
         &self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         cardinality: usize,
         name: &str,
     ) -> Result<*mut SCIP_Cons, Retcode> {
@@ -463,8 +463,8 @@ impl ScipPtr {
     }
     pub(crate) fn create_cons_indicator(
         &self,
-        bin_var: Rc<Variable>,
-        vars: Vec<Rc<Variable>>,
+        bin_var: &Variable,
+        vars: Vec<&Variable>,
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
@@ -503,7 +503,7 @@ impl ScipPtr {
     pub(crate) fn add_cons_coef_setppc(
         &self,
         cons: Rc<Constraint>,
-        var: Rc<Variable>,
+        var: &Variable,
     ) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) };
         Ok(())
@@ -916,7 +916,7 @@ impl ScipPtr {
     pub(crate) fn add_cons_coef(
         &self,
         cons: Rc<Constraint>,
-        var: Rc<Variable>,
+        var: &Variable,
         coef: f64,
     ) -> Result<(), Retcode> {
         let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;

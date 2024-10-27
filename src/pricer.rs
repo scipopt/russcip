@@ -158,7 +158,7 @@ mod tests {
                     .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
                 let conss = self.model.conss();
                 for cons in conss {
-                    self.model.add_cons_coef(cons, var.clone(), 1.0);
+                    self.model.add_cons_coef(cons, &var, 1.0);
                 }
                 let nvars_after = self.model.n_vars();
                 assert_eq!(nvars_before + 1, nvars_after);
