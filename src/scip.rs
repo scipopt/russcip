@@ -180,6 +180,11 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn solve_concurrent(&self) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsolveConcurrent(self.raw));
+        Ok(())
+    }
+
     pub(crate) fn n_sols(&self) -> usize {
         unsafe { ffi::SCIPgetNSols(self.raw) as usize }
     }

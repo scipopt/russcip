@@ -340,6 +340,26 @@ impl Model<ProblemCreated> {
             state: Solved {},
         }
     }
+
+    /// Solves copies of the model in multiple threads and returns a new `Model` instance with a `Solved` state.
+    ///
+    /// # Returns
+    ///
+    /// A new `Model` instance with a `Solved` state.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the problem cannot be solved in the current state.
+    #[allow(unused_mut)]
+    pub fn solve_concurrent(mut self) -> Model<Solved> {
+        self.scip
+            .solve_concurrent()
+            .expect("Failed to solve problem in state ProblemCreated");
+        Model {
+            scip: self.scip,
+            state: Solved {},
+        }
+    }
 }
 
 impl ModelSolving {
@@ -1899,6 +1919,15 @@ mod tests {
     fn best_bound() {
         let model = create_model();
         let solved_model = model.solve();
+        let best_bound = solved_model.best_bound();
+        let obj_val = solved_model.obj_val();
+        assert!((best_bound - obj_val) < 1e-6);
+    }
+
+    #[test]
+    fn solve_concurrent() {
+        let model = create_model();
+        let solved_model = model.solve_concurrent();
         let best_bound = solved_model.best_bound();
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
