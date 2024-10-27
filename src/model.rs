@@ -345,20 +345,16 @@ impl Model<ProblemCreated> {
     ///
     /// # Returns
     ///
-    /// A new `Model` instance with a `Solved` state.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the problem cannot be solved in the current state.
+    /// A result containing a new `Model` instance with a `Solved` state, or a `Retcode` error if SCIP
+    /// was compiled without multi-threading support.
     #[allow(unused_mut)]
-    pub fn solve_concurrent(mut self) -> Model<Solved> {
+    pub fn solve_concurrent(mut self) -> Result<Model<Solved>, Retcode> {
         self.scip
-            .solve_concurrent()
-            .expect("Failed to solve problem in state ProblemCreated");
-        Model {
+            .solve_concurrent()?;
+        Ok(Model {
             scip: self.scip,
             state: Solved {},
-        }
+        })
     }
 }
 
@@ -1928,8 +1924,11 @@ mod tests {
     fn solve_concurrent() {
         let model = create_model();
         let solved_model = model.solve_concurrent();
-        let best_bound = solved_model.best_bound();
-        let obj_val = solved_model.obj_val();
-        assert!((best_bound - obj_val) < 1e-6);
+        if solved_model.is_ok() {
+            let solved_model = solved_model.unwrap();
+            let best_bound = solved_model.best_bound();
+            let obj_val = solved_model.obj_val();
+            assert!((best_bound - obj_val) < 1e-6);
+        }
     }
 }
