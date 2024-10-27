@@ -31,6 +31,43 @@ impl Solution {
             val
         ));
     }
+
+    /// Returns the solution as a var-name to value map.
+    pub fn as_name_map(&self) -> std::collections::HashMap<String, f64> {
+        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr.raw) };
+        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr.raw) };
+        let mut map = std::collections::HashMap::new();
+        for i in 0..n_vars {
+            let var = unsafe { *vars.offset(i as isize) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
+            if val > eps || val < -eps {
+                let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
+                // from CString
+                let name = unsafe { std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap() };
+                map.insert(name.to_string(), val);
+            }
+        }
+        map
+    }
+
+    /// Returns the solution as a var-id to value map.
+    pub fn as_id_map(&self) -> std::collections::HashMap<i32, f64> {
+        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr.raw) };
+        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr.raw) };
+        let mut map = std::collections::HashMap::new();
+        for i in 0..n_vars {
+            let var = unsafe { *vars.offset(i as isize) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
+            if val > eps || val < -eps {
+                let id = unsafe { ffi::SCIPvarGetProbindex(var) };
+                map.insert(id, val);
+            }
+        }
+        map
+    }
+
 }
 
 impl fmt::Debug for Solution {
@@ -91,5 +128,13 @@ mod tests {
         assert_eq!(sol.val(vars[1].clone()), 20.);
 
         assert_eq!(sol.obj_val(), model.obj_val());
+
+        let sol_name_map = sol.as_name_map();
+        assert_eq!(sol_name_map.get("t_x1").unwrap(), &40.);
+        assert_eq!(sol_name_map.get("t_x2").unwrap(), &20.);
+
+        let sol_id_map = sol.as_id_map();
+        assert_eq!(sol_id_map.get(&0).unwrap(), &40.);
+        assert_eq!(sol_id_map.get(&1).unwrap(), &20.);
     }
 }
