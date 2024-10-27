@@ -89,6 +89,9 @@ impl ScipPtr {
             filename.as_ptr(),
             std::ptr::null_mut()
         ));
+        // capture vars and cons since they were not created by the user (and SCIP will free them later)
+        self.vars(true);
+        self.conss(true);
         Ok(())
     }
 
@@ -136,15 +139,17 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn vars(&self) -> BTreeMap<usize, *mut SCIP_Var> {
+    pub(crate) fn vars(&self, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
         let scip_vars = unsafe { ffi::SCIPgetVars(self.raw) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            unsafe {
-                ffi::SCIPcaptureVar(self.raw, scip_var);
+            if capture {
+                unsafe {
+                    ffi::SCIPcaptureVar(self.raw, scip_var);
+                }
             }
             let var = scip_var;
             let var_id = unsafe { ffi::SCIPvarGetIndex(var) } as usize;
@@ -153,15 +158,17 @@ impl ScipPtr {
         vars
     }
 
-    pub(crate) fn conss(&self) -> Vec<*mut SCIP_Cons> {
+    pub(crate) fn conss(&self, capture: bool) -> Vec<*mut SCIP_Cons> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.n_conss();
         let mut conss = Vec::with_capacity(n_conss);
         let scip_conss = unsafe { ffi::SCIPgetConss(self.raw) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            unsafe {
-                ffi::SCIPcaptureCons(self.raw, scip_cons);
+            if capture {
+                unsafe {
+                    ffi::SCIPcaptureCons(self.raw, scip_cons);
+                }
             }
             conss.push(scip_cons);
         }
