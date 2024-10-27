@@ -40,7 +40,6 @@ pub struct Solving;
 #[derive(Debug)]
 pub struct Solved;
 
-
 impl Model<Unsolved> {
     /// Creates a new `Model` instance with an `Unsolved` state.
     pub fn new() -> Self {
@@ -76,8 +75,7 @@ impl Model<PluginsIncluded> {
             .expect("Failed to create problem in state PluginsIncluded");
         Model {
             scip,
-            state: ProblemCreated {
-            },
+            state: ProblemCreated {},
         }
     }
 
@@ -96,7 +94,7 @@ impl Model<PluginsIncluded> {
         scip.read_prob(filename)?;
         let new_model = Model {
             scip: self.scip,
-            state: ProblemCreated { },
+            state: ProblemCreated {},
         };
         Ok(new_model)
     }
@@ -136,8 +134,7 @@ impl Model<ProblemCreated> {
     pub fn clone_for_plugins(&self) -> ModelSolving {
         ModelSolving {
             scip: Rc::downgrade(&self.scip.clone()),
-            state: Solving {
-            },
+            state: Solving {},
         }
     }
 
@@ -492,7 +489,7 @@ impl Model<Solved> {
             .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode));
         Model {
             scip: self.scip,
-            state: ProblemCreated{},
+            state: ProblemCreated {},
         }
     }
 }
