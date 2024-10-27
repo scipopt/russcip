@@ -22,5 +22,4 @@ Steps:
 ## Code Quality 
 
 - Add documentation for any new methods/struct.
-- Cover any new functionality or test any issue fix . 
-- Update the [change log](https://github.com/scipopt/russcip/blob/main/CHANGELOG.md).
+- Cover any new functionality or test any issue fix. 
