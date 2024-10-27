@@ -33,46 +33,54 @@ impl ScipPtr {
     pub(crate) fn set_str_param(&self, param: &str, value: &str) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         let value = CString::new(value).unwrap();
-        scip_call! { ffi::SCIPsetStringParam(self.raw, param.as_ptr(), value.as_ptr()) };
+        scip_call! { ffi::SCIPsetStringParam(self.raw, param.as_ptr(), value.as_ptr()) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_bool_param(&self, param: &str, value: bool) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
+        scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_int_param(&self, param: &str, value: i32) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_longint_param(&self, param: &str, value: i64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_real_param(&self, param: &str, value: f64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
-        scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) };
+        scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_presolving(&self, presolving: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetPresolving(self.raw, presolving.into(), true.into()) };
+        scip_call! { ffi::SCIPsetPresolving(self.raw, presolving.into(), true.into()) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_separating(&self, separating: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetSeparating(self.raw, separating.into(), true.into()) };
+        scip_call! { ffi::SCIPsetSeparating(self.raw, separating.into(), true.into()) }
+        ;
         Ok(())
     }
 
     pub(crate) fn set_heuristics(&self, heuristics: ParamSetting) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPsetHeuristics(self.raw, heuristics.into(), true.into()) };
+        scip_call! { ffi::SCIPsetHeuristics(self.raw, heuristics.into(), true.into()) }
+        ;
         Ok(())
     }
 
@@ -89,6 +97,9 @@ impl ScipPtr {
             filename.as_ptr(),
             std::ptr::null_mut()
         ));
+        // capture vars and cons since they were not created by the user (and SCIP will free them later)
+        self.vars(true);
+        self.conss(true);
         Ok(())
     }
 
@@ -127,7 +138,8 @@ impl ScipPtr {
             c_path.as_ptr(),
             c_ext.as_ptr(),
             true.into(),
-        ) };
+        ) }
+        ;
         Ok(())
     }
 
@@ -136,15 +148,17 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn vars(&self) -> BTreeMap<usize, *mut SCIP_Var> {
+    pub(crate) fn vars(&self, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
         let scip_vars = unsafe { ffi::SCIPgetVars(self.raw) };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
-            unsafe {
-                ffi::SCIPcaptureVar(self.raw, scip_var);
+            if capture {
+                unsafe {
+                    ffi::SCIPcaptureVar(self.raw, scip_var);
+                }
             }
             let var = scip_var;
             let var_id = unsafe { ffi::SCIPvarGetIndex(var) } as usize;
@@ -153,15 +167,17 @@ impl ScipPtr {
         vars
     }
 
-    pub(crate) fn conss(&self) -> Vec<*mut SCIP_Cons> {
+    pub(crate) fn conss(&self, capture: bool) -> Vec<*mut SCIP_Cons> {
         // NOTE: this method should only be called once per SCIP instance
         let n_conss = self.n_conss();
         let mut conss = Vec::with_capacity(n_conss);
         let scip_conss = unsafe { ffi::SCIPgetConss(self.raw) };
         for i in 0..n_conss {
             let scip_cons = unsafe { *scip_conss.add(i) };
-            unsafe {
-                ffi::SCIPcaptureCons(self.raw, scip_cons);
+            if capture {
+                unsafe {
+                    ffi::SCIPcaptureCons(self.raw, scip_cons);
+                }
             }
             conss.push(scip_cons);
         }
@@ -210,9 +226,11 @@ impl ScipPtr {
             ub,
             obj,
             var_type.into(),
-        ) };
+        ) }
+        ;
         let var_ptr = unsafe { var_ptr.assume_init() };
-        scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
+        scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
+        ;
         Ok(var_ptr)
     }
 
@@ -234,13 +252,16 @@ impl ScipPtr {
             ub,
             obj,
             var_type.into(),
-        ) };
+        ) }
+        ;
         let mut var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) }
         let mut transformed_var = MaybeUninit::uninit();
-        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) }
+        ;
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
-        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) }
+        ;
         Ok(trans_var_ptr)
     }
 
@@ -262,13 +283,17 @@ impl ScipPtr {
             ub,
             obj,
             var_type.into(),
-        ) };
+        ) }
+        ;
         let mut var_ptr = unsafe { var_ptr.assume_init() };
-        scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }; // 1.0 is used as a default score for now
+        scip_call! { ffi::SCIPaddPricedVar(self.raw, var_ptr, 1.0) }
+        ; // 1.0 is used as a default score for now
         let mut transformed_var = MaybeUninit::uninit();
-        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
+        scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) }
+        ;
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
-        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
+        scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) }
+        ;
         Ok(trans_var_ptr)
     }
 
@@ -292,12 +317,15 @@ impl ScipPtr {
             std::ptr::null_mut(),
             lhs,
             rhs,
-        ) };
+        ) }
+        ;
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
+            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) }
+            ;
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -315,12 +343,15 @@ impl ScipPtr {
             c_name.as_ptr(),
             0,
             std::ptr::null_mut(),
-        ) };
+        ) }
+        ;
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) }
+            ;
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -338,12 +369,15 @@ impl ScipPtr {
             c_name.as_ptr(),
             0,
             std::ptr::null_mut(),
-        ) };
+        ) }
+        ;
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) }
+            ;
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -394,10 +428,12 @@ impl ScipPtr {
             quad_coefs.as_mut_ptr(),
             lhs,
             rhs,
-        ) };
+        ) }
+        ;
 
         let scip_cons = unsafe { scip_cons.assume_init() };
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -415,12 +451,15 @@ impl ScipPtr {
             c_name.as_ptr(),
             0,
             std::ptr::null_mut(),
-        ) };
+        ) }
+        ;
         let scip_cons = unsafe { scip_cons.assume_init() };
         for var in vars.iter() {
-            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) };
+            scip_call! { ffi::SCIPaddCoefSetppc(self.raw, scip_cons, var.raw) }
+            ;
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -442,13 +481,17 @@ impl ScipPtr {
             0,
             std::ptr::null_mut(),
             std::ptr::null_mut(),
-        ) };
+        ) }
+        ;
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (ind, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddVarCardinality(self.raw, scip_cons, var.raw, std::ptr::null_mut(), ind as f64) };
+            scip_call! { ffi::SCIPaddVarCardinality(self.raw, scip_cons, var.raw, std::ptr::null_mut(), ind as f64) }
+            ;
         }
-        scip_call! { ffi:: SCIPchgCardvalCardinality(self.raw, scip_cons, cardinality as i32) };
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi:: SCIPchgCardvalCardinality(self.raw, scip_cons, cardinality as i32) }
+        ;
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -484,10 +527,12 @@ impl ScipPtr {
                 .collect::<Vec<_>>()).as_mut_ptr(),
             coefs.as_mut_ptr(),
             rhs,
-        ) };
+        ) }
+        ;
 
         let scip_cons = unsafe { scip_cons.assume_init() };
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) }
+        ;
         Ok(scip_cons)
     }
 
@@ -505,7 +550,8 @@ impl ScipPtr {
         cons: Rc<Constraint>,
         var: Rc<Variable>,
     ) -> Result<(), Retcode> {
-        scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) };
+        scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) }
+        ;
         Ok(())
     }
 

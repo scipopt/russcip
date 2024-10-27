@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::collections::BTreeMap;
 use std::rc::{Rc, Weak};
 
 use crate::constraint::Constraint;
@@ -18,6 +16,7 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 #[derive(Debug)]
 pub struct Model<State> {
     scip: Rc<ScipPtr>,
+    #[allow(dead_code)]
     state: State,
 }
 
@@ -31,54 +30,16 @@ pub struct PluginsIncluded;
 
 /// Represents the state of an optimization model where the problem has been created.
 #[derive(Debug, Clone)]
-pub struct ProblemCreated {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
-}
+pub struct ProblemCreated;
 
 /// Represents the state of an optimization model during the solving process (to be used in plugins).
 #[derive(Debug)]
-pub struct Solving {
-    pub(crate) vars: Weak<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Weak<RefCell<Vec<Rc<Constraint>>>>,
-}
+pub struct Solving;
 
 /// Represents the state of an optimization model that has been solved.
 #[derive(Debug)]
-pub struct Solved {
-    pub(crate) vars: Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>>,
-    pub(crate) conss: Rc<RefCell<Vec<Rc<Constraint>>>>,
-}
+pub struct Solved;
 
-impl ProblemCreated {
-    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
-        self.vars.clone()
-    }
-
-    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
-        self.conss.clone()
-    }
-}
-
-impl Solved {
-    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
-        self.vars.clone()
-    }
-
-    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
-        self.conss.clone()
-    }
-}
-
-impl Solving {
-    fn vars(&self) -> Rc<RefCell<BTreeMap<VarId, Rc<Variable>>>> {
-        self.vars.upgrade().expect("SCIP instance was dropped")
-    }
-
-    fn conss(&self) -> Rc<RefCell<Vec<Rc<Constraint>>>> {
-        self.conss.upgrade().expect("SCIP instance was dropped")
-    }
-}
 
 impl Model<Unsolved> {
     /// Creates a new `Model` instance with an `Unsolved` state.
@@ -116,8 +77,6 @@ impl Model<PluginsIncluded> {
         Model {
             scip,
             state: ProblemCreated {
-                vars: Rc::new(RefCell::new(BTreeMap::new())),
-                conss: Rc::new(RefCell::new(Vec::new())),
             },
         }
     }
@@ -135,36 +94,9 @@ impl Model<PluginsIncluded> {
     pub fn read_prob(mut self, filename: &str) -> Result<Model<ProblemCreated>, Retcode> {
         let scip = self.scip.clone();
         scip.read_prob(filename)?;
-        let vars = Rc::new(RefCell::new(
-            self.scip
-                .vars()
-                .into_iter()
-                .map(|(i, v)| {
-                    (
-                        i,
-                        Rc::new(Variable {
-                            raw: v,
-                            scip: scip.clone(),
-                        }),
-                    )
-                })
-                .collect(),
-        ));
-        let conss = Rc::new(RefCell::new(
-            self.scip
-                .conss()
-                .iter()
-                .map(|c| {
-                    Rc::new(Constraint {
-                        raw: *c,
-                        scip: self.scip.clone(),
-                    })
-                })
-                .collect(),
-        ));
         let new_model = Model {
             scip: self.scip,
-            state: ProblemCreated { vars, conss },
+            state: ProblemCreated { },
         };
         Ok(new_model)
     }
@@ -173,6 +105,7 @@ impl Model<PluginsIncluded> {
 /// Represents a model in the solving state. This is meant to be used in plugins (callbacks).
 pub struct ModelSolving {
     scip: Weak<ScipPtr>,
+    #[allow(dead_code)]
     state: Solving,
 }
 
@@ -204,8 +137,6 @@ impl Model<ProblemCreated> {
         ModelSolving {
             scip: Rc::downgrade(&self.scip.clone()),
             state: Solving {
-                vars: Rc::downgrade(&self.state.vars().clone()),
-                conss: Rc::downgrade(&self.state.conss().clone()),
             },
         }
     }
@@ -259,9 +190,7 @@ impl Model<ProblemCreated> {
             raw: var,
             scip: self.scip.clone(),
         };
-        let var_id = var.index();
         let var = Rc::new(var);
-        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -411,10 +340,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to solve problem in state ProblemCreated");
         Model {
             scip: self.scip,
-            state: Solved {
-                vars: self.state.vars(),
-                conss: self.state.conss(),
-            },
+            state: Solved {},
         }
     }
 }
@@ -457,9 +383,7 @@ impl ModelSolving {
             raw: var,
             scip: self.scip().clone(),
         };
-        let var_id = var.index();
         let var = Rc::new(var);
-        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -515,8 +439,6 @@ impl ModelSolving {
             scip: self.scip().clone(),
         };
         let var = Rc::new(var);
-        let var_id = var.index();
-        self.state.vars().borrow_mut().insert(var_id, var.clone());
         var
     }
 
@@ -570,10 +492,7 @@ impl Model<Solved> {
             .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode));
         Model {
             scip: self.scip,
-            state: ProblemCreated {
-                vars: self.state.vars(),
-                conss: self.state.conss(),
-            },
+            state: ProblemCreated{},
         }
     }
 }
@@ -605,12 +524,30 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all variables in the optimization model.
             fn vars(&self) -> Vec<Rc<Variable>> {
-                self.state.vars().borrow().values().map(Rc::clone).collect()
+                let scip_vars = self.scip().vars(false);
+                scip_vars
+                    .into_iter()
+                    .map(|(_i,v)| Variable {
+                        raw: v,
+                        scip: self.scip().clone(),
+                    })
+                    .map(Rc::new)
+                    .collect()
             }
 
             /// Returns the variable with the given ID, if it exists.
             fn var(&self, var_id: VarId) -> Option<Rc<Variable>> {
-                self.state.vars().borrow().get(&var_id).map(Rc::clone)
+                let vars = self.scip().vars(false);
+                for (i, v) in vars {
+                    if i == var_id {
+                        return Some(Rc::new(Variable {
+                            raw: v,
+                            scip: self.scip().clone(),
+                        }));
+                    }
+                }
+
+                None
             }
 
             /// Returns the number of variables in the optimization model.
@@ -625,7 +562,15 @@ macro_rules! impl_ModelWithProblem {
 
             /// Returns a vector of all constraints in the optimization model.
             fn conss(&mut self) -> Vec<Rc<Constraint>> {
-                self.state.conss().borrow().iter().map(Rc::clone).collect()
+                let scip_conss = self.scip().conss(false);
+                scip_conss
+                    .into_iter()
+                    .map(|c| Constraint {
+                        raw: c,
+                        scip: self.scip().clone(),
+                    })
+                    .map(Rc::new)
+                    .collect()
             }
 
             /// Writes the optimization model to a file with the given path and extension.
@@ -942,7 +887,6 @@ macro_rules! impl_ProblemOrSolving {
                         scip: self.scip().clone(),
                     }
                 );
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -982,7 +926,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1010,7 +953,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1038,7 +980,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1066,7 +1007,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1094,7 +1034,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
 
@@ -1133,7 +1072,6 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
-                self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
         })*
