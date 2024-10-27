@@ -272,6 +272,11 @@ impl ScipPtr {
         Ok(trans_var_ptr)
     }
 
+    pub(crate) fn add_cons(&self, cons: Rc<Constraint>) -> Result<(), Retcode> {
+        scip_call! { ffi::SCIPaddCons(self.raw, cons.raw) };
+        Ok(())
+    }
+
     pub(crate) fn create_cons(
         &self,
         vars: Vec<Rc<Variable>>,
@@ -292,12 +297,12 @@ impl ScipPtr {
             std::ptr::null_mut(),
             lhs,
             rhs,
-        ) };
+        ) }
         let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+
         Ok(scip_cons)
     }
 

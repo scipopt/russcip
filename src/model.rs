@@ -706,6 +706,42 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Rc<Constraint>;
+
+    /// Creates a new constraint without adding it to the model.
+    /// Could be used to pass it as input to other constraint types.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The variables in the constraint.
+    /// * `coefs` - The coefficients of the variables in the constraint.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn create_cons(
+        &mut self,
+        vars: Vec<Rc<Variable>>,
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Rc<Constraint>;
+
+    /// Adds a disjunction constraint to the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `conss` - The constraints in the disjunction.
+    /// * `name` - The name of the disjunction.
+    ///
+
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
     /// # Arguments
@@ -947,6 +983,27 @@ macro_rules! impl_ProblemOrSolving {
             }
 
 
+            fn create_cons(
+                &mut self,
+                vars: Vec<Rc<Variable>>,
+                coefs: &[f64],
+                lhs: f64,
+                rhs: f64,
+                name: &str,
+            ) -> Rc<Constraint> {
+                assert_eq!(vars.len(), coefs.len());
+                let cons = self
+                    .scip()
+                    .create_cons(vars, coefs, lhs, rhs, name)
+                    .expect("Failed to create constraint in state ProblemCreated");
+                let cons = Rc::new( Constraint {
+                    raw: cons,
+                    scip: self.scip().clone(),
+                });
+                self.state.conss().borrow_mut().push(cons.clone());
+                cons
+            }
+
 
             /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
             ///
@@ -982,6 +1039,7 @@ macro_rules! impl_ProblemOrSolving {
                     raw: cons,
                     scip: self.scip().clone(),
                 });
+                self.scip().add_cons(cons.clone()).expect("Failed to add constraint in state ProblemCreated");
                 self.state.conss().borrow_mut().push(cons.clone());
                 cons
             }
@@ -1967,5 +2025,25 @@ mod tests {
         let best_bound = solved_model.best_bound();
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
+    }
+
+    #[test]
+    fn create_cons() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+
+        // create a constraint but don't add it to the model
+        let _cons = model.create_cons(vec![x1.clone(), x2.clone()], &[1., 1.], -f64::INFINITY, 1., "c1");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.obj_val(), 7.);
     }
 }
