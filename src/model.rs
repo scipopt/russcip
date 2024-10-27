@@ -187,8 +187,8 @@ impl Model<ProblemCreated> {
             raw: var,
             scip: self.scip.clone(),
         };
-        let var = Rc::new(var);
-        var
+        
+        Rc::new(var)
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -380,8 +380,8 @@ impl ModelSolving {
             raw: var,
             scip: self.scip().clone(),
         };
-        let var = Rc::new(var);
-        var
+        
+        Rc::new(var)
     }
 
     /// Adds a new priced variable to the SCIP data structure.
@@ -435,8 +435,8 @@ impl ModelSolving {
             raw: var,
             scip: self.scip().clone(),
         };
-        let var = Rc::new(var);
-        var
+        
+        Rc::new(var)
     }
 
     /// Gets the variable in current problem given its index (in the problem).
