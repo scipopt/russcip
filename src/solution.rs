@@ -67,7 +67,6 @@ impl Solution {
         }
         map
     }
-
 }
 
 impl fmt::Debug for Solution {
