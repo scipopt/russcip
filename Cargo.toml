@@ -14,7 +14,7 @@ bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 
 [dependencies]
-scip-sys = "0.1.14"
+scip-sys = "0.1.15"
 
 [dev-dependencies]
 rayon = "1.5.1"
