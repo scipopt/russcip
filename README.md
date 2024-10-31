@@ -32,6 +32,7 @@ To build SCIP from source, you can enable the `from-source` feature. This will d
 ```bash
 cargo add russcip --features from-source
 ```
+This is currently the most relaiable way to get a statically-linked build of SCIP. However, it only includes SCIP with SoPlex so can only handle linear constraints. 
 
 ### Custom SCIP installation
 If no feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
