@@ -1156,7 +1156,7 @@ macro_rules! impl_WithSolvingStats {
 impl_WithSolvingStats!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
 
 pub(crate) trait HasScipPtr {
-    fn scip(&self) -> Rc<ScipPtr>;// Returns a pointer to the underlying SCIP instance.
+    fn scip(&self) -> Rc<ScipPtr>; // Returns a pointer to the underlying SCIP instance.
 
     // Returns a pointer to the underlying SCIP instance.
     ///
@@ -1187,7 +1187,6 @@ impl HasScipPtr for ModelSolving {
         self.scip.upgrade().expect("SCIP instance was dropped")
     }
 }
-
 
 impl<T> Model<T> {
     /// Returns the status of the optimization model.
