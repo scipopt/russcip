@@ -108,10 +108,6 @@ pub struct ModelSolving {
 }
 
 impl Model<ProblemCreated> {
-    fn scip(&self) -> Rc<ScipPtr> {
-        self.scip.clone()
-    }
-
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -343,10 +339,6 @@ impl Model<ProblemCreated> {
 }
 
 impl ModelSolving {
-    fn scip(&self) -> Rc<ScipPtr> {
-        self.scip.upgrade().expect("SCIP instance was dropped")
-    }
-
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -457,10 +449,6 @@ impl ModelSolving {
 }
 
 impl Model<Solved> {
-    fn scip(&self) -> Rc<ScipPtr> {
-        self.scip.clone()
-    }
-
     /// Returns the objective value of the best solution found by the optimization model.
     pub fn obj_val(&self) -> f64 {
         self.scip.obj_val()
@@ -1167,18 +1155,40 @@ macro_rules! impl_WithSolvingStats {
 
 impl_WithSolvingStats!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
 
-impl<T> Model<T> {
-    /// Returns a pointer to the underlying SCIP instance.
+pub(crate) trait HasScipPtr {
+    fn scip(&self) -> Rc<ScipPtr>; // Returns a pointer to the underlying SCIP instance.
+
+    // Returns a pointer to the underlying SCIP instance.
     ///
     /// # Safety
     ///
     /// This method is unsafe because it returns a raw pointer to the underlying SCIP instance.
     /// The caller must ensure that the pointer is used safely and correctly.
     #[cfg(feature = "raw")]
-    pub unsafe fn scip_ptr(&self) -> *mut ffi::SCIP {
-        self.scip.raw
+    unsafe fn scip_ptr(&self) -> *mut ffi::SCIP {
+        self.scip().raw
     }
+}
 
+impl HasScipPtr for Model<ProblemCreated> {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.clone()
+    }
+}
+
+impl HasScipPtr for Model<Solved> {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.clone()
+    }
+}
+
+impl HasScipPtr for ModelSolving {
+    fn scip(&self) -> Rc<ScipPtr> {
+        self.scip.upgrade().expect("SCIP instance was dropped")
+    }
+}
+
+impl<T> Model<T> {
     /// Returns the status of the optimization model.
     pub fn status(&self) -> Status {
         self.scip.status()
