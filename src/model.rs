@@ -1155,10 +1155,12 @@ macro_rules! impl_WithSolvingStats {
 
 impl_WithSolvingStats!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
 
-pub(crate) trait HasScipPtr {
-    fn scip(&self) -> Rc<ScipPtr>; // Returns a pointer to the underlying SCIP instance.
+/// A trait for optimization models with any state that hold a pointer to the underlying SCIP instance.
+pub trait HasScipPtr {
+    /// Returns a reference-counted pointer to the underlying SCIP instance.
+    fn scip(&self) -> Rc<ScipPtr>;
 
-    // Returns a pointer to the underlying SCIP instance.
+    /// Returns a pointer to the underlying SCIP instance.
     ///
     /// # Safety
     ///
