@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 #[non_exhaustive]
 #[derive(Debug)]
-pub(crate) struct ScipPtr {
+pub struct ScipPtr {
     pub(crate) raw: *mut ffi::SCIP,
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
