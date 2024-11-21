@@ -2,13 +2,13 @@ use std::rc::{Rc, Weak};
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
-use crate::{ffi, Separator};
 use crate::node::Node;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
+use crate::{ffi, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 
 /// Represents an optimization model.

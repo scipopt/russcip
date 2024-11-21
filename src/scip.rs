@@ -1,6 +1,9 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense, ParamSetting, Retcode, Solution, Status, VarType, Variable, Separator};
+use crate::{
+    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
+    ParamSetting, Retcode, Separator, Solution, Status, VarType, Variable,
+};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
 use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
@@ -928,7 +931,6 @@ impl ScipPtr {
         delay: bool,
         separator: Box<dyn Separator>,
     ) -> Result<(), Retcode> {
-
         let c_name = CString::new(name).unwrap();
         let c_desc = CString::new(desc).unwrap();
 
@@ -960,7 +962,6 @@ impl ScipPtr {
         ) -> ffi::SCIP_Retcode {
             Retcode::Okay.into()
         }
-
 
         extern "C" fn sepfree(
             _scip: *mut ffi::SCIP,
@@ -994,8 +995,6 @@ impl ScipPtr {
             Some(sepexecsol),
             sep_faker,
         ));
-
-
 
         Ok(())
     }

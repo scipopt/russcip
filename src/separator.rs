@@ -7,7 +7,6 @@ pub trait Separator {
     fn execute_lp(&mut self) -> SeparationResult;
 }
 
-
 /// The result of a separation routine.
 pub enum SeparationResult {
     /// Detected that the node is infeasible in the variable's bounds and can be cut off
@@ -27,7 +26,6 @@ pub enum SeparationResult {
     /// A new separation round should be started without calling the remaining separator methods
     NewRound,
 }
-
 
 impl From<SCIP_Result> for SeparationResult {
     fn from(result: SCIP_Result) -> Self {
