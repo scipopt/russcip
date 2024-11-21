@@ -52,6 +52,10 @@ pub use eventhdlr::*;
 pub mod heuristic;
 pub use heuristic::*;
 
+/// Contains the `Separator` trait used to define custom separation routines.
+pub mod separator;
+pub use separator::*;
+
 /// Contains all the traits and structs that are re-exported by default.
 pub mod prelude;
 
