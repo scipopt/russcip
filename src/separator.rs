@@ -58,11 +58,10 @@ impl From<SeparationResult> for SCIP_Result {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::Model;
     use super::*;
+    use crate::Model;
 
     struct NotRunningSeparator;
 
@@ -84,16 +83,17 @@ mod tests {
 
         let sep = NotRunningSeparator;
 
-        model.include_separator(
-            "NotRunningSeparator",
-            "",
-            1000000,
-            1,
-            1.0,
-            false,
-            false,
-            Box::new(sep),
-        ).solve();
+        model
+            .include_separator(
+                "NotRunningSeparator",
+                "",
+                1000000,
+                1,
+                1.0,
+                false,
+                false,
+                Box::new(sep),
+            )
+            .solve();
     }
-
 }
