@@ -57,3 +57,43 @@ impl Into<SCIP_Result> for SeparationResult {
         }
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{Model, ModelSolving, ModelWithProblem, ProblemOrSolving, Status, VarType};
+    use super::*;
+
+    struct NotRunningSeparator;
+
+    impl Separator for NotRunningSeparator {
+        fn execute_lp(&mut self) -> SeparationResult {
+            SeparationResult::DidNotRun
+        }
+    }
+
+    #[test]
+    fn test_not_running_separator() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/nodes", 2)
+            .unwrap() // only call brancher once
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+
+        let sep = NotRunningSeparator;
+
+        model.include_separator(
+            "NotRunningSeparator",
+            "",
+            1000000,
+            1,
+            1.0,
+            false,
+            false,
+            Box::new(sep),
+        ).solve();
+    }
+
+}
