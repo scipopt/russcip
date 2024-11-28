@@ -43,9 +43,9 @@ impl From<SCIP_Result> for SeparationResult {
     }
 }
 
-impl Into<SCIP_Result> for SeparationResult {
-    fn into(self) -> SCIP_Result {
-        match self {
+impl From<SeparationResult> for SCIP_Result {
+    fn from(val: SeparationResult) -> Self {
+        match val {
             SeparationResult::Cutoff => ffi::SCIP_Result_SCIP_CUTOFF,
             SeparationResult::ConsAdded => ffi::SCIP_Result_SCIP_CONSADDED,
             SeparationResult::ReducedDomain => ffi::SCIP_Result_SCIP_REDUCEDDOM,
@@ -61,7 +61,7 @@ impl Into<SCIP_Result> for SeparationResult {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Model, ModelSolving, ModelWithProblem, ProblemOrSolving, Status, VarType};
+    use crate::Model;
     use super::*;
 
     struct NotRunningSeparator;
