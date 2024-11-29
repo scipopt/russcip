@@ -2,13 +2,13 @@ use std::rc::{Rc, Weak};
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
-use crate::ffi;
 use crate::node::Node;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
+use crate::{ffi, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 
 /// Represents an optimization model.
@@ -265,6 +265,48 @@ impl Model<ProblemCreated> {
                 heur,
             )
             .expect("Failed to include heuristic at state ProblemCreated");
+        self
+    }
+
+    /// Includes a new separator in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the separator. This should be a unique identifier.
+    /// * `desc` - A brief description of the separator. This is used for informational purposes.
+    /// * `priority` - The priority of the separator. When SCIP decides which separator to call, it considers their priorities. A higher value indicates a higher priority.
+    /// * `freq` - The frequency for calling the separator in the tree; 1 means at every node, 2 means at every other node and so on, -1 turns off the separator.
+    /// * `maxbounddist` - The maximum relative distance from the current node's dual bound to primal bound compared to the best node's dual bound for applying the separator. A value of 0.0 means the separator can only be applied on the current best node, while 1.0 means it can be applied on all nodes.
+    /// * `usesubscip` - Does the separator use a secondary SCIP instance?
+    /// * `delay` - A boolean indicating whether the separator should be delayed.
+    /// * `separator`- The separator to be included. This should be a mutable reference to an object that implements the `Separator` trait, and represents the separator data.
+    ///
+    /// # Returns
+    ///
+    /// This function returns the `Model` instance for which the separator was included. This allows for method chaining.
+    pub fn include_separator(
+        self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        freq: i32,
+        maxbounddist: f64,
+        usesubscip: bool,
+        delay: bool,
+        separator: Box<dyn Separator>,
+    ) -> Self {
+        self.scip
+            .include_separator(
+                name,
+                desc,
+                priority,
+                freq,
+                maxbounddist,
+                usesubscip,
+                delay,
+                separator,
+            )
+            .expect("Failed to include separator at state ProblemCreated");
         self
     }
 

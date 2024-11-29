@@ -2,7 +2,7 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
-    ParamSetting, Retcode, Solution, Status, VarType, Variable,
+    ParamSetting, Retcode, Separator, Solution, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -915,6 +915,85 @@ impl ScipPtr {
             None,
             Some(heurexec),
             heur_faker,
+        ));
+
+        Ok(())
+    }
+
+    pub(crate) fn include_separator(
+        &self,
+        name: &str,
+        desc: &str,
+        priority: i32,
+        freq: i32,
+        maxbounddist: f64,
+        usesubscip: bool,
+        delay: bool,
+        separator: Box<dyn Separator>,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn sepexeclp(
+            _scip: *mut ffi::SCIP,
+            separator: *mut ffi::SCIP_SEPA,
+            result: *mut ffi::SCIP_RESULT,
+            _allowlocal: ::std::os::raw::c_uint,
+            _depth: ::std::os::raw::c_int,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPsepaGetData(separator) };
+            assert!(!data_ptr.is_null());
+            let rule_ptr = data_ptr as *mut Box<dyn Separator>;
+
+            let sep_res = unsafe { (*rule_ptr).execute_lp() };
+
+            unsafe { *result = sep_res.into() };
+
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn sepexecsol(
+            _scip: *mut ffi::SCIP,
+            _separator: *mut ffi::SCIP_SEPA,
+            _sol: *mut SCIP_SOL,
+            _result: *mut ffi::SCIP_RESULT,
+            _allowlocal: ::std::os::raw::c_uint,
+            _depth: ::std::os::raw::c_int,
+        ) -> ffi::SCIP_Retcode {
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn sepfree(
+            _scip: *mut ffi::SCIP,
+            separator: *mut ffi::SCIP_SEPA,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPsepaGetData(separator) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Separator>) });
+            Retcode::Okay.into()
+        }
+
+        let ptr = Box::into_raw(Box::new(separator));
+        let sep_faker = ptr as *mut ffi::SCIP_SEPADATA;
+
+        scip_call!(ffi::SCIPincludeSepa(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            priority,
+            freq,
+            maxbounddist,
+            usesubscip.into(),
+            delay.into(),
+            None,
+            Some(sepfree),
+            None,
+            None,
+            None,
+            None,
+            Some(sepexeclp),
+            Some(sepexecsol),
+            sep_faker,
         ));
 
         Ok(())
