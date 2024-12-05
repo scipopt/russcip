@@ -61,7 +61,7 @@ impl From<SeparationResult> for SCIP_Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Model;
+    use crate::{minimal_model, Model, ModelSolving, ModelWithProblem, ObjSense, ParamSetting, ProblemOrSolving, Unsolved, VarType};
 
     struct NotRunningSeparator;
 
@@ -96,4 +96,56 @@ mod tests {
             )
             .solve();
     }
+
+
+    struct ConsAddingSeparator {
+        model: ModelSolving,
+    }
+
+
+    impl Separator for ConsAddingSeparator {
+        fn execute_lp(&mut self) -> SeparationResult {
+            // adds a row representing the sum of all variables >= 1
+            let vars = self.model.vars();
+            let varlen = vars.len();
+
+            self.model.add_cons(
+                vars,
+                &vec![1.0; varlen],
+                5.0,
+                5.0,
+                "cons_added",
+            );
+            SeparationResult::ConsAdded
+        }
+    }
+
+
+    #[test]
+    fn cons_adding_separator() {
+        let mut model = minimal_model()
+            .hide_output()
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x= model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+        let y= model.add_var(0.0, 1.0, 1.0, "y", VarType::Binary);
+
+        model.add_cons(vec![x, y], &[1.0, 1.0], 1.0, 1.0, "cons1");
+
+        let sep = ConsAddingSeparator { model: model.clone_for_plugins() };
+
+        model
+            .include_separator(
+                "ConsAddingSeparator",
+                "",
+                1000000,
+                1,
+                1.0,
+                false,
+                false,
+                Box::new(sep),
+            )
+            .solve();
+    }
 }
+
