@@ -1232,6 +1232,14 @@ impl HasScipPtr for ModelSolving {
     }
 }
 
+/// Creates a minimal `Model` instance and sets off a lot of SCIP plugins, useful for writing tests.
+pub fn minimal_model() -> Model<ProblemCreated> {
+    Model::default()
+        .set_presolving(ParamSetting::Off)
+        .set_heuristics(ParamSetting::Off)
+        .set_separating(ParamSetting::Off)
+}
+
 impl<T> Model<T> {
     /// Returns the status of the optimization model.
     pub fn status(&self) -> Status {

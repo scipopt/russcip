@@ -300,11 +300,15 @@ impl ScipPtr {
             lhs,
             rhs,
         ) };
-        let scip_cons = unsafe { scip_cons.assume_init() };
+        let mut scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
+            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+        }
         Ok(scip_cons)
     }
 
