@@ -61,7 +61,7 @@ impl From<SeparationResult> for SCIP_Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{minimal_model, Model, ModelSolving, ModelWithProblem, ObjSense, ParamSetting, ProblemOrSolving, Unsolved, VarType};
+    use crate::{minimal_model, Model, ModelSolving, ModelWithProblem, ObjSense, ProblemOrSolving, VarType};
 
     struct NotRunningSeparator;
 
@@ -134,7 +134,8 @@ mod tests {
 
         let sep = ConsAddingSeparator { model: model.clone_for_plugins() };
 
-        model
+
+        let solved = model
             .include_separator(
                 "ConsAddingSeparator",
                 "",
@@ -146,6 +147,9 @@ mod tests {
                 Box::new(sep),
             )
             .solve();
+
+
+        assert_eq!(solved.status(), crate::Status::Infeasible);
     }
 }
 
