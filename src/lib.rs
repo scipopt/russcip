@@ -4,6 +4,7 @@
 //! For examples and usage, please refer to the [repository](https://github.com/scipopt/russcip).
 
 #![deny(missing_docs)]
+#![allow(clippy::macro_metavars_in_unsafe)]
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
