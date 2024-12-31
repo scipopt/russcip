@@ -42,7 +42,7 @@ jobs:
           fail_ci_if_error: false
 
   linux-conda-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: conda-incubator/setup-miniconda@v2
