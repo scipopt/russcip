@@ -47,7 +47,7 @@ impl Col {
     /// Returns the variable associated with the column.
     pub fn var(&self) -> Variable {
         let var_ptr = unsafe { ffi::SCIPcolGetVar(self.raw) };
-        
+
         Variable {
             raw: var_ptr,
             scip: Rc::clone(&self.scip),
