@@ -47,11 +47,11 @@ impl Col {
     /// Returns the variable associated with the column.
     pub fn var(&self) -> Variable {
         let var_ptr = unsafe { ffi::SCIPcolGetVar(self.raw) };
-        let var = Variable {
+        
+        Variable {
             raw: var_ptr,
             scip: Rc::clone(&self.scip),
-        };
-        var
+        }
     }
 
     // extern "C" {
@@ -222,11 +222,11 @@ mod tests {
             assert_eq!(col.max_primal_sol(), 1.0);
             assert_eq!(col.basis_status(), BasisStatus::Basic);
             assert_eq!(col.var_probindex(), Some(0));
-            assert_eq!(col.is_integral(), true);
-            assert_eq!(col.is_removable(), false);
+            assert!(col.is_integral());
+            assert!(!col.is_removable());
             assert_eq!(col.lp_pos(), Some(0));
             assert_eq!(col.lp_depth(), Some(0));
-            assert_eq!(col.is_in_lp(), true);
+            assert!(col.is_in_lp());
             assert_eq!(col.n_non_zeros(), 1);
             assert_eq!(col.n_lp_non_zeros(), 1);
             assert_eq!(col.vals(), vec![1.0]);
