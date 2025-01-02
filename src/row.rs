@@ -17,7 +17,7 @@ impl Row {
     }
 
     /// Returns the number of non-zero entries in the row.
-    pub fn non_zeroes(&self) -> usize {
+    pub fn n_non_zeroes(&self) -> usize {
         let len = unsafe { ffi::SCIProwGetNNonz(self.raw) };
         assert!(len >= 0);
         len as usize
@@ -196,6 +196,7 @@ impl From<ffi::SCIP_BASESTAT> for BasisStatus {
 }
 
 /// The origin type of row.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum RowOrigin {
     /// The row was created by a constraint handler.
     ConsHandler,
@@ -219,5 +220,70 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
             ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_UNSPEC => RowOrigin::Unspecified,
             _ => panic!("Unknown row origin type"),
         }
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{Eventhdlr, EventMask, HasScipPtr, minimal_model, ModelSolving, ModelWithProblem, ProblemOrSolving, VarType};
+
+    struct RowTesterEventHandler {
+        model: ModelSolving,
+    }
+
+    impl Eventhdlr for RowTesterEventHandler {
+        fn get_type(&self) -> EventMask {
+            EventMask::FIRST_LP_SOLVED
+        }
+
+        fn execute(&mut self) {
+            let first_cons = self.model.conss()[0].clone();
+            let row = first_cons.row().unwrap();
+            assert_eq!(row.n_non_zeroes(), 1);
+            assert_eq!(row.lhs(), 1.0);
+            assert_eq!(row.index(), 0);
+            assert!(row.is_modifiable());
+            assert!(!row.is_removable());
+            assert!(!row.is_local());
+            assert!(row.is_integral());
+            assert!(row.constraint().is_some());
+            assert_eq!(row.basis_status(), crate::BasisStatus::Lower);
+            assert_eq!(row.origin_type(), crate::RowOrigin::Constraint);
+            assert!(!row.is_in_global_cut_pool());
+            assert!(row.is_in_lp());
+            assert_eq!(row.lp_position(), Some(0));
+            assert_eq!(row.depth(), 0);
+            assert_eq!(row.active_lp_count(), 1);
+            assert_eq!(row.n_lp_since_create(), 1);
+            assert_eq!(row.rank(), 0);
+            row.set_rank(1);
+            assert_eq!(row.rank(), 1);
+            assert_eq!(row.name(), "cons1");
+            assert_eq!(row.age(), 0);
+            assert_eq!(row.dual(), 1.0);
+            let infinity = unsafe { crate::ffi::SCIPinfinity(self.model.scip().raw) };
+            assert!(row.farkas_dual() >= infinity);
+            assert!(row.rhs() - 1.0 < 1e-9);
+            assert!(row.lhs() - 1.0 < 1e-9);
+        }
+    }
+
+    #[test]
+    fn test_row() {
+        let mut model = minimal_model();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+
+        let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
+        model.set_cons_modifiable(cons, true);
+
+        let eventhdlr = Box::new(RowTesterEventHandler { model: model.clone_for_plugins() });
+        model = model.include_eventhdlr(
+            "ColTesterEventHandler", "",
+            eventhdlr,
+        );
+
+        model.solve();
     }
 }

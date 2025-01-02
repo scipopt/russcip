@@ -17,12 +17,6 @@ impl Col {
         self.raw
     }
 
-    /// Returns the number of non-zero entries in the column.
-    pub fn len(&self) -> usize {
-        let len = unsafe { ffi::SCIPcolGetNNonz(self.raw) };
-        assert!(len >= 0);
-        len as usize
-    }
 
     /// Returns the index of the column.
     pub fn index(&self) -> usize {
