@@ -196,3 +196,64 @@ impl PartialEq for Col {
         self.index() == other.index() && self.raw == other.raw
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use crate::{BasisStatus, Eventhdlr, EventMask, minimal_model, ModelSolving, ModelWithProblem, ProblemOrSolving, VarType};
+
+    struct ColTesterEventHandler {
+        model: ModelSolving,
+    }
+
+    impl Eventhdlr for ColTesterEventHandler {
+        fn get_type(&self) -> EventMask {
+            EventMask::FIRST_LP_SOLVED
+        }
+
+        fn execute(&mut self) {
+            let vars = self.model.vars();
+            let first_var = vars[0].clone();
+            let col = first_var.col().unwrap();
+            assert_eq!(col.index(), 0);
+            assert_eq!(col.index(), 0);
+            assert_eq!(col.index(), 0);
+            assert_eq!(col.obj(), 1.0);
+            assert_eq!(col.lb(), 0.0);
+            assert_eq!(col.ub(), 1.0);
+            assert_eq!(col.best_bound(), 0.0);
+            assert_eq!(col.primal_sol(), 1.0);
+            assert_eq!(col.min_primal_sol(), 1.0);
+            assert_eq!(col.max_primal_sol(), 1.0);
+            assert_eq!(col.basis_status(), BasisStatus::Basic);
+            assert_eq!(col.var_probindex(), Some(0));
+            assert_eq!(col.is_integral(), true);
+            assert_eq!(col.is_removable(), false);
+            assert_eq!(col.lp_pos(), Some(0));
+            assert_eq!(col.lp_depth(), Some(0));
+            assert_eq!(col.is_in_lp(), true);
+            assert_eq!(col.n_non_zeros(), 1);
+            assert_eq!(col.n_lp_non_zeros(), 1);
+            assert_eq!(col.vals(), vec![1.0]);
+            assert_eq!(col.strong_branching_node(), None);
+            assert_eq!(col.n_strong_branches(), 0);
+            assert_eq!(col.age(), 0);}
+    }
+
+    #[test]
+    fn test_col() {
+        let mut model = minimal_model();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+
+        let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
+        model.set_cons_modifiable(cons, true);
+
+        let eventhdlr = Box::new(ColTesterEventHandler { model: model.clone_for_plugins() });
+        model = model.include_eventhdlr(
+            "ColTesterEventHandler", "",
+            eventhdlr,
+        );
+
+        model.solve();
+    }
+}

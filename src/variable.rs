@@ -1,4 +1,4 @@
-use crate::ffi;
+use crate::{Col, ffi};
 use crate::scip::ScipPtr;
 use core::panic;
 use scip_sys::SCIP_Status;
@@ -69,6 +69,25 @@ impl Variable {
     pub fn status(&self) -> VarStatus {
         let status = unsafe { ffi::SCIPvarGetStatus(self.raw) };
         status.into()
+    }
+
+    /// Returns the column associated with the variable.
+    pub fn col(&self) -> Option<Col> {
+        if self.is_in_lp() {
+            let col_ptr = unsafe { ffi::SCIPvarGetCol(self.raw) };
+            let col = Col {
+                raw: col_ptr,
+                scip: Rc::clone(&self.scip),
+            };
+            Some(col)
+        } else {
+            None
+        }
+    }
+
+    /// Returns whether the variable is a column variable in the LP relaxation.
+    pub fn is_in_lp(&self) -> bool {
+        (unsafe { ffi::SCIPvarIsInLP(self.raw) }) != 0
     }
 }
 

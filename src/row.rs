@@ -171,6 +171,7 @@ impl PartialEq for Row {
 }
 
 /// The basis status of a row.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BasisStatus {
     /// The row is at its lower bound.
     Lower,
