@@ -1,14 +1,14 @@
-use std::rc::Rc;
-use crate::{ffi, Variable};
 use crate::row::BasisStatus;
-use crate::scip::ScipPtr;
 use crate::row::Row;
+use crate::scip::ScipPtr;
+use crate::{ffi, Variable};
+use std::rc::Rc;
 
-struct Col {
+/// A column in the LP relaxation.
+pub struct Col {
     pub(crate) raw: *mut ffi::SCIP_COL,
     pub(crate) scip: Rc<ScipPtr>,
 }
-
 
 impl Col {
     #[cfg(feature = "raw")]
@@ -76,12 +76,10 @@ impl Col {
         unsafe { ffi::SCIPcolGetMinPrimsol(self.raw) }
     }
 
-
     /// Returns the maximal LP solution value, this column ever assumed.
     pub fn max_primal_sol(&self) -> f64 {
         unsafe { ffi::SCIPcolGetMaxPrimsol(self.raw) }
     }
-
 
     /// Returns the basis status of a column in the LP solution.
     pub fn basis_status(&self) -> BasisStatus {
@@ -98,16 +96,14 @@ impl Col {
         }
     }
 
-
     /// Returns whether the column is of integral type.
     pub fn is_integral(&self) -> bool {
-        unsafe { ffi::SCIPcolIsIntegral(self.raw) }.into()
+        (unsafe { ffi::SCIPcolIsIntegral(self.raw) }) != 0
     }
-
 
     /// Returns whether the column is removable from the LP.
     pub fn is_removable(&self) -> bool {
-        unsafe { ffi::SCIPcolIsRemovable(self.raw) }.into()
+        (unsafe { ffi::SCIPcolIsRemovable(self.raw) }) != 0
     }
 
     /// Returns the position of the column in the current LP.
@@ -130,10 +126,9 @@ impl Col {
         }
     }
 
-
     /// Returns whether the column is in the current LP.
     pub fn is_in_lp(&self) -> bool {
-        unsafe { ffi::SCIPcolIsInLP(self.raw) }.into()
+        (unsafe { ffi::SCIPcolIsInLP(self.raw) }) != 0
     }
 
     /// Returns the number of non-zero entries.
@@ -150,18 +145,17 @@ impl Col {
         n_lp_non_zeros as usize
     }
 
-
     /// Returns the rows of non-zero entries.
     pub fn rows(&self) -> Vec<Row> {
         let n_non_zeros = self.n_non_zeros();
         let rows_ptr = unsafe { ffi::SCIPcolGetRows(self.raw) };
         let rows = unsafe { std::slice::from_raw_parts(rows_ptr, n_non_zeros) };
-        rows.iter().map(|&row_ptr| {
-            Row {
+        rows.iter()
+            .map(|&row_ptr| Row {
                 raw: row_ptr,
                 scip: Rc::clone(&self.scip),
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Returns the coefficients of non-zero entries.
@@ -172,7 +166,6 @@ impl Col {
         vals.to_vec()
     }
 
-
     /// Returns the node number of the last node in current branch and bound run, where strong branching was used on the given column.
     pub fn strong_branching_node(&self) -> Option<i64> {
         let node = unsafe { ffi::SCIPcolGetStrongbranchNode(self.raw) };
@@ -182,7 +175,6 @@ impl Col {
             Some(node)
         }
     }
-
 
     /// Returns the number of times, strong branching was applied in current run on the given column.
     pub fn n_strong_branches(&self) -> usize {

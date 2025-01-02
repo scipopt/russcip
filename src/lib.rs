@@ -61,9 +61,12 @@ pub use separator::*;
 pub mod prelude;
 
 mod scip;
+
+/// Contains the `Col` struct, which represents a column in an LP relaxation.
 pub mod col;
 pub use col::*;
 
+/// Contains the `Row` struct, which represents a row in an LP relaxation.
 pub mod row;
 pub use row::*;
 

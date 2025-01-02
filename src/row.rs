@@ -1,13 +1,13 @@
+use crate::scip::ScipPtr;
+use crate::{ffi, Constraint};
 use std::ffi::c_int;
 use std::rc::Rc;
-use crate::{Constraint, ffi};
-use crate::scip::ScipPtr;
 
+/// A row in the LP relaxation.
 pub struct Row {
     pub(crate) raw: *mut ffi::SCIP_ROW,
     pub(crate) scip: Rc<ScipPtr>,
 }
-
 
 impl Row {
     #[cfg(feature = "raw")]
@@ -79,22 +79,22 @@ impl Row {
 
     /// Returns whether the row is local.
     pub fn is_local(&self) -> bool {
-        unsafe { ffi::SCIProwIsLocal(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsLocal(self.raw) }) != 0
     }
 
     /// Returns whether the row is modifiable.
     pub fn is_modifiable(&self) -> bool {
-        unsafe { ffi::SCIProwIsModifiable(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsModifiable(self.raw) }) != 0
     }
 
     /// Returns whether the row is removable.
     pub fn is_removable(&self) -> bool {
-        unsafe { ffi::SCIProwIsRemovable(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsRemovable(self.raw) }) != 0
     }
 
     /// Returns whether the row is integral; the activity of an integral row (without the constant) is always integral.
     pub fn is_integral(&self) -> bool {
-        unsafe { ffi::SCIProwIsIntegral(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsIntegral(self.raw) }) != 0
     }
 
     /// Returns the origin type of the row.
@@ -119,12 +119,12 @@ impl Row {
 
     /// Returns whether the row is in the global cut pool.
     pub fn is_in_global_cut_pool(&self) -> bool {
-        unsafe { ffi::SCIProwIsInGlobalCutpool(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsInGlobalCutpool(self.raw) }) != 0
     }
 
     /// Returns whether the row is in the current LP.
     pub fn is_in_lp(&self) -> bool {
-        unsafe { ffi::SCIProwIsInLP(self.raw) }.into()
+        (unsafe { ffi::SCIProwIsInLP(self.raw) }) != 0
     }
 
     /// Returns whether the position of the row in the current LP.
@@ -139,7 +139,7 @@ impl Row {
 
     /// Returns the depth of the row; the depth in the tree when the row was introduced.
     pub fn depth(&self) -> usize {
-        let depth = unsafe { ffi::SCIProwGetLPDepth((self.raw) };
+        let depth = unsafe { ffi::SCIProwGetLPDepth(self.raw) };
         assert!(depth >= 0);
         depth as usize
     }
@@ -172,26 +172,27 @@ impl PartialEq for Row {
 
 /// The basis status of a row.
 pub enum BasisStatus {
+    /// The row is at its lower bound.
     Lower,
+    /// The row is basic.
     Basic,
+    /// The row is at its upper bound.
     Upper,
+    /// The row is at zero.
     Zero,
-    Unknown,
 }
-
 
 impl From<ffi::SCIP_BASESTAT> for BasisStatus {
     fn from(status: ffi::SCIP_BASESTAT) -> Self {
         match status {
-            ffi::SCIP_BASESTAT::SCIP_BASESTAT_LOWER => BasisStatus::Lower,
-            ffi::SCIP_BASESTAT::SCIP_BASESTAT_BASIC => BasisStatus::Basic,
-            ffi::SCIP_BASESTAT::SCIP_BASESTAT_UPPER => BasisStatus::Upper,
-            ffi::SCIP_BASESTAT::SCIP_BASESTAT_ZERO => BasisStatus::Zero,
-            ffi::SCIP_BASESTAT::SCIP_BASESTAT_UNKNOWN => BasisStatus::Unknown,
+            ffi::SCIP_BaseStat_SCIP_BASESTAT_LOWER => BasisStatus::Lower,
+            ffi::SCIP_BaseStat_SCIP_BASESTAT_BASIC => BasisStatus::Basic,
+            ffi::SCIP_BaseStat_SCIP_BASESTAT_UPPER => BasisStatus::Upper,
+            ffi::SCIP_BaseStat_SCIP_BASESTAT_ZERO => BasisStatus::Zero,
+            _ => panic!("Unknown basis status"),
         }
     }
 }
-
 
 /// The origin type of row.
 pub enum RowOrigin {
@@ -210,11 +211,12 @@ pub enum RowOrigin {
 impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
     fn from(origin: ffi::SCIP_ROWORIGINTYPE) -> Self {
         match origin {
-            ffi::SCIP_ROWORIGINTYPE::SCIP_ROWORIGINTYPE_CONSHDLR => RowOrigin::ConsHandler,
-            ffi::SCIP_ROWORIGINTYPE::SCIP_ROWORIGINTYPE_CONS => RowOrigin::Constraint,
-            ffi::SCIP_ROWORIGINTYPE::SCIP_ROWORIGINTYPE_REOPT => RowOrigin::Reoptimization,
-            ffi::SCIP_ROWORIGINTYPE::SCIP_ROWORIGINTYPE_SEPA => RowOrigin::Separator,
-            ffi::SCIP_ROWORIGINTYPE::SCIP_ROWORIGINTYPE_UNSPECIFIED => RowOrigin::Unspecified,
+            ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_CONSHDLR => RowOrigin::ConsHandler,
+            ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_CONS => RowOrigin::Constraint,
+            ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_REOPT => RowOrigin::Reoptimization,
+            ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_SEPA => RowOrigin::Separator,
+            ffi::SCIP_RowOriginType_SCIP_ROWORIGINTYPE_UNSPEC => RowOrigin::Unspecified,
+            _ => panic!("Unknown row origin type"),
         }
     }
 }
