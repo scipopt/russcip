@@ -1,5 +1,5 @@
-use crate::{Col, ffi};
 use crate::scip::ScipPtr;
+use crate::{ffi, Col};
 use core::panic;
 use scip_sys::SCIP_Status;
 use std::rc::Rc;

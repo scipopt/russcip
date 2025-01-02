@@ -223,11 +223,12 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use crate::{Eventhdlr, EventMask, HasScipPtr, minimal_model, ModelSolving, ModelWithProblem, ProblemOrSolving, VarType};
+    use crate::{
+        minimal_model, EventMask, Eventhdlr, HasScipPtr, ModelSolving, ModelWithProblem,
+        ProblemOrSolving, VarType,
+    };
 
     struct RowTesterEventHandler {
         model: ModelSolving,
@@ -278,11 +279,10 @@ mod tests {
         let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(cons, true);
 
-        let eventhdlr = Box::new(RowTesterEventHandler { model: model.clone_for_plugins() });
-        model = model.include_eventhdlr(
-            "ColTesterEventHandler", "",
-            eventhdlr,
-        );
+        let eventhdlr = Box::new(RowTesterEventHandler {
+            model: model.clone_for_plugins(),
+        });
+        model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
 
         model.solve();
     }

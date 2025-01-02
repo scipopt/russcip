@@ -1,5 +1,5 @@
-use crate::{ffi, Row};
 use crate::scip::ScipPtr;
+use crate::{ffi, Row};
 use std::rc::Rc;
 
 /// A constraint in an optimization problem.

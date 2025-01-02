@@ -17,7 +17,6 @@ impl Col {
         self.raw
     }
 
-
     /// Returns the index of the column.
     pub fn index(&self) -> usize {
         let id = unsafe { ffi::SCIPcolGetIndex(self.raw) };
@@ -191,10 +190,12 @@ impl PartialEq for Col {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::{BasisStatus, Eventhdlr, EventMask, minimal_model, ModelSolving, ModelWithProblem, ProblemOrSolving, VarType};
+    use crate::{
+        minimal_model, BasisStatus, EventMask, Eventhdlr, ModelSolving, ModelWithProblem,
+        ProblemOrSolving, VarType,
+    };
 
     struct ColTesterEventHandler {
         model: ModelSolving,
@@ -231,7 +232,8 @@ mod tests {
             assert_eq!(col.vals(), vec![1.0]);
             assert_eq!(col.strong_branching_node(), None);
             assert_eq!(col.n_strong_branches(), 0);
-            assert_eq!(col.age(), 0);}
+            assert_eq!(col.age(), 0);
+        }
     }
 
     #[test]
@@ -242,11 +244,10 @@ mod tests {
         let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(cons, true);
 
-        let eventhdlr = Box::new(ColTesterEventHandler { model: model.clone_for_plugins() });
-        model = model.include_eventhdlr(
-            "ColTesterEventHandler", "",
-            eventhdlr,
-        );
+        let eventhdlr = Box::new(ColTesterEventHandler {
+            model: model.clone_for_plugins(),
+        });
+        model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
 
         model.solve();
     }
