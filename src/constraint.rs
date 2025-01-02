@@ -1,5 +1,5 @@
-use crate::ffi;
 use crate::scip::ScipPtr;
+use crate::{ffi, Row};
 use std::rc::Rc;
 
 /// A constraint in an optimization problem.
@@ -24,6 +24,19 @@ impl Constraint {
         unsafe {
             let name = ffi::SCIPconsGetName(self.raw);
             String::from(std::ffi::CStr::from_ptr(name).to_str().unwrap())
+        }
+    }
+
+    /// Returns the row associated with the constraint.
+    pub fn row(&self) -> Option<Row> {
+        let row_ptr = unsafe { ffi::SCIPconsGetRow(self.scip.raw, self.raw) };
+        if row_ptr.is_null() {
+            None
+        } else {
+            Some(Row {
+                raw: row_ptr,
+                scip: Rc::clone(&self.scip),
+            })
         }
     }
 }
