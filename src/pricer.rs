@@ -6,8 +6,9 @@ pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
+    /// * `model` - the current model of the SCIP instance in `Solving` stage
     /// * `farkas`: If true, the pricer should generate columns to repair feasibility of LP.
-    fn generate_columns(&mut self, farkas: bool, model: Model<Solving>) -> PricerResult;
+    fn generate_columns(&mut self, model: Model<Solving>, farkas: bool) -> PricerResult;
 }
 
 /// An enum representing the possible states of a `PricerResult`.
@@ -54,7 +55,7 @@ mod tests {
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
-        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::FoundColumns,
                 lower_bound: None,
@@ -80,7 +81,7 @@ mod tests {
     struct EarlyStoppingPricer;
 
     impl Pricer for EarlyStoppingPricer {
-        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::StopEarly,
                 lower_bound: None,
@@ -107,7 +108,7 @@ mod tests {
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
-        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::NoColumns,
                 lower_bound: None,
@@ -143,7 +144,7 @@ mod tests {
     }
 
     impl Pricer for AddSameColumnPricer {
-        fn generate_columns(&mut self, _farkas: bool, mut model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, mut model: Model<Solving>, _farkas: bool) -> PricerResult {
             assert_eq!(self.data.a, (0..1000).collect::<Vec<usize>>());
             if self.added {
                 PricerResult {

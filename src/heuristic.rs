@@ -8,6 +8,7 @@ pub trait Heuristic {
     /// Executes the heuristic.
     ///
     /// # Arguments
+    /// * `model` - the current model of the SCIP instance in `Solving` stage
     /// * `timing` - the timing mask of the heuristic's execution
     /// * `node_inf` - whether the current node is infeasible
     ///
@@ -17,7 +18,11 @@ pub trait Heuristic {
     /// * `HeurResult::NoSolFound` if no new incumbent solution was found
     /// * `HeurResult::DidNotRun` if the heuristic was not executed
     /// * `HeurResult::Delayed` if the heuristic is delayed (skipped but should be called again)
-    fn execute(&mut self, timing: HeurTiming, node_inf: bool, model: Model<Solving>) -> HeurResult;
+    fn execute(&mut self,
+               model: Model<Solving>,
+               timing: HeurTiming,
+               node_inf: bool,
+    ) -> HeurResult;
 }
 
 /// The result of a primal heuristic execution.
@@ -110,9 +115,9 @@ mod tests {
     impl Heuristic for NoSolutionFoundHeur {
         fn execute(
             &mut self,
+            _model: Model<Solving>,
             _timing: HeurTiming,
             _node_inf: bool,
-            _model: Model<Solving>,
         ) -> HeurResult {
             HeurResult::NoSolFound
         }
@@ -150,9 +155,9 @@ mod tests {
     impl Heuristic for ImpostorHeur {
         fn execute(
             &mut self,
+            _model: Model<Solving>,
             _timing: HeurTiming,
             _node_inf: bool,
-            _model: Model<Solving>,
         ) -> HeurResult {
             HeurResult::FoundSol
         }
@@ -189,9 +194,9 @@ mod tests {
     impl Heuristic for DelayedHeur {
         fn execute(
             &mut self,
+            _model: Model<Solving>,
             _timing: HeurTiming,
             _node_inf: bool,
-            _model: Model<Solving>,
         ) -> HeurResult {
             HeurResult::Delayed
         }
@@ -227,9 +232,9 @@ mod tests {
     impl Heuristic for DidNotRunHeur {
         fn execute(
             &mut self,
+            _model: Model<Solving>,
             _timing: HeurTiming,
             _node_inf: bool,
-            _model: Model<Solving>,
         ) -> HeurResult {
             HeurResult::DidNotRun
         }
@@ -265,9 +270,9 @@ mod tests {
     impl Heuristic for FoundSolHeur {
         fn execute(
             &mut self,
+            model: Model<Solving>,
             _timing: HeurTiming,
             _node_inf: bool,
-            model: Model<Solving>,
         ) -> HeurResult {
             let sol = model.create_sol();
             for var in model.vars() {

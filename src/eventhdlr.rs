@@ -5,8 +5,15 @@ use std::ops::{BitOr, BitOrAssign};
 pub trait Eventhdlr {
     /// Returns the type of the event handler.
     fn get_type(&self) -> EventMask;
+
     /// Executes the event handler.
-    fn execute(&mut self, model: Model<Solving>);
+    ///
+    /// # Arguments
+    /// * `model` - the current model of the SCIP instance in `Solving` stage
+    fn execute(
+        &mut self,
+        model: Model<Solving>,
+    );
 }
 
 /// The EventMask represents different states or actions within an optimization problem.

@@ -697,7 +697,7 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let branching_res = unsafe { (*rule_ptr).execute(cands, model) };
+            let branching_res = unsafe { (*rule_ptr).execute(model, cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
                 unsafe {
@@ -782,7 +782,7 @@ impl ScipPtr {
                 state: Solving,
             };
 
-            let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas, model) };
+            let pricing_res = unsafe { (*pricer_ptr).generate_columns(model, farkas) };
 
             if !farkas {
                 if let Some(lb) = pricing_res.lower_bound {
@@ -904,7 +904,7 @@ impl ScipPtr {
                 state: Solving,
             };
             let heur_res =
-                unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0, model) };
+                unsafe { (*rule_ptr).execute(model, heurtiming.into(), nodeinfeasible != 0) };
             if heur_res == HeurResult::FoundSol {
                 let new_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
 

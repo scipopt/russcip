@@ -51,8 +51,8 @@ mod tests {
     impl BranchRule for NodeDataBranchRule {
         fn execute(
             &mut self,
-            candidates: Vec<crate::branchrule::BranchingCandidate>,
             model: Model<Solving>,
+            candidates: Vec<crate::branchrule::BranchingCandidate>,
         ) -> BranchingResult {
             let node = model.focus_node();
             if node.number() == 1 {
