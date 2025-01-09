@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Constraint};
+use crate::{ffi, Constraint, Variable};
 use std::ffi::c_int;
 use std::rc::Rc;
 
@@ -161,6 +161,11 @@ impl Row {
     /// Sets the rank of the row.
     pub fn set_rank(&self, rank: usize) {
         unsafe { ffi::SCIProwChgRank(self.raw, rank as c_int) };
+    }
+
+    /// Sets the coefficient of a variable in the row.
+    pub fn set_coeff(&self, var: &Variable, coeff: f64) {
+        unsafe { ffi::SCIPaddVarToRow(self.scip.raw, self.raw, var.raw, coeff) };
     }
 }
 
