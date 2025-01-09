@@ -24,7 +24,6 @@ impl PartialEq for Variable {
 impl Eq for Variable {}
 
 impl Variable {
-    #[cfg(feature = "raw")]
     /// Returns a raw pointer to the underlying `ffi::SCIP_VAR` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_VAR {
         self.raw
@@ -179,7 +178,6 @@ mod tests {
         assert_eq!(var.var_type(), VarType::ImplInt);
         assert_eq!(var.status(), VarStatus::Original);
 
-        #[cfg(feature = "raw")]
         assert!(!var.inner().is_null());
     }
 

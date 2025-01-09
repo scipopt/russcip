@@ -11,7 +11,6 @@ pub struct Col {
 }
 
 impl Col {
-    #[cfg(feature = "raw")]
     /// Returns a raw pointer to the underlying `ffi::SCIP_COL` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_COL {
         self.raw

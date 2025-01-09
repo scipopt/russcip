@@ -10,7 +10,6 @@ pub struct Row {
 }
 
 impl Row {
-    #[cfg(feature = "raw")]
     /// Returns a raw pointer to the underlying `ffi::SCIP_ROW` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_ROW {
         self.raw

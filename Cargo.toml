@@ -9,7 +9,6 @@ edition = "2021"
 exclude = ["data/test/*"]
 
 [features]
-raw = []
 bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 
