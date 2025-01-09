@@ -148,7 +148,14 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap()
-            .include_branch_rule("FirstChoosingBranchingRule", "", 100000, 1000, 1., Box::new(br));
+            .include_branch_rule(
+                "FirstChoosingBranchingRule",
+                "",
+                100000,
+                1000,
+                1.,
+                Box::new(br),
+            );
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);

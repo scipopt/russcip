@@ -39,7 +39,11 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use crate::{branchrule::{BranchRule, BranchingResult}, model::Model, SCIPBranchRule, Solving};
+    use crate::{
+        branchrule::{BranchRule, BranchingResult},
+        model::Model,
+        SCIPBranchRule, Solving,
+    };
 
     struct NodeDataBranchRule;
 
