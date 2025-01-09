@@ -6,9 +6,10 @@ pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
-    /// * `model` - the current model of the SCIP instance in `Solving` stage
+    /// * `model`: the current model of the SCIP instance in `Solving` stage.
+    /// * `pricer`: the internal pricer object. 
     /// * `farkas`: If true, the pricer should generate columns to repair feasibility of LP.
-    fn generate_columns(&mut self, model: Model<Solving>, farkas: bool) -> PricerResult;
+    fn generate_columns(&mut self, model: Model<Solving>, pricer: SCIPPricer, farkas: bool) -> PricerResult;
 }
 
 /// An enum representing the possible states of a `PricerResult`.
@@ -44,6 +45,55 @@ impl From<PricerResultState> for SCIP_Result {
     }
 }
 
+
+/// A wrapper around a SCIP pricer object.
+pub struct SCIPPricer {
+    pub(crate) raw: *mut ffi::SCIP_PRICER,
+}
+
+impl SCIPPricer {
+    /// Returns the name of the pricer.
+    pub fn name(&self) -> String {
+        unsafe {
+            let name = ffi::SCIPpricerGetName(self.raw);
+            std::ffi::CStr::from_ptr(name)
+                .to_string_lossy()
+                .into_owned()
+        }
+    }
+
+    /// Returns the description of the pricer.
+    pub fn desc(&self) -> String {
+        unsafe {
+            let desc = ffi::SCIPpricerGetDesc(self.raw);
+            std::ffi::CStr::from_ptr(desc)
+                .to_string_lossy()
+                .into_owned()
+        }
+    }
+
+    /// Returns the priority of the pricer.
+    pub fn priority(&self) -> i32 {
+        unsafe {
+            ffi::SCIPpricerGetPriority(self.raw)
+        }
+    }
+
+    /// Returns the delay of the pricer.
+    pub fn is_delayed(&self) -> bool {
+        unsafe {
+            ffi::SCIPpricerIsDelayed(self.raw) != 0
+        }
+    }
+
+    /// Returns whether the pricer is active.
+    pub fn is_active(&self) -> bool {
+        unsafe {
+            ffi::SCIPpricerIsActive(self.raw) != 0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -55,7 +105,7 @@ mod tests {
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
-        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _pricer: SCIPPricer, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::FoundColumns,
                 lower_bound: None,
@@ -81,7 +131,7 @@ mod tests {
     struct EarlyStoppingPricer;
 
     impl Pricer for EarlyStoppingPricer {
-        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _pricer: SCIPPricer, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::StopEarly,
                 lower_bound: None,
@@ -108,7 +158,7 @@ mod tests {
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
-        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _pricer: SCIPPricer, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::NoColumns,
                 lower_bound: None,
@@ -144,7 +194,7 @@ mod tests {
     }
 
     impl Pricer for AddSameColumnPricer {
-        fn generate_columns(&mut self, mut model: Model<Solving>, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, mut model: Model<Solving>, _pricer: SCIPPricer, _farkas: bool) -> PricerResult {
             assert_eq!(self.data.a, (0..1000).collect::<Vec<usize>>());
             if self.added {
                 PricerResult {
@@ -195,5 +245,35 @@ mod tests {
             .include_pricer("", "", 9999999, false, Box::new(pricer))
             .solve();
         assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    struct InternalSCIPPricerTester;
+
+    impl Pricer for InternalSCIPPricerTester {
+        fn generate_columns(&mut self, _model: Model<Solving>, pricer: SCIPPricer, _farkas: bool) -> PricerResult {
+            assert_eq!(pricer.name(), "internal");
+            assert_eq!(pricer.desc(), "internal pricer");
+            assert_eq!(pricer.priority(), 100);
+            assert!(!pricer.is_delayed());
+            assert!(pricer.is_active());
+            PricerResult {
+                state: PricerResultState::NoColumns,
+                lower_bound: None,
+            }
+        }
+    }
+    
+    #[test]
+    fn internal_pricer() {
+        let pricer = InternalSCIPPricerTester {};
+
+        let model = crate::model::Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .include_pricer("internal", "internal pricer", 100, false, Box::new(pricer));
+
+        model.solve();
     }
 }

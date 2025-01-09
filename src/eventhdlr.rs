@@ -1,4 +1,4 @@
-use crate::{Model, Solving};
+use crate::{ffi, Model, Solving};
 use std::ops::{BitOr, BitOrAssign};
 
 /// Trait used to define custom event handlers.
@@ -10,11 +10,14 @@ pub trait Eventhdlr {
     ///
     /// # Arguments
     /// * `model` - the current model of the SCIP instance in `Solving` stage
-    fn execute(&mut self, model: Model<Solving>);
+    /// * `eventhdlr` - the event handler
+    /// * `event` - the event mask that triggered the event handler
+    fn execute(&mut self, model: Model<Solving>, eventhdlr: SCIPEventhdlr, event: Event);
 }
 
 /// The EventMask represents different states or actions within an optimization problem.
 #[derive(Debug, Copy, Clone)]
+#[derive(PartialEq)]
 pub struct EventMask(u64);
 
 impl EventMask {
@@ -147,6 +150,11 @@ impl EventMask {
             | Self::ROW_DELETED_LP.0
             | Self::ROW_CHANGED.0,
     );
+
+    /// Event mask matches some other mask
+    pub fn matches(&self, mask: EventMask) -> bool {
+        self.0 & mask.0 != 0
+    }
 }
 
 impl BitOr for EventMask {
@@ -169,11 +177,41 @@ impl From<EventMask> for u64 {
     }
 }
 
+/// Wrapper for the internal SCIP event handler.
+pub struct SCIPEventhdlr {
+    pub(crate) raw: *mut ffi::SCIP_EVENTHDLR,
+}
+
+impl SCIPEventhdlr {
+    /// Returns the name of the event handler.
+    pub fn name(&self) -> String {
+        unsafe {
+            let name = ffi::SCIPeventhdlrGetName(self.raw);
+            std::ffi::CStr::from_ptr(name)
+                .to_string_lossy()
+                .into_owned()
+        }
+    }
+}
+
+/// Wrapper for the internal SCIP event.
+pub struct Event {
+    pub(crate) raw: *mut ffi::SCIP_EVENT,
+}
+
+impl Event {
+    /// Returns the event type of the event.
+    pub fn event_type(&self) -> EventMask {
+        let event_type = unsafe { ffi::SCIPeventGetType(self.raw) };
+        EventMask(event_type)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::eventhdlr::{EventMask, Eventhdlr};
     use crate::model::Model;
-    use crate::Solving;
+    use crate::{Event, Solving};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -186,7 +224,7 @@ mod tests {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
-        fn execute(&mut self, _model: Model<Solving>) {
+        fn execute(&mut self, _model: Model<Solving>, _eventhdlr: crate::SCIPEventhdlr, _event: Event) {
             *self.counter.borrow_mut() += 1;
         }
     }
@@ -207,5 +245,30 @@ mod tests {
             .solve();
 
         assert!(*counter.borrow() > 1);
+    }
+
+
+    struct InternalSCIPEventHdlrTester;
+
+    impl Eventhdlr for InternalSCIPEventHdlrTester {
+        fn get_type(&self) -> EventMask {
+            EventMask::LP_EVENT | EventMask::NODE_EVENT
+        }
+
+        fn execute(&mut self, _model: Model<Solving>, eventhdlr: crate::SCIPEventhdlr, event: Event) {
+            assert!(self.get_type().matches(event.event_type()));
+            assert_eq!(eventhdlr.name(), "InternalSCIPEventHdlrTester");
+        }
+    }
+
+    #[test]
+    fn test_internal_eventhdlr() {
+        Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .include_eventhdlr("InternalSCIPEventHdlrTester", "", Box::new(InternalSCIPEventHdlrTester))
+            .solve();
     }
 }
