@@ -69,7 +69,7 @@ mod tests {
         fn execute(
             &mut self,
             candidates: Vec<BranchingCandidate>,
-            model: Model<Solving>,
+            _model: Model<Solving>,
         ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
             BranchingResult::DidNotRun
@@ -103,7 +103,7 @@ mod tests {
         fn execute(
             &mut self,
             _candidates: Vec<BranchingCandidate>,
-            model: Model<Solving>,
+            _model: Model<Solving>,
         ) -> BranchingResult {
             BranchingResult::CutOff
         }

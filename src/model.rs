@@ -1,4 +1,4 @@
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -401,8 +401,6 @@ impl Model<Solving> {
 
         Rc::new(var)
     }
-
-    /// Adds a new priced variable to the SCIP data structure.
 
     /// Returns the current node of the model.
     ///
@@ -1410,7 +1408,7 @@ mod tests {
 
     #[test]
     fn solve_from_lp_file() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
@@ -1534,7 +1532,7 @@ mod tests {
 
     #[test]
     fn build_model_with_functions() {
-        let mut model = create_model();
+        let model = create_model();
         assert_eq!(model.vars().len(), 2);
         assert_eq!(model.n_conss(), 2);
 

@@ -54,7 +54,7 @@ mod tests {
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
-        fn generate_columns(&mut self, _farkas: bool, model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
             PricerResult {
                 state: PricerResultState::FoundColumns,
                 lower_bound: None,
@@ -80,7 +80,7 @@ mod tests {
     struct EarlyStoppingPricer;
 
     impl Pricer for EarlyStoppingPricer {
-        fn generate_columns(&mut self, _farkas: bool, model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
             PricerResult {
                 state: PricerResultState::StopEarly,
                 lower_bound: None,
@@ -107,7 +107,7 @@ mod tests {
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
-        fn generate_columns(&mut self, _farkas: bool, model: Model<Solving>) -> PricerResult {
+        fn generate_columns(&mut self, _farkas: bool, _model: Model<Solving>) -> PricerResult {
             PricerResult {
                 state: PricerResultState::NoColumns,
                 lower_bound: None,
