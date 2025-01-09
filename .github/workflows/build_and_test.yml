@@ -3,6 +3,7 @@ name: tests
 env:
   version: 9.2.0
   RUST_VERSION: 1.83.0
+  UBUNTU_VERSION: 20
 
 on:
   push:
@@ -16,15 +17,13 @@ on:
 
 jobs:
   test-with-coverage:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-${{ env.UBUNTU_VERSION }}.04
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-Linux-ubuntu24.deb
           sudo apt-get update
-          sudo apt-get install libssl1.1
-          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu24.deb
+          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu${{ env.UBUNTU_VERSION }}.deb
 
       - name: Install rust stable toolchain
         uses: actions-rs/toolchain@v1
