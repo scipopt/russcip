@@ -3,7 +3,6 @@ name: tests
 env:
   version: 9.2.0
   RUST_VERSION: 1.83.0
-  UBUNTU_VERSION: 20
 
 on:
   push:
@@ -17,13 +16,13 @@ on:
 
 jobs:
   test-with-coverage:
-    runs-on: ubuntu-${{ env.UBUNTU_VERSION }}.04
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies (SCIPOptSuite)
         run: |
           sudo apt-get update
-          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu${{ env.UBUNTU_VERSION }}.deb
+          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu20.deb
 
       - name: Install rust stable toolchain
         uses: actions-rs/toolchain@v1
