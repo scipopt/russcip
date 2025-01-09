@@ -232,8 +232,8 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 mod tests {
     use crate::Event;
     use crate::{
-        minimal_model, EventMask, Eventhdlr, HasScipPtr, Model, ModelWithProblem, ProblemOrSolving,
-        Solving, VarType,
+        minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving, Solving,
+        VarType,
     };
 
     struct RowTesterEventHandler;
@@ -273,7 +273,7 @@ mod tests {
             assert_eq!(row.name(), "cons1");
             assert_eq!(row.age(), 0);
             assert_eq!(row.dual(), 1.0);
-            let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip().raw) };
+            let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip.raw) };
             assert!(row.farkas_dual() >= infinity);
             assert!(row.rhs() - 1.0 < 1e-9);
             assert!(row.lhs() - 1.0 < 1e-9);
