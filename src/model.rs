@@ -1,5 +1,3 @@
-use std::rc::Rc;
-use scip_sys::SCIP;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
@@ -10,6 +8,8 @@ use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
+use scip_sys::SCIP;
+use std::rc::Rc;
 
 /// Represents an optimization model.
 #[non_exhaustive]

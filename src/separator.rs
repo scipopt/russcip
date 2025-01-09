@@ -75,7 +75,7 @@ impl SCIPSeparator {
     pub fn inner(&self) -> *mut ffi::SCIP_SEPA {
         self.raw
     }
-    
+
     /// Returns the name of the separator.
     pub fn name(&self) -> String {
         unsafe {

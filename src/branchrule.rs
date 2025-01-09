@@ -73,7 +73,7 @@ impl SCIPBranchRule {
     pub fn inner(&self) -> *mut ffi::SCIP_BRANCHRULE {
         self.raw
     }
-    
+
     /// Returns the name of the branch rule.
     pub fn name(&self) -> String {
         unsafe {
