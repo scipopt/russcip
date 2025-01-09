@@ -1,10 +1,22 @@
-use crate::ffi;
+use crate::{ffi, Model, Solving};
 use scip_sys::SCIP_Result;
 
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
     /// Executes the branching rule on the given candidates and returns the result.
-    fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult;
+    ///
+    /// # Arguments
+    /// * `model` - the current model of the SCIP instance in `Solving` stage
+    /// * `candidates` - the branching candidates
+    ///
+    /// # Returns
+    ///
+    /// * `BranchingResult` indicating the result of the branching rule
+    fn execute(
+        &mut self,
+        model: Model<Solving>,
+        candidates: Vec<BranchingCandidate>,
+    ) -> BranchingResult;
 }
 
 /// The result of a branching rule execution.
@@ -55,15 +67,18 @@ pub struct BranchingCandidate {
 mod tests {
     use super::*;
     use crate::model::ModelWithProblem;
-    use crate::ModelSolving;
-    use crate::{model::Model, status::Status};
+    use crate::{model::Model, status::Status, Solving};
 
     struct FirstChoosingBranchingRule {
         pub chosen: Option<BranchingCandidate>,
     }
 
     impl BranchRule for FirstChoosingBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            _model: Model<Solving>,
+            candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
             BranchingResult::DidNotRun
         }
@@ -93,7 +108,11 @@ mod tests {
     struct CuttingOffBranchingRule;
 
     impl BranchRule for CuttingOffBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            _model: Model<Solving>,
+            _candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
             BranchingResult::CutOff
         }
     }
@@ -113,13 +132,15 @@ mod tests {
         assert_eq!(model.n_nodes(), 1);
     }
 
-    struct FirstBranchingRule {
-        model: ModelSolving,
-    }
+    struct FirstBranchingRule;
 
     impl BranchRule for FirstBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            assert!(self.model.n_vars() >= candidates.len());
+        fn execute(
+            &mut self,
+            model: Model<Solving>,
+            candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
+            assert!(model.n_vars() >= candidates.len());
             BranchingResult::BranchOn(candidates[0].clone())
         }
     }
@@ -134,9 +155,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let br = FirstBranchingRule {
-            model: model.clone_for_plugins(),
-        };
+        let br = FirstBranchingRule;
         let solved = model
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
@@ -144,13 +163,15 @@ mod tests {
         assert!(solved.n_nodes() > 1);
     }
 
-    struct CustomBranchingRule {
-        model: ModelSolving,
-    }
+    struct CustomBranchingRule;
 
     impl BranchRule for CustomBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>) -> BranchingResult {
-            self.model.create_child();
+        fn execute(
+            &mut self,
+            mut model: Model<Solving>,
+            _candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
+            model.create_child();
             BranchingResult::CustomBranching
         }
     }
@@ -165,9 +186,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let br = CustomBranchingRule {
-            model: model.clone_for_plugins(),
-        };
+        let br = CustomBranchingRule;
         let solved = model
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();
@@ -175,16 +194,18 @@ mod tests {
         assert!(solved.n_nodes() > 1);
     }
 
-    struct HighestBoundBranchRule {
-        model: ModelSolving,
-    }
+    struct HighestBoundBranchRule;
 
     impl BranchRule for HighestBoundBranchRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            model: Model<Solving>,
+            candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
             let mut max_bound = f64::NEG_INFINITY;
             let mut max_candidate = None;
             for candidate in candidates {
-                let var = self.model.var_in_prob(candidate.var_prob_id).unwrap();
+                let var = model.var_in_prob(candidate.var_prob_id).unwrap();
                 let bound = var.ub();
                 if bound > max_bound {
                     max_bound = bound;
@@ -210,9 +231,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let br = HighestBoundBranchRule {
-            model: model.clone_for_plugins(),
-        };
+        let br = HighestBoundBranchRule;
         let solved = model
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
             .solve();

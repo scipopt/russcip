@@ -1,4 +1,4 @@
-use crate::ffi;
+use crate::{ffi, Model, Solving};
 use scip_sys::SCIP_Result;
 
 /// A trait for SCIP pricers.
@@ -6,8 +6,9 @@ pub trait Pricer {
     /// Generates negative reduced cost columns.
     ///
     /// # Arguments
+    /// * `model` - the current model of the SCIP instance in `Solving` stage
     /// * `farkas`: If true, the pricer should generate columns to repair feasibility of LP.
-    fn generate_columns(&mut self, farkas: bool) -> PricerResult;
+    fn generate_columns(&mut self, model: Model<Solving>, farkas: bool) -> PricerResult;
 }
 
 /// An enum representing the possible states of a `PricerResult`.
@@ -47,13 +48,14 @@ impl From<PricerResultState> for SCIP_Result {
 mod tests {
     use super::*;
     use crate::{
-        model::ModelWithProblem, status::Status, variable::VarType, ModelSolving, ProblemOrSolving,
+        model::ModelWithProblem, status::Status, variable::VarType, Model, ProblemOrSolving,
+        Solving,
     };
 
     struct LyingPricer;
 
     impl Pricer for LyingPricer {
-        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::FoundColumns,
                 lower_bound: None,
@@ -79,7 +81,7 @@ mod tests {
     struct EarlyStoppingPricer;
 
     impl Pricer for EarlyStoppingPricer {
-        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::StopEarly,
                 lower_bound: None,
@@ -106,7 +108,7 @@ mod tests {
     struct OptimalPricer;
 
     impl Pricer for OptimalPricer {
-        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
+        fn generate_columns(&mut self, _model: Model<Solving>, _farkas: bool) -> PricerResult {
             PricerResult {
                 state: PricerResultState::NoColumns,
                 lower_bound: None,
@@ -138,13 +140,12 @@ mod tests {
 
     struct AddSameColumnPricer {
         added: bool,
-        model: ModelSolving,
         data: ComplexData,
     }
 
     impl Pricer for AddSameColumnPricer {
-        fn generate_columns(&mut self, _farkas: bool) -> PricerResult {
-            assert!(self.data.a == (0..1000).collect::<Vec<usize>>());
+        fn generate_columns(&mut self, mut model: Model<Solving>, _farkas: bool) -> PricerResult {
+            assert_eq!(self.data.a, (0..1000).collect::<Vec<usize>>());
             if self.added {
                 PricerResult {
                     state: PricerResultState::NoColumns,
@@ -152,15 +153,13 @@ mod tests {
                 }
             } else {
                 self.added = true;
-                let nvars_before = self.model.n_vars();
-                let var = self
-                    .model
-                    .add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-                let conss = self.model.conss();
+                let nvars_before = model.n_vars();
+                let var = model.add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+                let conss = model.conss();
                 for cons in conss {
-                    self.model.add_cons_coef(cons, var.clone(), 1.0);
+                    model.add_cons_coef(cons, var.clone(), 1.0);
                 }
-                let nvars_after = self.model.n_vars();
+                let nvars_after = model.n_vars();
                 assert_eq!(nvars_before + 1, nvars_after);
                 PricerResult {
                     state: PricerResultState::FoundColumns,
@@ -185,7 +184,6 @@ mod tests {
 
         let pricer = AddSameColumnPricer {
             added: false,
-            model: model.clone_for_plugins(),
             data: ComplexData {
                 a: (0..1000).collect::<Vec<usize>>(),
                 b: 1.0,

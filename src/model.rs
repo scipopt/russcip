@@ -1,4 +1,4 @@
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -15,9 +15,9 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct Model<State> {
-    scip: Rc<ScipPtr>,
+    pub(crate) scip: Rc<ScipPtr>,
     #[allow(dead_code)]
-    state: State,
+    pub(crate) state: State,
 }
 
 /// Represents the state of an optimization model that has not yet been solved.
@@ -100,13 +100,6 @@ impl Model<PluginsIncluded> {
     }
 }
 
-/// Represents a model in the solving state. This is meant to be used in plugins (callbacks).
-pub struct ModelSolving {
-    scip: Weak<ScipPtr>,
-    #[allow(dead_code)]
-    state: Solving,
-}
-
 impl Model<ProblemCreated> {
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
@@ -123,15 +116,6 @@ impl Model<ProblemCreated> {
             .expect("Failed to set objective sense in state ProblemCreated");
         self.scip = scip;
         self
-    }
-
-    /// Returns a clone of the current model.
-    /// The clone is meant for use in implementing custom plugins.
-    pub fn clone_for_plugins(&self) -> ModelSolving {
-        ModelSolving {
-            scip: Rc::downgrade(&self.scip.clone()),
-            state: Solving {},
-        }
     }
 
     /// Sets the constraint as modifiable or not.
@@ -380,7 +364,7 @@ impl Model<ProblemCreated> {
     }
 }
 
-impl ModelSolving {
+impl Model<Solving> {
     /// Adds a new variable to the model with the given lower bound, upper bound, objective coefficient, name, and type.
     ///
     /// # Arguments
@@ -417,8 +401,6 @@ impl ModelSolving {
 
         Rc::new(var)
     }
-
-    /// Adds a new priced variable to the SCIP data structure.
 
     /// Returns the current node of the model.
     ///
@@ -536,10 +518,10 @@ pub trait ModelWithProblem {
     fn n_vars(&self) -> usize;
 
     /// Returns the number of constraints in the optimization model.
-    fn n_conss(&mut self) -> usize;
+    fn n_conss(&self) -> usize;
 
     /// Returns a vector of all constraints in the optimization model.
-    fn conss(&mut self) -> Vec<Rc<Constraint>>;
+    fn conss(&self) -> Vec<Rc<Constraint>>;
 
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
@@ -583,12 +565,12 @@ macro_rules! impl_ModelWithProblem {
             }
 
             /// Returns the number of constraints in the optimization model.
-            fn n_conss(&mut self) -> usize {
+            fn n_conss(&self) -> usize {
                 self.scip().n_conss()
             }
 
             /// Returns a vector of all constraints in the optimization model.
-            fn conss(&mut self) -> Vec<Rc<Constraint>> {
+            fn conss(&self) -> Vec<Rc<Constraint>> {
                 let scip_conss = self.scip().conss(false);
                 scip_conss
                     .into_iter()
@@ -610,7 +592,7 @@ macro_rules! impl_ModelWithProblem {
     }
 }
 
-impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>,  ModelSolving);
+impl_ModelWithProblem!(for Model<ProblemCreated>, Model<Solved>,  Model<Solving>);
 
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
@@ -1105,7 +1087,7 @@ macro_rules! impl_ProblemOrSolving {
     }
 }
 
-impl_ProblemOrSolving!(for Model<ProblemCreated>, ModelSolving);
+impl_ProblemOrSolving!(for Model<ProblemCreated>, Model<Solving>);
 
 /// A trait for optimization models with any state that might have solutions.
 pub trait WithSolutions {
@@ -1142,7 +1124,7 @@ macro_rules! impl_WithSolutions {
     }
 }
 
-impl_WithSolutions!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
+impl_WithSolutions!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
 
 /// A trait for optimization models with any state that might have solving statistics.
 pub trait WithSolvingStats {
@@ -1195,7 +1177,7 @@ macro_rules! impl_WithSolvingStats {
     }
 }
 
-impl_WithSolvingStats!(for Model<Solved>, ModelSolving, Model<ProblemCreated>);
+impl_WithSolvingStats!(for Model<Solved>, Model<Solving>, Model<ProblemCreated>);
 
 /// A trait for optimization models with any state that hold a pointer to the underlying SCIP instance.
 pub trait HasScipPtr {
@@ -1226,9 +1208,9 @@ impl HasScipPtr for Model<Solved> {
     }
 }
 
-impl HasScipPtr for ModelSolving {
+impl HasScipPtr for Model<Solving> {
     fn scip(&self) -> Rc<ScipPtr> {
-        self.scip.upgrade().expect("SCIP instance was dropped")
+        self.scip.clone()
     }
 }
 
@@ -1426,7 +1408,7 @@ mod tests {
 
     #[test]
     fn solve_from_lp_file() {
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
@@ -1550,7 +1532,7 @@ mod tests {
 
     #[test]
     fn build_model_with_functions() {
-        let mut model = create_model();
+        let model = create_model();
         assert_eq!(model.vars().len(), 2);
         assert_eq!(model.n_conss(), 2);
 

@@ -226,21 +226,19 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 #[cfg(test)]
 mod tests {
     use crate::{
-        minimal_model, EventMask, Eventhdlr, HasScipPtr, ModelSolving, ModelWithProblem,
-        ProblemOrSolving, VarType,
+        minimal_model, EventMask, Eventhdlr, HasScipPtr, Model, ModelWithProblem, ProblemOrSolving,
+        Solving, VarType,
     };
 
-    struct RowTesterEventHandler {
-        model: ModelSolving,
-    }
+    struct RowTesterEventHandler;
 
     impl Eventhdlr for RowTesterEventHandler {
         fn get_type(&self) -> EventMask {
             EventMask::FIRST_LP_SOLVED
         }
 
-        fn execute(&mut self) {
-            let first_cons = self.model.conss()[0].clone();
+        fn execute(&mut self, model: Model<Solving>) {
+            let first_cons = model.conss()[0].clone();
             let row = first_cons.row().unwrap();
             assert_eq!(row.n_non_zeroes(), 1);
             assert_eq!(row.lhs(), 1.0);
@@ -264,7 +262,7 @@ mod tests {
             assert_eq!(row.name(), "cons1");
             assert_eq!(row.age(), 0);
             assert_eq!(row.dual(), 1.0);
-            let infinity = unsafe { crate::ffi::SCIPinfinity(self.model.scip().raw) };
+            let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip().raw) };
             assert!(row.farkas_dual() >= infinity);
             assert!(row.rhs() - 1.0 < 1e-9);
             assert!(row.lhs() - 1.0 < 1e-9);
@@ -279,9 +277,7 @@ mod tests {
         let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(cons, true);
 
-        let eventhdlr = Box::new(RowTesterEventHandler {
-            model: model.clone_for_plugins(),
-        });
+        let eventhdlr = Box::new(RowTesterEventHandler);
         model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
 
         model.solve();

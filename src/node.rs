@@ -43,19 +43,18 @@ mod tests {
     use crate::{
         branchrule::{BranchRule, BranchingResult},
         model::Model,
-        ModelSolving,
+        Solving,
     };
 
-    struct NodeDataBranchRule {
-        model: ModelSolving,
-    }
+    struct NodeDataBranchRule;
 
     impl BranchRule for NodeDataBranchRule {
         fn execute(
             &mut self,
+            model: Model<Solving>,
             candidates: Vec<crate::branchrule::BranchingCandidate>,
         ) -> BranchingResult {
-            let node = self.model.focus_node();
+            let node = model.focus_node();
             if node.number() == 1 {
                 assert_eq!(node.depth(), 0);
                 assert!(node.lower_bound() < 6777.0);
@@ -79,9 +78,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        let br = NodeDataBranchRule {
-            model: model.clone_for_plugins(),
-        };
+        let br = NodeDataBranchRule;
 
         model
             .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
