@@ -8,7 +8,7 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
-use crate::{ffi, Separator};
+use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 
 /// Represents an optimization model.
@@ -469,6 +469,20 @@ impl Model<Solving> {
                 scip: self.scip().clone(),
             })
         }
+    }
+
+    /// Adds a new cut (row) to the model.
+    ///
+    /// # Arguments
+    /// * `row` - The row to add.
+    /// * `force_cut` - If true, the cut (row) is forced to be selected.
+    ///
+    /// # Returns
+    /// A boolean indicating whether the row is infeasible from the local bounds.
+    pub fn add_cut(&mut self, cut: Row, force_cut: bool) -> bool {
+        self.scip()
+            .add_row(cut, force_cut)
+            .expect("Failed to add row in state ProblemCreated")
     }
 }
 

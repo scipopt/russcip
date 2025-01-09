@@ -117,7 +117,7 @@ impl SCIPSeparator {
     /// Creates an empty LP row.
     pub fn create_empty_row(
         &self,
-        model: Model<Solving>,
+        model: &Model<Solving>,
         name: &str,
         lhs: f64,
         rhs: f64,
@@ -238,7 +238,7 @@ mod tests {
             assert_eq!(sep.maxbounddist(), 1.0);
             assert!(!sep.is_delayed());
             let row = sep
-                .create_empty_row(model, "test", 0.0, 1.0, true, false, false)
+                .create_empty_row(&model, "test", 0.0, 1.0, true, false, false)
                 .unwrap();
             assert_eq!(row.name(), "test");
             assert_eq!(row.lhs(), 0.0);
@@ -276,5 +276,53 @@ mod tests {
                 Box::new(sep),
             )
             .solve();
+    }
+
+    struct CutsAddingSeparator;
+
+    impl Separator for CutsAddingSeparator {
+        fn execute_lp(
+            &mut self,
+            mut model: Model<Solving>,
+            sepa: SCIPSeparator,
+        ) -> SeparationResult {
+            // adds a row representing the sum of all variables == 5, causing infeasibility
+            let row = sepa.create_empty_row(&model, "test", 5.0, 5.0, true, false, false).unwrap();
+            for var in model.vars() {
+                row.set_coeff(&var, 1.0);
+            }
+            model.add_row(row, true);
+
+            SeparationResult::Separated
+        }
+    }
+
+    #[test]
+    fn cuts_adding() {
+        let mut model = minimal_model()
+            .hide_output()
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+        let y = model.add_var(0.0, 1.0, 1.0, "y", VarType::Binary);
+
+        model.add_cons(vec![x, y], &[1.0, 1.0], 1.0, 1.0, "cons1");
+
+        let sep = CutsAddingSeparator {};
+
+        let solved = model
+            .include_separator(
+                "CutsAddingSeparator",
+                "",
+                1000000,
+                1,
+                1.0,
+                false,
+                false,
+                Box::new(sep),
+            )
+            .solve();
+
+        assert_eq!(solved.status(), crate::Status::Infeasible);
     }
 }
