@@ -2,7 +2,8 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Model, Node,
-    ObjSense, ParamSetting, Retcode, Separator, Solution, Solving, Status, VarType, Variable,
+    ObjSense, ParamSetting, Retcode, SCIPSeparator, Separator, Solution, Solving, Status, VarType,
+    Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -990,7 +991,8 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let sep_res = unsafe { (*rule_ptr).execute_lp(model) };
+            let separator = SCIPSeparator { raw: separator };
+            let sep_res = unsafe { (*rule_ptr).execute_lp(model, separator) };
 
             unsafe { *result = sep_res.into() };
 
