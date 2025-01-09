@@ -22,7 +22,9 @@ jobs:
       - name: Install dependencies (SCIPOptSuite)
         run: |
           wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-Linux-ubuntu24.deb
-          sudo apt-get update && sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu24.deb
+          sudo apt-get update
+          sudo apt-get install libssl1.1
+          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu24.deb
 
       - name: Install rust stable toolchain
         uses: actions-rs/toolchain@v1
