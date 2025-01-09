@@ -10,10 +10,7 @@ pub trait Eventhdlr {
     ///
     /// # Arguments
     /// * `model` - the current model of the SCIP instance in `Solving` stage
-    fn execute(
-        &mut self,
-        model: Model<Solving>,
-    );
+    fn execute(&mut self, model: Model<Solving>);
 }
 
 /// The EventMask represents different states or actions within an optimization problem.

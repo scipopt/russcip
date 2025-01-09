@@ -18,11 +18,7 @@ pub trait Heuristic {
     /// * `HeurResult::NoSolFound` if no new incumbent solution was found
     /// * `HeurResult::DidNotRun` if the heuristic was not executed
     /// * `HeurResult::Delayed` if the heuristic is delayed (skipped but should be called again)
-    fn execute(&mut self,
-               model: Model<Solving>,
-               timing: HeurTiming,
-               node_inf: bool,
-    ) -> HeurResult;
+    fn execute(&mut self, model: Model<Solving>, timing: HeurTiming, node_inf: bool) -> HeurResult;
 }
 
 /// The result of a primal heuristic execution.
