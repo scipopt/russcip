@@ -71,6 +71,11 @@ pub struct SCIPSeparator {
 }
 
 impl SCIPSeparator {
+    /// Returns the internal raw pointer of the separator.
+    pub fn inner(&self) -> *mut ffi::SCIP_SEPA {
+        self.raw
+    }
+    
     /// Returns the name of the separator.
     pub fn name(&self) -> String {
         unsafe {

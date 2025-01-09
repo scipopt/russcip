@@ -56,6 +56,11 @@ pub struct SCIPPricer {
 }
 
 impl SCIPPricer {
+    /// Returns the internal raw pointer of the pricer.
+    pub fn inner(&self) -> *mut ffi::SCIP_PRICER {
+        self.raw
+    }
+
     /// Returns the name of the pricer.
     pub fn name(&self) -> String {
         unsafe {
