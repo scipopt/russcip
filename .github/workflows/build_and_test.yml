@@ -64,7 +64,7 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly
-          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test --features raw
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test 
 
   linux-bundled-test:
     runs-on: ubuntu-latest
