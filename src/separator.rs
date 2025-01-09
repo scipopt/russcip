@@ -291,7 +291,7 @@ mod tests {
             for var in model.vars() {
                 row.set_coeff(&var, 1.0);
             }
-            model.add_row(row, true);
+            model.add_cut(row, true);
 
             SeparationResult::Separated
         }
