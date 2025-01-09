@@ -906,11 +906,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
                 name,
             )
             .expect("Failed to create constraint in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
@@ -943,11 +943,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new set partitioning constraint to the model with the given variables and name.
@@ -970,11 +970,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new set cover constraint to the model with the given variables and name.
@@ -997,11 +997,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_cover(vars, name)
             .expect("Failed to add constraint set cover in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new set packing constraint to the model with the given variables and name.
@@ -1024,11 +1024,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_pack(vars, name)
             .expect("Failed to add constraint set packing in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
@@ -1056,11 +1056,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_cardinality(vars, cardinality, name)
             .expect("Failed to add cardinality constraint");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 
     /// Adds a new indicator constraint to the model with the given variables, coefficients, right-hand side, and name.
@@ -1094,11 +1094,11 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_indicator(bin_var, vars, coefs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        let cons = Rc::new(Constraint {
+        
+        Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        });
-        cons
+        })
     }
 }
 
