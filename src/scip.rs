@@ -2,8 +2,8 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model, Node,
-    ObjSense, ParamSetting, Retcode, Row, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator,
-    Solution, Solving, Status, VarType, Variable,
+    ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPEventhdlr, SCIPPricer, SCIPSeparator,
+    Separator, Solution, Solving, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -700,7 +700,8 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let branching_res = unsafe { (*rule_ptr).execute(model, cands) };
+            let branchrule = SCIPBranchRule { raw: branchrule };
+            let branching_res = unsafe { (*rule_ptr).execute(model, branchrule, cands) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
                 unsafe {

@@ -42,7 +42,7 @@ mod tests {
     use crate::{
         branchrule::{BranchRule, BranchingResult},
         model::Model,
-        Solving,
+        SCIPBranchRule, Solving,
     };
 
     struct NodeDataBranchRule;
@@ -51,6 +51,7 @@ mod tests {
         fn execute(
             &mut self,
             model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             candidates: Vec<crate::branchrule::BranchingCandidate>,
         ) -> BranchingResult {
             let node = model.focus_node();
