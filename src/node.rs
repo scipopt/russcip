@@ -6,7 +6,6 @@ pub struct Node {
 }
 
 impl Node {
-    #[cfg(feature = "raw")]
     /// Returns a raw pointer to the underlying `ffi::SCIP_NODE` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_NODE {
         self.raw

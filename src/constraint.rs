@@ -14,7 +14,6 @@ pub struct Constraint {
 
 impl Constraint {
     /// Returns a pointer to the underlying `SCIP_CONS` C struct.
-    #[cfg(feature = "raw")]
     pub fn inner(&self) -> *mut ffi::SCIP_CONS {
         self.raw
     }

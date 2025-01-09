@@ -69,6 +69,11 @@ pub struct SCIPBranchRule {
 }
 
 impl SCIPBranchRule {
+    /// Returns the internal raw pointer of the branch rule.
+    pub fn inner(&self) -> *mut ffi::SCIP_BRANCHRULE {
+        self.raw
+    }
+
     /// Returns the name of the branch rule.
     pub fn name(&self) -> String {
         unsafe {

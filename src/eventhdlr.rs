@@ -182,6 +182,11 @@ pub struct SCIPEventhdlr {
 }
 
 impl SCIPEventhdlr {
+    /// Returns the internal raw pointer of the event handler.
+    pub fn inner(&self) -> *mut ffi::SCIP_EVENTHDLR {
+        self.raw
+    }
+
     /// Returns the name of the event handler.
     pub fn name(&self) -> String {
         unsafe {

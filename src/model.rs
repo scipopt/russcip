@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
@@ -10,6 +8,8 @@ use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
 use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
+use scip_sys::SCIP;
+use std::rc::Rc;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -1195,6 +1195,11 @@ pub fn minimal_model() -> Model<ProblemCreated> {
 }
 
 impl<T> Model<T> {
+    /// Returns a pointer to the SCIP instance. This is useful for passing to functions in the `ffi` module.
+    pub fn scip_ptr(&self) -> *mut SCIP {
+        self.scip.raw
+    }
+
     /// Returns the status of the optimization model.
     pub fn status(&self) -> Status {
         self.scip.status()
@@ -1566,7 +1571,6 @@ mod tests {
         assert!(sol.is_none());
     }
 
-    #[cfg(feature = "raw")]
     #[test]
     fn scip_ptr() {
         let mut model = Model::new()
