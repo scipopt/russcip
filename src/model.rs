@@ -906,7 +906,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
                 name,
             )
             .expect("Failed to create constraint in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -943,7 +943,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -970,7 +970,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -997,7 +997,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_cover(vars, name)
             .expect("Failed to add constraint set cover in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -1024,7 +1024,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_set_pack(vars, name)
             .expect("Failed to add constraint set packing in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -1056,7 +1056,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_cardinality(vars, cardinality, name)
             .expect("Failed to add cardinality constraint");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -1094,7 +1094,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_indicator(bin_var, vars, coefs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
-        
+
         Rc::new(Constraint {
             raw: cons,
             scip: self.scip.clone(),
