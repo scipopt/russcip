@@ -16,8 +16,7 @@ pub trait Eventhdlr {
 }
 
 /// The EventMask represents different states or actions within an optimization problem.
-#[derive(Debug, Copy, Clone)]
-#[derive(PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EventMask(u64);
 
 impl EventMask {
@@ -224,7 +223,12 @@ mod tests {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
-        fn execute(&mut self, _model: Model<Solving>, _eventhdlr: crate::SCIPEventhdlr, _event: Event) {
+        fn execute(
+            &mut self,
+            _model: Model<Solving>,
+            _eventhdlr: crate::SCIPEventhdlr,
+            _event: Event,
+        ) {
             *self.counter.borrow_mut() += 1;
         }
     }
@@ -247,7 +251,6 @@ mod tests {
         assert!(*counter.borrow() > 1);
     }
 
-
     struct InternalSCIPEventHdlrTester;
 
     impl Eventhdlr for InternalSCIPEventHdlrTester {
@@ -255,7 +258,12 @@ mod tests {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
-        fn execute(&mut self, _model: Model<Solving>, eventhdlr: crate::SCIPEventhdlr, event: Event) {
+        fn execute(
+            &mut self,
+            _model: Model<Solving>,
+            eventhdlr: crate::SCIPEventhdlr,
+            event: Event,
+        ) {
             assert!(self.get_type().matches(event.event_type()));
             assert_eq!(eventhdlr.name(), "InternalSCIPEventHdlrTester");
         }
@@ -268,7 +276,11 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap()
-            .include_eventhdlr("InternalSCIPEventHdlrTester", "", Box::new(InternalSCIPEventHdlrTester))
+            .include_eventhdlr(
+                "InternalSCIPEventHdlrTester",
+                "",
+                Box::new(InternalSCIPEventHdlrTester),
+            )
             .solve();
     }
 }

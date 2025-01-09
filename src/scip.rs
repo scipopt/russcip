@@ -1,6 +1,10 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model, Node, ObjSense, ParamSetting, Retcode, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable};
+use crate::{
+    ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model, Node,
+    ObjSense, ParamSetting, Retcode, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution,
+    Solving, Status, VarType, Variable,
+};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
 use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
@@ -600,12 +604,8 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let eventhdlr = SCIPEventhdlr {
-                raw: eventhdlr,
-            };
-            let event = Event {
-                raw: event,
-            };
+            let eventhdlr = SCIPEventhdlr { raw: eventhdlr };
+            let event = Event { raw: event };
             unsafe { (*eventhdlr_ptr).execute(model, eventhdlr, event) };
             Retcode::Okay.into()
         }
@@ -785,9 +785,7 @@ impl ScipPtr {
                 state: Solving,
             };
 
-            let pricer = SCIPPricer {
-                raw: pricer,
-            };
+            let pricer = SCIPPricer { raw: pricer };
             let pricing_res = unsafe { (*pricer_ptr).generate_columns(model, pricer, farkas) };
 
             if !farkas {
