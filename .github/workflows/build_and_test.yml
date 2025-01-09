@@ -1,8 +1,8 @@
 name: tests
 
 env:
-  version: 9.0.0
-  RUST_VERSION: 1.81.0
+  version: 9.2.0
+  RUST_VERSION: 1.83.0
 
 on:
   push:
