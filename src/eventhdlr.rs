@@ -1,5 +1,5 @@
-use std::ops::{BitOr, BitOrAssign};
 use crate::{Model, Solving};
+use std::ops::{BitOr, BitOrAssign};
 
 /// Trait used to define custom event handlers.
 pub trait Eventhdlr {
@@ -169,9 +169,9 @@ impl From<EventMask> for u64 {
 mod tests {
     use crate::eventhdlr::{EventMask, Eventhdlr};
     use crate::model::Model;
+    use crate::Solving;
     use std::cell::RefCell;
     use std::rc::Rc;
-    use crate::Solving;
 
     struct CountingEventHdlr {
         counter: Rc<RefCell<usize>>,

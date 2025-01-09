@@ -4,7 +4,11 @@ use scip_sys::SCIP_Result;
 /// A trait for defining custom branching rules.
 pub trait BranchRule {
     /// Executes the branching rule on the given candidates and returns the result.
-    fn execute(&mut self, candidates: Vec<BranchingCandidate>, model: Model<Solving>) -> BranchingResult;
+    fn execute(
+        &mut self,
+        candidates: Vec<BranchingCandidate>,
+        model: Model<Solving>,
+    ) -> BranchingResult;
 }
 
 /// The result of a branching rule execution.
@@ -62,7 +66,11 @@ mod tests {
     }
 
     impl BranchRule for FirstChoosingBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>, model: Model<Solving>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            candidates: Vec<BranchingCandidate>,
+            model: Model<Solving>,
+        ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
             BranchingResult::DidNotRun
         }
@@ -92,7 +100,11 @@ mod tests {
     struct CuttingOffBranchingRule;
 
     impl BranchRule for CuttingOffBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>, model: Model<Solving>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            _candidates: Vec<BranchingCandidate>,
+            model: Model<Solving>,
+        ) -> BranchingResult {
             BranchingResult::CutOff
         }
     }
@@ -115,7 +127,11 @@ mod tests {
     struct FirstBranchingRule;
 
     impl BranchRule for FirstBranchingRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>, model: Model<Solving>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            candidates: Vec<BranchingCandidate>,
+            model: Model<Solving>,
+        ) -> BranchingResult {
             assert!(model.n_vars() >= candidates.len());
             BranchingResult::BranchOn(candidates[0].clone())
         }
@@ -142,7 +158,11 @@ mod tests {
     struct CustomBranchingRule;
 
     impl BranchRule for CustomBranchingRule {
-        fn execute(&mut self, _candidates: Vec<BranchingCandidate>, mut model: Model<Solving>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            _candidates: Vec<BranchingCandidate>,
+            mut model: Model<Solving>,
+        ) -> BranchingResult {
             model.create_child();
             BranchingResult::CustomBranching
         }
@@ -169,7 +189,11 @@ mod tests {
     struct HighestBoundBranchRule;
 
     impl BranchRule for HighestBoundBranchRule {
-        fn execute(&mut self, candidates: Vec<BranchingCandidate>, model: Model<Solving>) -> BranchingResult {
+        fn execute(
+            &mut self,
+            candidates: Vec<BranchingCandidate>,
+            model: Model<Solving>,
+        ) -> BranchingResult {
             let mut max_bound = f64::NEG_INFINITY;
             let mut max_candidate = None;
             for candidate in candidates {

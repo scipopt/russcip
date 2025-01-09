@@ -62,7 +62,7 @@ impl From<SeparationResult> for SCIP_Result {
 mod tests {
     use super::*;
     use crate::{
-        minimal_model, Model, Solving, ModelWithProblem, ObjSense, ProblemOrSolving, VarType,
+        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
     };
 
     struct NotRunningSeparator;

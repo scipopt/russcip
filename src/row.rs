@@ -225,7 +225,10 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 
 #[cfg(test)]
 mod tests {
-    use crate::{minimal_model, EventMask, Eventhdlr, HasScipPtr, Model, ModelWithProblem, ProblemOrSolving, Solving, VarType};
+    use crate::{
+        minimal_model, EventMask, Eventhdlr, HasScipPtr, Model, ModelWithProblem, ProblemOrSolving,
+        Solving, VarType,
+    };
 
     struct RowTesterEventHandler;
 

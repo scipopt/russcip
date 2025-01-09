@@ -192,7 +192,10 @@ impl PartialEq for Col {
 
 #[cfg(test)]
 mod tests {
-    use crate::{minimal_model, BasisStatus, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving, Solving, VarType};
+    use crate::{
+        minimal_model, BasisStatus, EventMask, Eventhdlr, Model, ModelWithProblem,
+        ProblemOrSolving, Solving, VarType,
+    };
 
     struct ColTesterEventHandler;
 

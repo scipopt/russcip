@@ -1,6 +1,9 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Model, Node, ObjSense, ParamSetting, Retcode, Separator, Solution, Solving, Status, VarType, Variable};
+use crate::{
+    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Model, Node,
+    ObjSense, ParamSetting, Retcode, Separator, Solution, Solving, Status, VarType, Variable,
+};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
 use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
@@ -900,7 +903,8 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0, model) };
+            let heur_res =
+                unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0, model) };
             if heur_res == HeurResult::FoundSol {
                 let new_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
 

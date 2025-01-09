@@ -100,13 +100,6 @@ impl Model<PluginsIncluded> {
     }
 }
 
-// /// Represents a model in the solving state. This is meant to be used in plugins (callbacks).
-// pub struct ModelSolving {
-//     scip: Weak<ScipPtr>,
-//     #[allow(dead_code)]
-//     state: Solving,
-// }
-
 impl Model<ProblemCreated> {
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
@@ -1222,14 +1215,6 @@ impl HasScipPtr for Model<Solving> {
         self.scip.clone()
     }
 }
-
-// impl HasScipPtr for ModelSolving {
-//     fn scip(&self) -> Rc<ScipPtr> {
-//         self.scip.upgrade().expect("SCIP instance was dropped")
-//     }
-// }
-
-
 
 /// Creates a minimal `Model` instance and sets off a lot of SCIP plugins, useful for writing tests.
 pub fn minimal_model() -> Model<ProblemCreated> {
