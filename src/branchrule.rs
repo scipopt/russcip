@@ -6,15 +6,17 @@ pub trait BranchRule {
     /// Executes the branching rule on the given candidates and returns the result.
     ///
     /// # Arguments
-    /// * `model` - the current model of the SCIP instance in `Solving` stage
-    /// * `candidates` - the branching candidates
+    /// * `model` - the current model of the SCIP instance in `Solving` stage.
+    /// * `branchrule` - the internal SCIP branch rule.
+    /// * `candidates` - the branching candidates.
     ///
     /// # Returns
     ///
-    /// * `BranchingResult` indicating the result of the branching rule
+    /// * `BranchingResult` indicating the result of the branching rule.
     fn execute(
         &mut self,
         model: Model<Solving>,
+        branchrule: SCIPBranchRule,
         candidates: Vec<BranchingCandidate>,
     ) -> BranchingResult;
 }
@@ -122,9 +124,15 @@ mod tests {
         fn execute(
             &mut self,
             _model: Model<Solving>,
+            branchrule: SCIPBranchRule,
             candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
+            assert_eq!(branchrule.name(), "FirstChoosingBranchingRule");
+            assert_eq!(branchrule.desc(), "");
+            assert_eq!(branchrule.priority(), 100000);
+            assert_eq!(branchrule.maxdepth(), 1000);
+            assert_eq!(branchrule.maxbounddist(), 1.0);
             BranchingResult::DidNotRun
         }
     }
@@ -140,7 +148,7 @@ mod tests {
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap()
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br));
+            .include_branch_rule("FirstChoosingBranchingRule", "", 100000, 1000, 1., Box::new(br));
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);
@@ -152,6 +160,7 @@ mod tests {
         fn execute(
             &mut self,
             _model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             _candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             BranchingResult::CutOff
@@ -179,6 +188,7 @@ mod tests {
         fn execute(
             &mut self,
             model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             assert!(model.n_vars() >= candidates.len());
@@ -210,6 +220,7 @@ mod tests {
         fn execute(
             &mut self,
             mut model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             _candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             model.create_child();
@@ -241,6 +252,7 @@ mod tests {
         fn execute(
             &mut self,
             model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             let mut max_bound = f64::NEG_INFINITY;
@@ -286,6 +298,7 @@ mod tests {
         fn execute(
             &mut self,
             _model: Model<Solving>,
+            _branchrule: SCIPBranchRule,
             _candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
             BranchingResult::DidNotRun
