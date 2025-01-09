@@ -63,6 +63,46 @@ pub struct BranchingCandidate {
     pub frac: f64,
 }
 
+/// A wrapper struct for the internal ffi::SCIP_BRANCHRULE
+pub struct SCIPBranchRule {
+    pub(crate) raw: *mut ffi::SCIP_BRANCHRULE,
+}
+
+impl SCIPBranchRule {
+    /// Returns the name of the branch rule.
+    pub fn name(&self) -> String {
+        unsafe {
+            let name_ptr = ffi::SCIPbranchruleGetName(self.raw);
+            let name = std::ffi::CStr::from_ptr(name_ptr).to_str().unwrap();
+            name.to_string()
+        }
+    }
+
+    /// Returns the description of the branch rule.
+    pub fn desc(&self) -> String {
+        unsafe {
+            let desc_ptr = ffi::SCIPbranchruleGetDesc(self.raw);
+            let desc = std::ffi::CStr::from_ptr(desc_ptr).to_str().unwrap();
+            desc.to_string()
+        }
+    }
+
+    /// Returns the priority of the branch rule.
+    pub fn priority(&self) -> i32 {
+        unsafe { ffi::SCIPbranchruleGetPriority(self.raw) }
+    }
+
+    /// Returns the maxdepth of the branch rule.
+    pub fn maxdepth(&self) -> i32 {
+        unsafe { ffi::SCIPbranchruleGetMaxdepth(self.raw) }
+    }
+
+    /// Returns the maxbounddist of the branch rule.
+    pub fn maxbounddist(&self) -> f64 {
+        unsafe { ffi::SCIPbranchruleGetMaxbounddist(self.raw) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -99,10 +139,6 @@ mod tests {
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);
-        // assert!(br.chosen.is_some());
-        // let candidate = br.chosen.unwrap();
-        // assert!(candidate.lp_sol_val.fract() > 0.);
-        // assert!(candidate.frac > 0. && candidate.frac < 1.);
     }
 
     struct CuttingOffBranchingRule;
@@ -237,5 +273,41 @@ mod tests {
             .solve();
 
         assert!(solved.n_nodes() > 1);
+    }
+
+    struct InternalBranchRuleDataTester;
+
+    impl BranchRule for InternalBranchRuleDataTester {
+        fn execute(
+            &mut self,
+            _model: Model<Solving>,
+            _candidates: Vec<BranchingCandidate>,
+        ) -> BranchingResult {
+            BranchingResult::DidNotRun
+        }
+    }
+
+    #[test]
+    fn test_internal_scip_branch_rule() {
+        let model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/nodes", 2)
+            .unwrap() // only call brancher once
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+
+        let br = InternalBranchRuleDataTester;
+
+        model
+            .include_branch_rule(
+                "InternalBranchRuleDataTester",
+                "Internal branch rule data tester",
+                1000000,
+                1,
+                1.0,
+                Box::new(br),
+            )
+            .solve();
     }
 }

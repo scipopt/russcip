@@ -1,8 +1,9 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Model, Node,
-    ObjSense, ParamSetting, Retcode, Separator, Solution, Solving, Status, VarType, Variable,
+    ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model, Node,
+    ObjSense, ParamSetting, Retcode, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution,
+    Solving, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -592,7 +593,7 @@ impl ScipPtr {
         extern "C" fn eventhdlrexec(
             scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
-            _event: *mut ffi::SCIP_EVENT,
+            event: *mut ffi::SCIP_EVENT,
             _event_data: *mut ffi::SCIP_EVENTDATA,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
@@ -603,7 +604,9 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            unsafe { (*eventhdlr_ptr).execute(model) };
+            let eventhdlr = SCIPEventhdlr { raw: eventhdlr };
+            let event = Event { raw: event };
+            unsafe { (*eventhdlr_ptr).execute(model, eventhdlr, event) };
             Retcode::Okay.into()
         }
 
@@ -782,7 +785,8 @@ impl ScipPtr {
                 state: Solving,
             };
 
-            let pricing_res = unsafe { (*pricer_ptr).generate_columns(model, farkas) };
+            let pricer = SCIPPricer { raw: pricer };
+            let pricing_res = unsafe { (*pricer_ptr).generate_columns(model, pricer, farkas) };
 
             if !farkas {
                 if let Some(lb) = pricing_res.lower_bound {
@@ -990,7 +994,8 @@ impl ScipPtr {
                 scip: Rc::new(scip_ptr),
                 state: Solving,
             };
-            let sep_res = unsafe { (*rule_ptr).execute_lp(model) };
+            let separator = SCIPSeparator { raw: separator };
+            let sep_res = unsafe { (*rule_ptr).execute_lp(model, separator) };
 
             unsafe { *result = sep_res.into() };
 

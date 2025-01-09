@@ -225,6 +225,7 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 
 #[cfg(test)]
 mod tests {
+    use crate::Event;
     use crate::{
         minimal_model, EventMask, Eventhdlr, HasScipPtr, Model, ModelWithProblem, ProblemOrSolving,
         Solving, VarType,
@@ -237,7 +238,12 @@ mod tests {
             EventMask::FIRST_LP_SOLVED
         }
 
-        fn execute(&mut self, model: Model<Solving>) {
+        fn execute(
+            &mut self,
+            model: Model<Solving>,
+            _eventhdlr: crate::SCIPEventhdlr,
+            _event: Event,
+        ) {
             let first_cons = model.conss()[0].clone();
             let row = first_cons.row().unwrap();
             assert_eq!(row.n_non_zeroes(), 1);

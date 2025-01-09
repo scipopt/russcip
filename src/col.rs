@@ -193,8 +193,8 @@ impl PartialEq for Col {
 #[cfg(test)]
 mod tests {
     use crate::{
-        minimal_model, BasisStatus, EventMask, Eventhdlr, Model, ModelWithProblem,
-        ProblemOrSolving, Solving, VarType,
+        minimal_model, BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem,
+        ProblemOrSolving, SCIPEventhdlr, Solving, VarType,
     };
 
     struct ColTesterEventHandler;
@@ -204,7 +204,8 @@ mod tests {
             EventMask::FIRST_LP_SOLVED
         }
 
-        fn execute(&mut self, model: Model<Solving>) {
+        fn execute(&mut self, model: Model<Solving>, _eventhdlr: SCIPEventhdlr, event: Event) {
+            assert_eq!(event.event_type(), EventMask::FIRST_LP_SOLVED);
             let vars = model.vars();
             let first_var = vars[0].clone();
             let col = first_var.col().unwrap();
