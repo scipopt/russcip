@@ -1,10 +1,10 @@
-use crate::ffi;
+use crate::{ffi, Model, Solving};
 use scip_sys::SCIP_Result;
 
 /// A trait for defining custom separation routines.
 pub trait Separator {
     /// Execute the separation routine on LP solutions.
-    fn execute_lp(&mut self) -> SeparationResult;
+    fn execute_lp(&mut self, model: Model<Solving>) -> SeparationResult;
 }
 
 /// The result of a separation routine.
@@ -62,13 +62,13 @@ impl From<SeparationResult> for SCIP_Result {
 mod tests {
     use super::*;
     use crate::{
-        minimal_model, Model, ModelSolving, ModelWithProblem, ObjSense, ProblemOrSolving, VarType,
+        minimal_model, Model, Solving, ModelWithProblem, ObjSense, ProblemOrSolving, VarType,
     };
 
     struct NotRunningSeparator;
 
     impl Separator for NotRunningSeparator {
-        fn execute_lp(&mut self) -> SeparationResult {
+        fn execute_lp(&mut self, _model: Model<Solving>) -> SeparationResult {
             SeparationResult::DidNotRun
         }
     }
@@ -99,18 +99,15 @@ mod tests {
             .solve();
     }
 
-    struct ConsAddingSeparator {
-        model: ModelSolving,
-    }
+    struct ConsAddingSeparator {}
 
     impl Separator for ConsAddingSeparator {
-        fn execute_lp(&mut self) -> SeparationResult {
+        fn execute_lp(&mut self, mut model: Model<Solving>) -> SeparationResult {
             // adds a row representing the sum of all variables >= 1
-            let vars = self.model.vars();
+            let vars = model.vars();
             let varlen = vars.len();
 
-            self.model
-                .add_cons(vars, &vec![1.0; varlen], 5.0, 5.0, "cons_added");
+            model.add_cons(vars, &vec![1.0; varlen], 5.0, 5.0, "cons_added");
             SeparationResult::ConsAdded
         }
     }
@@ -126,9 +123,7 @@ mod tests {
 
         model.add_cons(vec![x, y], &[1.0, 1.0], 1.0, 1.0, "cons1");
 
-        let sep = ConsAddingSeparator {
-            model: model.clone_for_plugins(),
-        };
+        let sep = ConsAddingSeparator {};
 
         let solved = model
             .include_separator(

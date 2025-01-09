@@ -1,7 +1,7 @@
 use scip_sys::SCIP_Result;
 use std::ops::{BitOr, BitOrAssign};
 
-use crate::ffi;
+use crate::{ffi, Model, Solving};
 
 /// A trait for defining custom primal heuristics.
 pub trait Heuristic {
@@ -17,7 +17,7 @@ pub trait Heuristic {
     /// * `HeurResult::NoSolFound` if no new incumbent solution was found
     /// * `HeurResult::DidNotRun` if the heuristic was not executed
     /// * `HeurResult::Delayed` if the heuristic is delayed (skipped but should be called again)
-    fn execute(&mut self, timing: HeurTiming, node_inf: bool) -> HeurResult;
+    fn execute(&mut self, timing: HeurTiming, node_inf: bool, model: Model<Solving>) -> HeurResult;
 }
 
 /// The result of a primal heuristic execution.
@@ -101,14 +101,19 @@ impl From<HeurResult> for SCIP_Result {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Model, ModelSolving, ModelWithProblem, ProblemOrSolving};
+    use crate::{Model, ModelWithProblem, ProblemOrSolving};
 
     use super::*;
 
     struct NoSolutionFoundHeur;
 
     impl Heuristic for NoSolutionFoundHeur {
-        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+        fn execute(
+            &mut self,
+            _timing: HeurTiming,
+            _node_inf: bool,
+            _model: Model<Solving>,
+        ) -> HeurResult {
             HeurResult::NoSolFound
         }
     }
@@ -143,7 +148,12 @@ mod tests {
     struct ImpostorHeur;
 
     impl Heuristic for ImpostorHeur {
-        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+        fn execute(
+            &mut self,
+            _timing: HeurTiming,
+            _node_inf: bool,
+            _model: Model<Solving>,
+        ) -> HeurResult {
             HeurResult::FoundSol
         }
     }
@@ -177,7 +187,12 @@ mod tests {
     struct DelayedHeur;
 
     impl Heuristic for DelayedHeur {
-        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+        fn execute(
+            &mut self,
+            _timing: HeurTiming,
+            _node_inf: bool,
+            _model: Model<Solving>,
+        ) -> HeurResult {
             HeurResult::Delayed
         }
     }
@@ -210,7 +225,12 @@ mod tests {
     struct DidNotRunHeur;
 
     impl Heuristic for DidNotRunHeur {
-        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
+        fn execute(
+            &mut self,
+            _timing: HeurTiming,
+            _node_inf: bool,
+            _model: Model<Solving>,
+        ) -> HeurResult {
             HeurResult::DidNotRun
         }
     }
@@ -240,18 +260,21 @@ mod tests {
             .solve();
     }
 
-    struct FoundSolHeur {
-        model: ModelSolving,
-    }
+    struct FoundSolHeur;
 
     impl Heuristic for FoundSolHeur {
-        fn execute(&mut self, _timing: HeurTiming, _node_inf: bool) -> HeurResult {
-            let sol = self.model.create_sol();
-            for var in self.model.vars() {
+        fn execute(
+            &mut self,
+            _timing: HeurTiming,
+            _node_inf: bool,
+            model: Model<Solving>,
+        ) -> HeurResult {
+            let sol = model.create_sol();
+            for var in model.vars() {
                 sol.set_val(var, 1.0);
             }
             assert_eq!(sol.obj_val(), 7.0);
-            assert_eq!(self.model.add_sol(sol), Ok(()));
+            assert_eq!(model.add_sol(sol), Ok(()));
             HeurResult::FoundSol
         }
     }
@@ -264,9 +287,7 @@ mod tests {
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = FoundSolHeur {
-            model: model.clone_for_plugins(),
-        };
+        let heur = FoundSolHeur;
         model
             .include_heur(
                 "found_sol_heur",

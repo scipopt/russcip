@@ -1,9 +1,6 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Node, ObjSense,
-    ParamSetting, Retcode, Separator, Solution, Status, VarType, Variable,
-};
+use crate::{ffi, scip_call_panic, BranchingResult, Constraint, Eventhdlr, HeurResult, Model, Node, ObjSense, ParamSetting, Retcode, Separator, Solution, Solving, Status, VarType, Variable};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
 use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
@@ -15,7 +12,11 @@ use std::rc::Rc;
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct ScipPtr {
+    /// Pointer to the SCIP instance
     pub(crate) raw: *mut ffi::SCIP,
+    /// If true, the SCIP instance will not be freed when the ScipPtr is dropped
+    pub(crate) weak: bool,
+    /// Variables added during solving (to be released after solving)
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
 }
 
@@ -26,6 +27,15 @@ impl ScipPtr {
         let scip_ptr = unsafe { scip_ptr.assume_init() };
         ScipPtr {
             raw: scip_ptr,
+            weak: false,
+            vars_added_in_solving: Vec::new(),
+        }
+    }
+
+    pub(crate) fn from_raw(raw: *mut ffi::SCIP, weak: bool) -> Self {
+        ScipPtr {
+            raw,
+            weak,
             vars_added_in_solving: Vec::new(),
         }
     }
@@ -577,7 +587,7 @@ impl ScipPtr {
         eventhdlr: Box<dyn Eventhdlr>,
     ) -> Result<(), Retcode> {
         extern "C" fn eventhdlrexec(
-            _scip: *mut ffi::SCIP,
+            scip: *mut ffi::SCIP,
             eventhdlr: *mut ffi::SCIP_EVENTHDLR,
             _event: *mut ffi::SCIP_EVENT,
             _event_data: *mut ffi::SCIP_EVENTDATA,
@@ -585,7 +595,12 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            unsafe { (*eventhdlr_ptr).execute() };
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: Solving,
+            };
+            unsafe { (*eventhdlr_ptr).execute(model) };
             Retcode::Okay.into()
         }
 
@@ -674,7 +689,12 @@ impl ScipPtr {
                     frac,
                 })
                 .collect::<Vec<_>>();
-            let branching_res = unsafe { (*rule_ptr).execute(cands) };
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: Solving,
+            };
+            let branching_res = unsafe { (*rule_ptr).execute(cands, model) };
 
             if let BranchingResult::BranchOn(cand) = branching_res.clone() {
                 unsafe {
@@ -752,7 +772,14 @@ impl ScipPtr {
             let pricer_ptr = data_ptr as *mut Box<dyn Pricer>;
 
             let n_vars_before = unsafe { ffi::SCIPgetNVars(scip) };
-            let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas) };
+
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: Solving,
+            };
+
+            let pricing_res = unsafe { (*pricer_ptr).generate_columns(farkas, model) };
 
             if !farkas {
                 if let Some(lb) = pricing_res.lower_bound {
@@ -868,7 +895,12 @@ impl ScipPtr {
             let rule_ptr = data_ptr as *mut Box<dyn Heuristic>;
 
             let current_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
-            let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0) };
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: Solving,
+            };
+            let heur_res = unsafe { (*rule_ptr).execute(heurtiming.into(), nodeinfeasible != 0, model) };
             if heur_res == HeurResult::FoundSol {
                 let new_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
 
@@ -939,7 +971,7 @@ impl ScipPtr {
         let c_desc = CString::new(desc).unwrap();
 
         extern "C" fn sepexeclp(
-            _scip: *mut ffi::SCIP,
+            scip: *mut ffi::SCIP,
             separator: *mut ffi::SCIP_SEPA,
             result: *mut ffi::SCIP_RESULT,
             _allowlocal: ::std::os::raw::c_uint,
@@ -949,7 +981,12 @@ impl ScipPtr {
             assert!(!data_ptr.is_null());
             let rule_ptr = data_ptr as *mut Box<dyn Separator>;
 
-            let sep_res = unsafe { (*rule_ptr).execute_lp() };
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: Solving,
+            };
+            let sep_res = unsafe { (*rule_ptr).execute_lp(model) };
 
             unsafe { *result = sep_res.into() };
 
@@ -1103,6 +1140,10 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
+        if self.weak {
+            return;
+        }
+
         // Rust Model struct keeps at most one copy of each variable and constraint pointers
         // so we need to release them before freeing the SCIP instance
 

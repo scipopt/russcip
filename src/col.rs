@@ -192,22 +192,17 @@ impl PartialEq for Col {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        minimal_model, BasisStatus, EventMask, Eventhdlr, ModelSolving, ModelWithProblem,
-        ProblemOrSolving, VarType,
-    };
+    use crate::{minimal_model, BasisStatus, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving, Solving, VarType};
 
-    struct ColTesterEventHandler {
-        model: ModelSolving,
-    }
+    struct ColTesterEventHandler;
 
     impl Eventhdlr for ColTesterEventHandler {
         fn get_type(&self) -> EventMask {
             EventMask::FIRST_LP_SOLVED
         }
 
-        fn execute(&mut self) {
-            let vars = self.model.vars();
+        fn execute(&mut self, model: Model<Solving>) {
+            let vars = model.vars();
             let first_var = vars[0].clone();
             let col = first_var.col().unwrap();
             assert_eq!(col.index(), 0);
@@ -244,9 +239,7 @@ mod tests {
         let cons = model.add_cons(vec![x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(cons, true);
 
-        let eventhdlr = Box::new(ColTesterEventHandler {
-            model: model.clone_for_plugins(),
-        });
+        let eventhdlr = Box::new(ColTesterEventHandler);
         model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
 
         model.solve();

@@ -1,11 +1,12 @@
 use std::ops::{BitOr, BitOrAssign};
+use crate::{Model, Solving};
 
 /// Trait used to define custom event handlers.
 pub trait Eventhdlr {
     /// Returns the type of the event handler.
     fn get_type(&self) -> EventMask;
     /// Executes the event handler.
-    fn execute(&mut self);
+    fn execute(&mut self, model: Model<Solving>);
 }
 
 /// The EventMask represents different states or actions within an optimization problem.
@@ -170,6 +171,7 @@ mod tests {
     use crate::model::Model;
     use std::cell::RefCell;
     use std::rc::Rc;
+    use crate::Solving;
 
     struct CountingEventHdlr {
         counter: Rc<RefCell<usize>>,
@@ -180,7 +182,7 @@ mod tests {
             EventMask::LP_EVENT | EventMask::NODE_EVENT
         }
 
-        fn execute(&mut self) {
+        fn execute(&mut self, _model: Model<Solving>) {
             *self.counter.borrow_mut() += 1;
         }
     }
