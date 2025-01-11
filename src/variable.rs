@@ -88,9 +88,14 @@ impl Variable {
     pub fn is_in_lp(&self) -> bool {
         (unsafe { ffi::SCIPvarIsInLP(self.raw) }) != 0
     }
+
+    /// Returns the solution value of the variable in the current node.
+    pub fn sol_val(&self) -> f64 {
+        unsafe { ffi::SCIPgetVarSol(self.scip.raw, self.raw) }
+    }
 }
 
-/// The type of a variable in an optimization problem.
+/// The type of variable in an optimization problem.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum VarType {
     /// The variable is a continuous variable.
@@ -163,7 +168,7 @@ impl From<SCIP_Status> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Model, ObjSense};
+    use crate::{minimal_model, Model, ObjSense, ProblemOrSolving};
 
     #[test]
     fn var_data() {
@@ -192,7 +197,17 @@ mod tests {
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
 
         drop(model);
-
         assert_eq!(x1.name(), "x1");
+    }
+
+    #[test]
+    fn var_sol_val() {
+        let mut model = minimal_model();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+        let _cons = model.add_cons(vec![x.clone()], &[1.0], 1.0, 1.0, "cons1");
+
+        model.solve();
+
+        assert_eq!(x.sol_val(), 1.0);
     }
 }
