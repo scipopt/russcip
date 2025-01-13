@@ -158,12 +158,12 @@ impl Row {
     }
 
     /// Sets the rank of the row.
-    pub fn set_rank(&self, rank: usize) {
+    pub fn set_rank(&mut self, rank: usize) {
         unsafe { ffi::SCIProwChgRank(self.raw, rank as c_int) };
     }
 
     /// Sets the coefficient of a variable in the row.
-    pub fn set_coeff(&self, var: &Variable, coeff: f64) {
+    pub fn set_coeff(&mut self, var: &Variable, coeff: f64) {
         unsafe { ffi::SCIPaddVarToRow(self.scip.raw, self.raw, var.raw, coeff) };
     }
 }
@@ -249,7 +249,7 @@ mod tests {
             _event: Event,
         ) {
             let first_cons = model.conss()[0].clone();
-            let row = first_cons.row().unwrap();
+            let mut row = first_cons.row().unwrap();
             assert_eq!(row.n_non_zeroes(), 1);
             assert_eq!(row.lhs(), 1.0);
             assert_eq!(row.index(), 0);

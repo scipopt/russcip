@@ -292,7 +292,7 @@ mod tests {
             sepa: SCIPSeparator,
         ) -> SeparationResult {
             // adds a row representing the sum of all variables == 5, causing infeasibility
-            let row = sepa
+            let mut row = sepa
                 .create_empty_row(&model, "test", 5.0, 5.0, true, false, false)
                 .unwrap();
             for var in model.vars() {
