@@ -6,9 +6,10 @@ use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
+#[derive(Clone)]
 pub struct Solution {
-    pub(crate) scip_ptr: Rc<ScipPtr>,
     pub(crate) raw: *mut ffi::SCIP_SOL,
+    pub(crate) scip_ptr: Rc<ScipPtr>,
 }
 
 impl Solution {
