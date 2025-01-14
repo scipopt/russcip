@@ -240,7 +240,7 @@ mod tests {
         let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
 
         let cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
-        model.set_cons_modifiable(cons, true);
+        model.set_cons_modifiable(&cons, true);
 
         let eventhdlr = Box::new(ColTesterEventHandler);
         model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);

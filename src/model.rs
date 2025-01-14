@@ -119,7 +119,7 @@ impl Model<ProblemCreated> {
     }
 
     /// Sets the constraint as modifiable or not.
-    pub fn set_cons_modifiable(&mut self, cons: Rc<Constraint>, modifiable: bool) {
+    pub fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool) {
         self.scip
             .set_cons_modifiable(cons, modifiable)
             .expect("Failed to set constraint modifiable");
@@ -534,7 +534,7 @@ pub trait ModelWithProblem {
     fn n_conss(&self) -> usize;
 
     /// Returns a vector of all constraints in the optimization model.
-    fn conss(&self) -> Vec<Rc<Constraint>>;
+    fn conss(&self) -> Vec<Constraint>;
 
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
@@ -584,7 +584,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     }
 
     /// Returns a vector of all constraints in the optimization model.
-    fn conss(&self) -> Vec<Rc<Constraint>> {
+    fn conss(&self) -> Vec<Constraint> {
         let scip_conss = self.scip.conss(false);
         scip_conss
             .into_iter()
@@ -592,7 +592,6 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
                 raw: c,
                 scip: self.scip.clone(),
             })
-            .map(Rc::new)
             .collect()
     }
 
@@ -624,7 +623,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: &Variable);
+    fn add_cons_coef_setppc(&mut self, cons: &Constraint, var: &Variable);
 
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
@@ -637,7 +636,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: &Variable, coef: f64);
+    fn add_cons_coef(&mut self, cons: &Constraint, var: &Variable, coef: f64);
 
     /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
@@ -669,7 +668,7 @@ pub trait ProblemOrSolving {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> Constraint;
 
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
@@ -695,7 +694,7 @@ pub trait ProblemOrSolving {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> Constraint;
 
     /// Adds a new set partitioning constraint to the model with the given variables and name.
     ///
@@ -711,7 +710,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint;
 
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
@@ -727,7 +726,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint;
 
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
@@ -743,7 +742,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint;
 
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
     ///
@@ -765,7 +764,7 @@ pub trait ProblemOrSolving {
         vars: Vec<&Variable>,
         cardinality: usize,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> Constraint;
 
     /// Adds a new indicator constraint to the model with the given variables, coefficients, right-hand side, and name.
     ///
@@ -791,7 +790,7 @@ pub trait ProblemOrSolving {
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint>;
+    ) -> Constraint;
 }
 trait ModelStageProblemOrSolving {}
 impl ModelStageProblemOrSolving for ProblemCreated {}
@@ -833,7 +832,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: &Variable) {
+    fn add_cons_coef_setppc(&mut self, cons: &Constraint, var: &Variable) {
         assert_eq!(var.var_type(), VarType::Binary);
         self.scip
             .add_cons_coef_setppc(cons, var)
@@ -851,7 +850,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: &Variable, coef: f64) {
+    fn add_cons_coef(&mut self, cons: &Constraint, var: &Variable, coef: f64) {
         self.scip
             .add_cons_coef(cons, var, coef)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -887,7 +886,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint> {
+    ) -> Constraint {
         assert_eq!(lin_vars.len(), lin_coefs.len());
         assert_eq!(quad_vars_1.len(), quad_vars_2.len());
         assert_eq!(quad_vars_1.len(), quad_coefs.len());
@@ -905,10 +904,10 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             )
             .expect("Failed to create constraint in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
@@ -935,17 +934,17 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         lhs: f64,
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint> {
+    ) -> Constraint {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
             .create_cons(vars, coefs, lhs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new set partitioning constraint to the model with the given variables and name.
@@ -962,17 +961,17 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_part(vars, name)
             .expect("Failed to add constraint set partition in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new set cover constraint to the model with the given variables and name.
@@ -989,17 +988,17 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_cover(vars, name)
             .expect("Failed to add constraint set cover in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new set packing constraint to the model with the given variables and name.
@@ -1016,17 +1015,17 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Constraint {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
             .create_cons_set_pack(vars, name)
             .expect("Failed to add constraint set packing in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
@@ -1049,16 +1048,16 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         vars: Vec<&Variable>,
         cardinality: usize,
         name: &str,
-    ) -> Rc<Constraint> {
+    ) -> Constraint {
         let cons = self
             .scip
             .create_cons_cardinality(vars, cardinality, name)
             .expect("Failed to add cardinality constraint");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 
     /// Adds a new indicator constraint to the model with the given variables, coefficients, right-hand side, and name.
@@ -1085,7 +1084,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
-    ) -> Rc<Constraint> {
+    ) -> Constraint {
         assert_eq!(vars.len(), coefs.len());
         assert_eq!(bin_var.var_type(), VarType::Binary);
         let cons = self
@@ -1093,10 +1092,10 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .create_cons_indicator(bin_var, vars, coefs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
 
-        Rc::new(Constraint {
+        Constraint {
             raw: cons,
             scip: self.scip.clone(),
-        })
+        }
     }
 }
 
@@ -1610,8 +1609,8 @@ mod tests {
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         let cons = model.add_cons(vec![], &[], -f64::INFINITY, 10., "c1");
 
-        model.add_cons_coef(cons.clone(), &x1, 0.); // x1 is unconstrained
-        model.add_cons_coef(cons, &x2, 10.); // x2 can't be used
+        model.add_cons_coef(&cons, &x1, 0.); // x1 is unconstrained
+        model.add_cons_coef(&cons, &x2, 10.); // x2 can't be used
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1629,7 +1628,7 @@ mod tests {
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1, &x1);
+        model.add_cons_coef_setppc(&cons1, &x1);
 
         model.add_cons_set_cover(vec![&x2], "c");
         model.add_cons_set_pack(vec![&x2], "c");
@@ -1717,7 +1716,7 @@ mod tests {
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1, &x1);
+        model.add_cons_coef_setppc(&cons1, &x1);
 
         model.add_cons_set_pack(vec![&x2], "c");
 

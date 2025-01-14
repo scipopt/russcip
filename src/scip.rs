@@ -527,7 +527,7 @@ impl ScipPtr {
     /// Add coefficient to set packing/partitioning/covering constraint
     pub(crate) fn add_cons_coef_setppc(
         &self,
-        cons: Rc<Constraint>,
+        cons: &Constraint,
         var: &Variable,
     ) -> Result<(), Retcode> {
         scip_call! { ffi::SCIPaddCoefSetppc(self.raw, cons.raw, var.raw) };
@@ -1052,7 +1052,7 @@ impl ScipPtr {
 
     pub(crate) fn add_cons_coef(
         &self,
-        cons: Rc<Constraint>,
+        cons: &Constraint,
         var: &Variable,
         coef: f64,
     ) -> Result<(), Retcode> {
@@ -1089,7 +1089,7 @@ impl ScipPtr {
 
     pub(crate) fn set_cons_modifiable(
         &self,
-        cons: Rc<Constraint>,
+        cons: &Constraint,
         modifiable: bool,
     ) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPsetConsModifiable(
