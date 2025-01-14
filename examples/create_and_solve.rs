@@ -14,14 +14,14 @@ fn main() {
 
     // Add constraints
     model.add_cons(
-        vec![x1.clone(), x2.clone()],
+        vec![&x1, &x2],
         &[2., 1.],
         -f64::INFINITY,
         100.,
         "c1",
     );
     model.add_cons(
-        vec![x1.clone(), x2.clone()],
+        vec![&x1, &x2],
         &[1., 2.],
         -f64::INFINITY,
         80.,
@@ -40,6 +40,6 @@ fn main() {
     let vars = solved_model.vars();
 
     for var in vars {
-        println!("{} = {}", &var.name(), sol.val(var));
+        println!("{} = {}", var.name(), sol.val(&var));
     }
 }

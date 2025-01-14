@@ -8,7 +8,7 @@ use std::rc::Rc;
 pub type VarId = usize;
 
 /// A wrapper for a mutable reference to a SCIP variable.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Variable {
     pub(crate) raw: *mut ffi::SCIP_VAR,
@@ -204,7 +204,7 @@ mod tests {
     fn var_sol_val() {
         let mut model = minimal_model();
         let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-        let _cons = model.add_cons(vec![x.clone()], &[1.0], 1.0, 1.0, "cons1");
+        let _cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
 
         model.solve();
 

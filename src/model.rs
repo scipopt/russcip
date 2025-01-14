@@ -158,17 +158,16 @@ impl Model<ProblemCreated> {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> Rc<Variable> {
+    ) -> Variable {
         let var = self
             .scip
             .create_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Variable {
+
+        Variable {
             raw: var,
             scip: self.scip.clone(),
-        };
-
-        Rc::new(var)
+        }
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -523,10 +522,10 @@ impl Model<Solved> {
 /// A trait for optimization models with a problem created.
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
-    fn vars(&self) -> Vec<Rc<Variable>>;
+    fn vars(&self) -> Vec<Variable>;
 
     /// Returns the variable with the given ID, if it exists.
-    fn var(&self, var_id: VarId) -> Option<Rc<Variable>>;
+    fn var(&self, var_id: VarId) -> Option<Variable>;
 
     /// Returns the number of variables in the optimization model.
     fn n_vars(&self) -> usize;
@@ -548,7 +547,7 @@ impl ModelStageWithProblem for Solving {}
 
 impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns a vector of all variables in the optimization model.
-    fn vars(&self) -> Vec<Rc<Variable>> {
+    fn vars(&self) -> Vec<Variable> {
         let scip_vars = self.scip.vars(false);
         scip_vars
             .into_values()
@@ -556,19 +555,18 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
                 raw: v,
                 scip: self.scip.clone(),
             })
-            .map(Rc::new)
             .collect()
     }
 
     /// Returns the variable with the given ID, if it exists.
-    fn var(&self, var_id: VarId) -> Option<Rc<Variable>> {
+    fn var(&self, var_id: VarId) -> Option<Variable> {
         let vars = self.scip.vars(false);
         for (i, v) in vars {
             if i == var_id {
-                return Some(Rc::new(Variable {
+                return Some(Variable {
                     raw: v,
                     scip: self.scip.clone(),
-                }));
+                });
             }
         }
 
@@ -626,7 +624,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>);
+    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: &Variable);
 
     /// Adds a coefficient to the given constraint for the given variable and coefficient value.
     ///
@@ -639,7 +637,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64);
+    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: &Variable, coef: f64);
 
     /// Adds a new quadratic constraint to the model with the given variables, coefficients, left-hand side, right-hand side, and name.
     ///
@@ -663,10 +661,10 @@ pub trait ProblemOrSolving {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_quadratic(
         &mut self,
-        lin_vars: Vec<Rc<Variable>>,
+        lin_vars: Vec<&Variable>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
+        quad_vars_1: Vec<&Variable>,
+        quad_vars_2: Vec<&Variable>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
@@ -692,7 +690,7 @@ pub trait ProblemOrSolving {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
@@ -713,7 +711,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
 
     /// Adds a new set cover constraint to the model with the given variables and name.
     ///
@@ -729,7 +727,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
 
     /// Adds a new set packing constraint to the model with the given variables and name.
     ///
@@ -745,7 +743,7 @@ pub trait ProblemOrSolving {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint>;
+    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint>;
 
     /// Adds a new cardinality constraint to the model with the given variables, cardinality limit, and name.
     ///
@@ -764,7 +762,7 @@ pub trait ProblemOrSolving {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_cardinality(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         cardinality: usize,
         name: &str,
     ) -> Rc<Constraint>;
@@ -788,8 +786,8 @@ pub trait ProblemOrSolving {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_indicator(
         &mut self,
-        bin_var: Rc<Variable>,
-        vars: Vec<Rc<Variable>>,
+        bin_var: &Variable,
+        vars: Vec<&Variable>,
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
@@ -835,7 +833,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the variable cannot be added in the current state, or if the variable is not binary.
-    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: Rc<Variable>) {
+    fn add_cons_coef_setppc(&mut self, cons: Rc<Constraint>, var: &Variable) {
         assert_eq!(var.var_type(), VarType::Binary);
         self.scip
             .add_cons_coef_setppc(cons, var)
@@ -853,7 +851,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the coefficient cannot be added in the current state.
-    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: Rc<Variable>, coef: f64) {
+    fn add_cons_coef(&mut self, cons: Rc<Constraint>, var: &Variable, coef: f64) {
         self.scip
             .add_cons_coef(cons, var, coef)
             .expect("Failed to add constraint coefficient in state ProblemCreated");
@@ -881,10 +879,10 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_quadratic(
         &mut self,
-        lin_vars: Vec<Rc<Variable>>,
+        lin_vars: Vec<&Variable>,
         lin_coefs: &mut [f64],
-        quad_vars_1: Vec<Rc<Variable>>,
-        quad_vars_2: Vec<Rc<Variable>>,
+        quad_vars_1: Vec<&Variable>,
+        quad_vars_2: Vec<&Variable>,
         quad_coefs: &mut [f64],
         lhs: f64,
         rhs: f64,
@@ -932,7 +930,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
@@ -964,7 +962,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_part(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_part(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
@@ -991,7 +989,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_cover(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_cover(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
@@ -1018,7 +1016,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state, or if any of the variables are not binary.
-    fn add_cons_set_pack(&mut self, vars: Vec<Rc<Variable>>, name: &str) -> Rc<Constraint> {
+    fn add_cons_set_pack(&mut self, vars: Vec<&Variable>, name: &str) -> Rc<Constraint> {
         assert!(vars.iter().all(|v| v.var_type() == VarType::Binary));
         let cons = self
             .scip
@@ -1048,7 +1046,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_cardinality(
         &mut self,
-        vars: Vec<Rc<Variable>>,
+        vars: Vec<&Variable>,
         cardinality: usize,
         name: &str,
     ) -> Rc<Constraint> {
@@ -1082,8 +1080,8 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// This method panics if the constraint cannot be created in the current state.
     fn add_cons_indicator(
         &mut self,
-        bin_var: Rc<Variable>,
-        vars: Vec<Rc<Variable>>,
+        bin_var: &Variable,
+        vars: Vec<&Variable>,
         coefs: &mut [f64],
         rhs: f64,
         name: &str,
@@ -1406,8 +1404,8 @@ mod tests {
         let sol = model.best_sol().unwrap();
         let vars = model.vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.val(vars[0].clone()), 40.);
-        assert_eq!(sol.val(vars[1].clone()), 20.);
+        assert_eq!(sol.val(&vars[0]), 40.);
+        assert_eq!(sol.val(&vars[1]), 20.);
 
         assert_eq!(sol.obj_val(), model.obj_val());
     }
@@ -1496,13 +1494,13 @@ mod tests {
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         model.add_cons(
-            vec![x1.clone(), x2.clone()],
+            vec![&x1, &x2],
             &[2., 1.],
             -f64::INFINITY,
             100.,
             "c1",
         );
-        model.add_cons(vec![x1, x2], &[1., 2.], -f64::INFINITY, 80., "c2");
+        model.add_cons(vec![&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
         model
     }
@@ -1529,8 +1527,8 @@ mod tests {
         let sol = solved_model.best_sol().unwrap();
         let vars = solved_model.vars();
         assert_eq!(vars.len(), 2);
-        assert_eq!(sol.val(vars[0].clone()), 40.);
-        assert_eq!(sol.val(vars[1].clone()), 20.);
+        assert_eq!(sol.val(&vars[0]), 40.);
+        assert_eq!(sol.val(&vars[1]), 20.);
     }
 
     #[test]
@@ -1559,7 +1557,7 @@ mod tests {
 
         let var = model.add_var(0., 1., 1., "x1", VarType::Integer);
 
-        model.add_cons(vec![var], &[1.], -f64::INFINITY, -1., "c1");
+        model.add_cons(vec![&var], &[1.], -f64::INFINITY, -1., "c1");
 
         let solved_model = model.solve();
 
@@ -1582,14 +1580,14 @@ mod tests {
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         model.add_cons(
-            vec![x1.clone(), x2.clone()],
+            vec![&x1, &x2],
             &[2., 1.],
             -f64::INFINITY,
             100.,
             "c1",
         );
         model.add_cons(
-            vec![x1.clone(), x2.clone()],
+            vec![&x1, &x2],
             &[1., 2.],
             -f64::INFINITY,
             80.,
@@ -1612,8 +1610,8 @@ mod tests {
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
         let cons = model.add_cons(vec![], &[], -f64::INFINITY, 10., "c1");
 
-        model.add_cons_coef(cons.clone(), x1, 0.); // x1 is unconstrained
-        model.add_cons_coef(cons, x2, 10.); // x2 can't be be used
+        model.add_cons_coef(cons.clone(), &x1, 0.); // x1 is unconstrained
+        model.add_cons_coef(cons, &x2, 10.); // x2 can't be used
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1631,10 +1629,10 @@ mod tests {
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1, x1);
+        model.add_cons_coef_setppc(cons1, &x1);
 
-        model.add_cons_set_cover(vec![x2.clone()], "c");
-        model.add_cons_set_pack(vec![x2], "c");
+        model.add_cons_set_cover(vec![&x2], "c");
+        model.add_cons_set_pack(vec![&x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1656,7 +1654,7 @@ mod tests {
         let x3 = model.add_var(0., 10., 3., "x3", VarType::Integer);
 
         // cardinality constraint allows just two variables to be non-zero
-        model.add_cons_cardinality(vec![x1.clone(), x2.clone(), x3.clone()], 2, "cardinality");
+        model.add_cons_cardinality(vec![&x1, &x2, &x3], 2, "cardinality");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1664,9 +1662,9 @@ mod tests {
         assert_eq!(solved_model.obj_val(), 70.);
 
         let solution = solved_model.best_sol().unwrap();
-        assert_eq!(solution.val(x1), 10.);
-        assert_eq!(solution.val(x2), 0.);
-        assert_eq!(solution.val(x3), 10.);
+        assert_eq!(solution.val(&x1), 10.);
+        assert_eq!(solution.val(&x2), 0.);
+        assert_eq!(solution.val(&x3), 10.);
     }
 
     #[test]
@@ -1684,8 +1682,8 @@ mod tests {
 
         // Indicator constraint: `b == 1` implies `x1 - x2 <= -1`
         model.add_cons_indicator(
-            b.clone(),
-            vec![x1.clone(), x2.clone()],
+            &b,
+            vec![&x1, &x2],
             &mut [1., -1.],
             -1.,
             "indicator",
@@ -1693,7 +1691,7 @@ mod tests {
 
         // Force `b` to be exactly 1 and later make sure that the constraint `x1 - x2 <= -1` is
         // indeed active
-        model.add_cons(vec![b.clone()], &[1.], 1., 1., "c1");
+        model.add_cons(vec![&b], &[1.], 1., 1., "c1");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1703,9 +1701,9 @@ mod tests {
         let solution = solved_model.best_sol().unwrap();
 
         // Indeed `x1 - x2 <= -1` when `b == 1`
-        assert_eq!(solution.val(x1), 9.);
-        assert_eq!(solution.val(x2), 10.);
-        assert_eq!(solution.val(b), 1.);
+        assert_eq!(solution.val(&x1), 9.);
+        assert_eq!(solution.val(&x2), 10.);
+        assert_eq!(solution.val(&b), 1.);
     }
 
     #[test]
@@ -1719,15 +1717,15 @@ mod tests {
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
         let cons1 = model.add_cons_set_part(vec![], "c");
-        model.add_cons_coef_setppc(cons1, x1.clone());
+        model.add_cons_coef_setppc(cons1, &x1);
 
-        model.add_cons_set_pack(vec![x2.clone()], "c");
+        model.add_cons_set_pack(vec![&x2], "c");
 
         let sol = model.create_sol();
         assert_eq!(sol.obj_val(), 0.);
 
-        sol.set_val(x1, 1.);
-        sol.set_val(x2, 1.);
+        sol.set_val(&x1, 1.);
+        sol.set_val(&x2, 1.);
         assert_eq!(sol.obj_val(), 7.);
 
         assert!(model.add_sol(sol).is_ok());
@@ -1752,8 +1750,8 @@ mod tests {
         let _cons = model.add_cons_quadratic(
             vec![],
             &mut [],
-            vec![x1.clone(), x2.clone()],
-            vec![x1, x2],
+            vec![&x1, &x2],
+            vec![&x1, &x2],
             &mut [1., 1.],
             0.,
             1.,
@@ -1780,7 +1778,7 @@ mod tests {
 
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
-        model.add_cons_set_part(vec![x1, x2], "c");
+        model.add_cons_set_part(vec![&x1, &x2], "c");
 
         let solved_model = model.solve();
         let status = solved_model.status();
@@ -1907,7 +1905,7 @@ mod tests {
         let x3 = second_model.add_var(0.0, f64::INFINITY, 1.0, "x3", VarType::Integer);
 
         let bound = 2.0;
-        second_model.add_cons(vec![x3], &[1.0], 0.0, bound, "x3-cons");
+        second_model.add_cons(vec![&x3], &[1.0], 0.0, bound, "x3-cons");
 
         let second_solved = second_model.solve();
         let expected_obj = obj_val + bound;

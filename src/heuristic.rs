@@ -272,7 +272,7 @@ mod tests {
         ) -> HeurResult {
             let sol = model.create_sol();
             for var in model.vars() {
-                sol.set_val(var, 1.0);
+                sol.set_val(&var, 1.0);
             }
             assert_eq!(sol.obj_val(), 7.0);
             assert_eq!(model.add_sol(sol), Ok(()));

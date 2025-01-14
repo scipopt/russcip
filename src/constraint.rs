@@ -3,7 +3,7 @@ use crate::{ffi, Row};
 use std::rc::Rc;
 
 /// A constraint in an optimization problem.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Constraint {
     /// A pointer to the underlying `SCIP_CONS` C struct.
@@ -54,7 +54,7 @@ mod tests {
             .set_obj_sense(ObjSense::Maximize);
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
-        let cons = model.add_cons(vec![x1], &[1.], 4., 4., "cons");
+        let cons = model.add_cons(vec![&x1], &[1.], 4., 4., "cons");
         drop(model);
 
         assert_eq!(cons.name(), "cons");
