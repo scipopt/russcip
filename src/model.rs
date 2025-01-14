@@ -1492,13 +1492,7 @@ mod tests {
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-        model.add_cons(
-            vec![&x1, &x2],
-            &[2., 1.],
-            -f64::INFINITY,
-            100.,
-            "c1",
-        );
+        model.add_cons(vec![&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
         model.add_cons(vec![&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
         model
@@ -1578,20 +1572,8 @@ mod tests {
 
         let x1 = model.add_var(0., f64::INFINITY, 3., "x1", VarType::Integer);
         let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
-        model.add_cons(
-            vec![&x1, &x2],
-            &[2., 1.],
-            -f64::INFINITY,
-            100.,
-            "c1",
-        );
-        model.add_cons(
-            vec![&x1, &x2],
-            &[1., 2.],
-            -f64::INFINITY,
-            80.,
-            "c2",
-        );
+        model.add_cons(vec![&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
+        model.add_cons(vec![&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
         let scip_ptr = model.scip.raw;
         assert!(!scip_ptr.is_null());
@@ -1680,13 +1662,7 @@ mod tests {
         let b = model.add_var(0., 1., 0., "b", VarType::Binary);
 
         // Indicator constraint: `b == 1` implies `x1 - x2 <= -1`
-        model.add_cons_indicator(
-            &b,
-            vec![&x1, &x2],
-            &mut [1., -1.],
-            -1.,
-            "indicator",
-        );
+        model.add_cons_indicator(&b, vec![&x1, &x2], &mut [1., -1.], -1., "indicator");
 
         // Force `b` to be exactly 1 and later make sure that the constraint `x1 - x2 <= -1` is
         // indeed active

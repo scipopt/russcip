@@ -148,7 +148,10 @@ impl SCIPSeparator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType, Variable};
+    use crate::{
+        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
+        Variable,
+    };
 
     struct NotRunningSeparator;
 
