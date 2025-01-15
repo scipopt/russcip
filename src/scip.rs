@@ -51,10 +51,27 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn str_param(&self, param: &str) -> Result<&str, Retcode> {
+        let param = CString::new(param).unwrap();
+        let mut value_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetStringParam(self.raw, param.as_ptr(), value_ptr.as_mut_ptr()) };
+        let value_ptr = unsafe { value_ptr.assume_init() };
+        let value = unsafe { CStr::from_ptr(value_ptr) };
+        Ok(value.to_str().unwrap())
+    }
+
     pub(crate) fn set_bool_param(&self, param: &str, value: bool) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
         Ok(())
+    }
+    
+    pub(crate) fn bool_param(&self, param: &str) -> Result<bool, Retcode> {
+        let param = CString::new(param).unwrap();
+        let mut value = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetBoolParam(self.raw, param.as_ptr(), value.as_mut_ptr()) };
+        let value = unsafe { value.assume_init() };
+        Ok(value != 0)
     }
 
     pub(crate) fn set_int_param(&self, param: &str, value: i32) -> Result<(), Retcode> {
@@ -62,17 +79,41 @@ impl ScipPtr {
         scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
+    
+    pub(crate) fn int_param(&self, param: &str) -> Result<i32, Retcode> {
+        let param = CString::new(param).unwrap();
+        let mut value = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetIntParam(self.raw, param.as_ptr(), value.as_mut_ptr()) };
+        let value = unsafe { value.assume_init() };
+        Ok(value)
+    }
 
     pub(crate) fn set_longint_param(&self, param: &str, value: i64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
+    
+    pub(crate) fn longint_param(&self, param: &str) -> Result<i64, Retcode> {
+        let param = CString::new(param).unwrap();
+        let mut value = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetLongintParam(self.raw, param.as_ptr(), value.as_mut_ptr()) };
+        let value = unsafe { value.assume_init() };
+        Ok(value)
+    }
 
     pub(crate) fn set_real_param(&self, param: &str, value: f64) -> Result<(), Retcode> {
         let param = CString::new(param).unwrap();
         scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) };
         Ok(())
+    }
+    
+    pub(crate) fn real_param(&self, param: &str) -> Result<f64, Retcode> {
+        let param = CString::new(param).unwrap();
+        let mut value = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPgetRealParam(self.raw, param.as_ptr(), value.as_mut_ptr()) };
+        let value = unsafe { value.assume_init() };
+        Ok(value)
     }
 
     pub(crate) fn set_presolving(&self, presolving: ParamSetting) -> Result<(), Retcode> {

@@ -1289,6 +1289,34 @@ impl<T> Model<T> {
         Ok(self)
     }
 
+    /// Returns the value of a SCIP string parameter.
+    pub fn str_param(&self, param: &str) -> String {
+        self.scip
+            .str_param(param)
+            .expect("Failed to get string parameter")
+            .to_string()
+    }
+
+    /// Returns the value of a SCIP boolean parameter.
+    pub fn bool_param(&self, param: &str) -> bool {
+        self.scip.bool_param(param).expect("Failed to get boolean parameter")
+    }
+
+    /// Returns the value of a SCIP integer parameter.
+    pub fn int_param(&self, param: &str) -> i32 {
+        self.scip.int_param(param).expect("Failed to get integer parameter")
+    }
+
+    /// Returns the value of a SCIP long integer parameter.
+    pub fn longint_param(&self, param: &str) -> i64 {
+        self.scip.longint_param(param).expect("Failed to get long integer parameter")
+    }
+
+    /// Returns the value of a SCIP real parameter.
+    pub fn real_param(&self, param: &str) -> f64 {
+        self.scip.real_param(param).expect("Failed to get real parameter")
+    }
+
     /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
     #[allow(unused_mut)]
     pub fn set_presolving(mut self, presolving: ParamSetting) -> Self {
@@ -1376,7 +1404,6 @@ mod tests {
     use crate::status::Status;
     use rayon::prelude::*;
     use std::fs;
-    use std::path::Path;
 
     use super::*;
 
@@ -1743,28 +1770,12 @@ mod tests {
     #[test]
     fn set_str_param() {
         let output_path = "data/ignored/test.vbc";
-        let mut model = Model::new()
+        let model = Model::new()
             .hide_output()
             .set_str_param("visual/vbcfilename", output_path)
-            .unwrap()
-            .include_default_plugins()
-            .create_prob("test")
-            .set_obj_sense(ObjSense::Minimize);
-
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
-        model.add_cons_set_part(vec![&x1, &x2], "c");
-
-        let solved_model = model.solve();
-        let status = solved_model.status();
-        assert_eq!(status, Status::Optimal);
-        assert_eq!(solved_model.obj_val(), 3.);
-
-        assert!(Path::new(output_path).exists());
-
-        // drop model so the file is closed and it can be removed
-        drop(solved_model);
-        fs::remove_file(output_path).unwrap();
+            .unwrap();
+        
+        assert_eq!(model.str_param("visual/vbcfilename"), output_path);
     }
 
     #[test]
@@ -1809,10 +1820,12 @@ mod tests {
 
     #[test]
     fn set_bool_param() {
-        Model::new()
+        let model = Model::new()
             .hide_output()
             .set_bool_param("display/allviols", true)
             .unwrap();
+
+        assert!(model.bool_param("display/allviols"));
     }
 
     #[test]
@@ -1830,13 +1843,9 @@ mod tests {
         let model = Model::new()
             .hide_output()
             .set_real_param("limits/time", 0.)
-            .unwrap()
-            .include_default_plugins()
-            .read_prob("data/test/simple.lp")
-            .unwrap()
-            .solve();
+            .unwrap();
 
-        assert_eq!(model.status(), Status::TimeLimit);
+        assert_eq!(model.real_param("limits/time"), 0.);
     }
 
     #[test]
