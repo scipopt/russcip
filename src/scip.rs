@@ -65,7 +65,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPsetBoolParam(self.raw, param.as_ptr(), if value { 1u32 } else { 0u32 }) };
         Ok(())
     }
-    
+
     pub(crate) fn bool_param(&self, param: &str) -> Result<bool, Retcode> {
         let param = CString::new(param).unwrap();
         let mut value = MaybeUninit::uninit();
@@ -79,7 +79,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPsetIntParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
-    
+
     pub(crate) fn int_param(&self, param: &str) -> Result<i32, Retcode> {
         let param = CString::new(param).unwrap();
         let mut value = MaybeUninit::uninit();
@@ -93,7 +93,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPsetLongintParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
-    
+
     pub(crate) fn longint_param(&self, param: &str) -> Result<i64, Retcode> {
         let param = CString::new(param).unwrap();
         let mut value = MaybeUninit::uninit();
@@ -107,7 +107,7 @@ impl ScipPtr {
         scip_call! { ffi::SCIPsetRealParam(self.raw, param.as_ptr(), value) };
         Ok(())
     }
-    
+
     pub(crate) fn real_param(&self, param: &str) -> Result<f64, Retcode> {
         let param = CString::new(param).unwrap();
         let mut value = MaybeUninit::uninit();

@@ -1299,22 +1299,30 @@ impl<T> Model<T> {
 
     /// Returns the value of a SCIP boolean parameter.
     pub fn bool_param(&self, param: &str) -> bool {
-        self.scip.bool_param(param).expect("Failed to get boolean parameter")
+        self.scip
+            .bool_param(param)
+            .expect("Failed to get boolean parameter")
     }
 
     /// Returns the value of a SCIP integer parameter.
     pub fn int_param(&self, param: &str) -> i32 {
-        self.scip.int_param(param).expect("Failed to get integer parameter")
+        self.scip
+            .int_param(param)
+            .expect("Failed to get integer parameter")
     }
 
     /// Returns the value of a SCIP long integer parameter.
     pub fn longint_param(&self, param: &str) -> i64 {
-        self.scip.longint_param(param).expect("Failed to get long integer parameter")
+        self.scip
+            .longint_param(param)
+            .expect("Failed to get long integer parameter")
     }
 
     /// Returns the value of a SCIP real parameter.
     pub fn real_param(&self, param: &str) -> f64 {
-        self.scip.real_param(param).expect("Failed to get real parameter")
+        self.scip
+            .real_param(param)
+            .expect("Failed to get real parameter")
     }
 
     /// Sets the presolving parameter of the SCIP instance and returns the same `Model` instance.
@@ -1774,7 +1782,7 @@ mod tests {
             .hide_output()
             .set_str_param("visual/vbcfilename", output_path)
             .unwrap();
-        
+
         assert_eq!(model.str_param("visual/vbcfilename"), output_path);
     }
 
