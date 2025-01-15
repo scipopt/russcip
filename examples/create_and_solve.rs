@@ -13,20 +13,8 @@ fn main() {
     let x2 = model.add_var(0., f64::INFINITY, 4., "x2", VarType::Integer);
 
     // Add constraints
-    model.add_cons(
-        vec![x1.clone(), x2.clone()],
-        &[2., 1.],
-        -f64::INFINITY,
-        100.,
-        "c1",
-    );
-    model.add_cons(
-        vec![x1.clone(), x2.clone()],
-        &[1., 2.],
-        -f64::INFINITY,
-        80.,
-        "c2",
-    );
+    model.add_cons(vec![&x1, &x2], &[2., 1.], -f64::INFINITY, 100., "c1");
+    model.add_cons(vec![&x1, &x2], &[1., 2.], -f64::INFINITY, 80., "c2");
 
     let solved_model = model.solve();
 
@@ -40,6 +28,6 @@ fn main() {
     let vars = solved_model.vars();
 
     for var in vars {
-        println!("{} = {}", &var.name(), sol.val(var));
+        println!("{} = {}", var.name(), sol.val(&var));
     }
 }

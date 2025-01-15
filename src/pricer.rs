@@ -230,7 +230,7 @@ mod tests {
                 let var = model.add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
                 let conss = model.conss();
                 for cons in conss {
-                    model.add_cons_coef(cons, var.clone(), 1.0);
+                    model.add_cons_coef(&cons, &var, 1.0);
                 }
                 let nvars_after = model.n_vars();
                 assert_eq!(nvars_before + 1, nvars_after);
@@ -252,7 +252,7 @@ mod tests {
 
         let conss = model.conss();
         for c in conss {
-            model.set_cons_modifiable(c, true);
+            model.set_cons_modifiable(&c, true);
         }
 
         let pricer = AddSameColumnPricer {

@@ -6,9 +6,10 @@ use crate::variable::Variable;
 use crate::{ffi, scip_call_panic};
 
 /// A wrapper for a SCIP solution.
+#[derive(Clone)]
 pub struct Solution {
-    pub(crate) scip_ptr: Rc<ScipPtr>,
     pub(crate) raw: *mut ffi::SCIP_SOL,
+    pub(crate) scip_ptr: Rc<ScipPtr>,
 }
 
 impl Solution {
@@ -18,12 +19,12 @@ impl Solution {
     }
 
     /// Returns the value of a variable in the solution.
-    pub fn val(&self, var: Rc<Variable>) -> f64 {
+    pub fn val(&self, var: &Variable) -> f64 {
         unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var.raw) }
     }
 
     /// Sets the value of a variable in the solution.
-    pub fn set_val(&self, var: Rc<Variable>, val: f64) {
+    pub fn set_val(&self, var: &Variable, val: f64) {
         scip_call_panic!(ffi::SCIPsetSolVal(
             self.scip_ptr.raw,
             self.raw,
@@ -123,8 +124,8 @@ mod tests {
         assert!(debug_str.contains("Var t_x2=20"));
 
         let vars = model.vars();
-        assert_eq!(sol.val(vars[0].clone()), 40.);
-        assert_eq!(sol.val(vars[1].clone()), 20.);
+        assert_eq!(sol.val(&vars[0]), 40.);
+        assert_eq!(sol.val(&vars[1]), 20.);
 
         assert_eq!(sol.obj_val(), model.obj_val());
 
