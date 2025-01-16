@@ -4,7 +4,8 @@ use crate::scip::ScipPtr;
 use crate::{ffi, Variable};
 use std::rc::Rc;
 
-/// A column in the LP relaxation.
+/// A column in the LP relaxation.u
+#[derive(Debug, Clone)]
 pub struct Col {
     pub(crate) raw: *mut ffi::SCIP_COL,
     pub(crate) scip: Rc<ScipPtr>,

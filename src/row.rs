@@ -4,6 +4,7 @@ use std::ffi::c_int;
 use std::rc::Rc;
 
 /// A row in the LP relaxation.
+#[derive(Debug, Clone)]
 pub struct Row {
     pub(crate) raw: *mut ffi::SCIP_ROW,
     pub(crate) scip: Rc<ScipPtr>,

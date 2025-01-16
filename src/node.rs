@@ -1,8 +1,12 @@
+use std::rc::Rc;
 use crate::ffi;
+use crate::scip::ScipPtr;
 
 /// A node in the branch-and-bound tree.
+#[derive(Debug, Clone)]
 pub struct Node {
     pub(crate) raw: *mut ffi::SCIP_NODE,
+    pub(crate) scip: Rc<ScipPtr>,
 }
 
 impl Node {
@@ -32,7 +36,7 @@ impl Node {
         if parent.is_null() {
             None
         } else {
-            Some(Node { raw: parent })
+            Some(Node { raw: parent, scip: self.scip.clone() })
         }
     }
 }

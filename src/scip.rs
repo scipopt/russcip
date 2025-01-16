@@ -1,13 +1,13 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model, Node,
+    ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model,
     ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPEventhdlr, SCIPPricer, SCIPSeparator,
     Separator, Solution, Solving, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
-use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_SOL};
+use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_NODE, SCIP_SOL};
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -1153,13 +1153,16 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNLPIterations(self.raw) as usize }
     }
 
-    pub(crate) fn focus_node(&self) -> Node {
-        Node {
-            raw: unsafe { ffi::SCIPgetFocusNode(self.raw) },
+    pub(crate) fn focus_node(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetFocusNode(self.raw) };
+        if ptr.is_null() {
+            None
+        } else {
+            Some(ptr)
         }
     }
 
-    pub(crate) fn create_child(&self) -> Result<Node, Retcode> {
+    pub(crate) fn create_child(&self) -> Result<*mut SCIP_NODE, Retcode> {
         let mut node_ptr = MaybeUninit::uninit();
         scip_call!(ffi::SCIPcreateChild(
             self.raw,
@@ -1169,7 +1172,7 @@ impl ScipPtr {
         ));
 
         let node_ptr = unsafe { node_ptr.assume_init() };
-        Ok(Node { raw: node_ptr })
+        Ok(node_ptr)
     }
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
