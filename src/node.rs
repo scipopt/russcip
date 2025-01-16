@@ -1,6 +1,6 @@
-use std::rc::Rc;
 use crate::ffi;
 use crate::scip::ScipPtr;
+use std::rc::Rc;
 
 /// A node in the branch-and-bound tree.
 #[derive(Debug, Clone)]
@@ -36,7 +36,10 @@ impl Node {
         if parent.is_null() {
             None
         } else {
-            Some(Node { raw: parent, scip: self.scip.clone() })
+            Some(Node {
+                raw: parent,
+                scip: self.scip.clone(),
+            })
         }
     }
 }

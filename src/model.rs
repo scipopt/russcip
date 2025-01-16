@@ -420,10 +420,11 @@ impl Model<Solving> {
     ///
     /// This method panics if not called from plugins implementations.
     pub fn create_child(&mut self) -> Node {
-        let node_ptr = self.scip
+        let node_ptr = self
+            .scip
             .create_child()
             .expect("Failed to create child node in state ProblemCreated");
-        
+
         Node {
             raw: node_ptr,
             scip: self.scip.clone(),
