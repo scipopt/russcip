@@ -407,7 +407,11 @@ impl Model<Solving> {
     ///
     /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
     pub fn focus_node(&self) -> Node {
-        self.scip.focus_node()
+        let scip_node = self.scip.focus_node().expect("Failed to get focus node");
+        Node {
+            raw: scip_node,
+            scip: self.scip.clone(),
+        }
     }
 
     /// Creates a new child node of the current node and returns it.
@@ -416,9 +420,15 @@ impl Model<Solving> {
     ///
     /// This method panics if not called from plugins implementations.
     pub fn create_child(&mut self) -> Node {
-        self.scip
+        let node_ptr = self
+            .scip
             .create_child()
-            .expect("Failed to create child node in state ProblemCreated")
+            .expect("Failed to create child node in state ProblemCreated");
+
+        Node {
+            raw: node_ptr,
+            scip: self.scip.clone(),
+        }
     }
 
     /// Adds a new priced variable to the SCIP data structure.
