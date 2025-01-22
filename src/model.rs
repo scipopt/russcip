@@ -1217,13 +1217,25 @@ impl<T> Model<T> {
         self.scip.print_version()
     }
 
+    /// Sets the `display/verblevel` parameter to the provided value.
+    #[allow(unused_mut)]
+    pub fn set_display_verbosity(mut self, level: i32) -> Self {
+        self.scip
+            .set_int_param("display/verblevel", level)
+            .unwrap_or_else(|_| panic!("Failed to set display/verblevel to {level}"));
+        self
+    }
+
+    /// Shows the output of the optimization model by setting the `display/verblevel` parameter to its default value 4.
+    #[allow(unused_mut)]
+    pub fn show_output(mut self) -> Self {
+        self.set_display_verbosity(4)
+    }
+
     /// Hides the output of the optimization model by setting the `display/verblevel` parameter to 0.
     #[allow(unused_mut)]
     pub fn hide_output(mut self) -> Self {
-        self.scip
-            .set_int_param("display/verblevel", 0)
-            .expect("Failed to set display/verblevel to 0");
-        self
+        self.set_display_verbosity(0)
     }
 
     /// Sets the time limit for the optimization model.
