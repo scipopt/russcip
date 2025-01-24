@@ -22,8 +22,7 @@ impl Row {
         assert!(len >= 0);
         len as usize
     }
-    
-    
+
     /// Returns the columns of the row.
     pub fn cols(&self) -> Vec<Col> {
         let mut columns = Vec::new();
@@ -300,7 +299,7 @@ mod tests {
                 assert_eq!(cols[0].index(), 0);
             }
         }
-        
+
         let mut model = minimal_model();
         let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
 
