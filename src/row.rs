@@ -252,52 +252,55 @@ mod tests {
         VarType,
     };
 
-    struct RowTesterEventHandler;
-
-    impl Eventhdlr for RowTesterEventHandler {
-        fn get_type(&self) -> EventMask {
-            EventMask::FIRST_LP_SOLVED
-        }
-
-        fn execute(
-            &mut self,
-            model: Model<Solving>,
-            _eventhdlr: crate::SCIPEventhdlr,
-            _event: Event,
-        ) {
-            let first_cons = model.conss()[0].clone();
-            let mut row = first_cons.row().unwrap();
-            assert_eq!(row.n_non_zeroes(), 1);
-            assert_eq!(row.lhs(), 1.0);
-            assert_eq!(row.index(), 0);
-            assert!(row.is_modifiable());
-            assert!(!row.is_removable());
-            assert!(!row.is_local());
-            assert!(row.is_integral());
-            assert!(row.constraint().is_some());
-            assert_eq!(row.basis_status(), crate::BasisStatus::Lower);
-            assert_eq!(row.origin_type(), crate::RowOrigin::Constraint);
-            assert!(!row.is_in_global_cut_pool());
-            assert!(row.is_in_lp());
-            assert_eq!(row.lp_position(), Some(0));
-            assert_eq!(row.depth(), 0);
-            assert_eq!(row.active_lp_count(), 1);
-            assert_eq!(row.n_lp_since_create(), 1);
-            assert_eq!(row.rank(), 0);
-            row.set_rank(1);
-            assert_eq!(row.rank(), 1);
-            assert_eq!(row.name(), "cons1");
-            assert_eq!(row.age(), 0);
-            assert_eq!(row.dual(), 1.0);
-            let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip.raw) };
-            assert!(row.farkas_dual() >= infinity);
-            assert!(row.rhs() - 1.0 < 1e-9);
-            assert!(row.lhs() - 1.0 < 1e-9);
-        }
-    }
-
     #[test]
     fn test_row() {
+        struct RowTesterEventHandler;
+
+        impl Eventhdlr for RowTesterEventHandler {
+            fn get_type(&self) -> EventMask {
+                EventMask::FIRST_LP_SOLVED
+            }
+
+            fn execute(
+                &mut self,
+                model: Model<Solving>,
+                _eventhdlr: crate::SCIPEventhdlr,
+                _event: Event,
+            ) {
+                let first_cons = model.conss()[0].clone();
+                let mut row = first_cons.row().unwrap();
+                assert_eq!(row.n_non_zeroes(), 1);
+                assert_eq!(row.lhs(), 1.0);
+                assert_eq!(row.index(), 0);
+                assert!(row.is_modifiable());
+                assert!(!row.is_removable());
+                assert!(!row.is_local());
+                assert!(row.is_integral());
+                assert!(row.constraint().is_some());
+                assert_eq!(row.basis_status(), crate::BasisStatus::Lower);
+                assert_eq!(row.origin_type(), crate::RowOrigin::Constraint);
+                assert!(!row.is_in_global_cut_pool());
+                assert!(row.is_in_lp());
+                assert_eq!(row.lp_position(), Some(0));
+                assert_eq!(row.depth(), 0);
+                assert_eq!(row.active_lp_count(), 1);
+                assert_eq!(row.n_lp_since_create(), 1);
+                assert_eq!(row.rank(), 0);
+                row.set_rank(1);
+                assert_eq!(row.rank(), 1);
+                assert_eq!(row.name(), "cons1");
+                assert_eq!(row.age(), 0);
+                assert_eq!(row.dual(), 1.0);
+                let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip.raw) };
+                assert!(row.farkas_dual() >= infinity);
+                assert!(row.rhs() - 1.0 < 1e-9);
+                assert!(row.lhs() - 1.0 < 1e-9);
+                let cols = row.cols();
+                assert_eq!(cols.len(), 1);
+                assert_eq!(cols[0].index(), 0);
+            }
+        }
+        
         let mut model = minimal_model();
         let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
 
@@ -305,7 +308,7 @@ mod tests {
         model.set_cons_modifiable(&cons, true);
 
         let eventhdlr = Box::new(RowTesterEventHandler);
-        model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
+        model = model.include_eventhdlr("RowTesterEventHandler", "", eventhdlr);
 
         model.solve();
     }
