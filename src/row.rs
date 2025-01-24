@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Constraint, Variable};
+use crate::{ffi, Col, Constraint, Variable};
 use std::ffi::c_int;
 use std::rc::Rc;
 
@@ -21,6 +21,22 @@ impl Row {
         let len = unsafe { ffi::SCIProwGetNNonz(self.raw) };
         assert!(len >= 0);
         len as usize
+    }
+    
+    
+    /// Returns the columns of the row.
+    pub fn cols(&self) -> Vec<Col> {
+        let mut columns = Vec::new();
+        let cols_ptr = unsafe { ffi::SCIProwGetCols(self.raw) };
+        for i in 0..self.n_non_zeroes() {
+            let col_ptr = unsafe { *cols_ptr.add(i) };
+            let col = Col {
+                raw: col_ptr,
+                scip: Rc::clone(&self.scip),
+            };
+            columns.push(col);
+        }
+        columns
     }
 
     /// Returns the index of the row.
