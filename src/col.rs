@@ -54,11 +54,6 @@ impl Col {
         }
     }
 
-    // extern "C" {
-    //     #[doc = " gets the primal LP solution of a column"]
-    //     pub fn SCIPcolGetPrimsol(col: *mut SCIP_COL) -> f64;
-    // }
-
     /// Returns the primal LP solution of the column.
     pub fn primal_sol(&self) -> f64 {
         unsafe { ffi::SCIPcolGetPrimsol(self.raw) }
