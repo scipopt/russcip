@@ -67,7 +67,14 @@ jobs:
           RUSTFLAGS=-Zsanitizer=leak cargo +nightly test 
 
   linux-bundled-test:
-    runs-on: ubuntu-latest
+    matrix:
+      os: [
+        ubuntu-latest,
+        macos-latest,
+        macos-14, # macOS arm runner
+        windows-latest,
+      ]
+    runs-on: {{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
       - name: Test
