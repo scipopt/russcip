@@ -1,10 +1,10 @@
 [package]
 name = "russcip"
-authors = ["Mohammad Ghannam <mohammad.m.ghannam@gmail.com>"]
+authors = ["Mohammed Ghannam <ghannam@zib.de>"]
 description = "Rust interface for SCIP"
 license = "Apache-2.0"
 repository = "https://github.com/scipopt/russcip"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2021"
 exclude = ["data/test/*"]
 
