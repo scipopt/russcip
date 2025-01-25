@@ -68,6 +68,8 @@ pub use col::*;
 
 /// Contains the `Row` struct, which represents a row in an LP relaxation.
 pub mod row;
+mod param;
+
 pub use row::*;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
