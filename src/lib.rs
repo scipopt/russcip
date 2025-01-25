@@ -66,9 +66,9 @@ mod scip;
 pub mod col;
 pub use col::*;
 
+mod param;
 /// Contains the `Row` struct, which represents a row in an LP relaxation.
 pub mod row;
-mod param;
 
 pub use row::*;
 

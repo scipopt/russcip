@@ -1,6 +1,7 @@
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
+use crate::param::ScipParameter;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
@@ -10,7 +11,6 @@ use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
 use std::rc::Rc;
-use crate::param::ScipParameter;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -1326,7 +1326,11 @@ impl<T> Model<T> {
     }
 
     /// Tries to set the value of a SCIP parameter and returns the same `Model` instance if successful.
-    pub fn try_set_param<P: ScipParameter>(self, param: &str, value: P) -> Result<Model<T>, Retcode> {
+    pub fn try_set_param<P: ScipParameter>(
+        self,
+        param: &str,
+        value: P,
+    ) -> Result<Model<T>, Retcode> {
         P::set(self, param, value)
     }
 
@@ -1923,7 +1927,7 @@ mod tests {
             .set_int_param("display/verblevel", 0)
             .unwrap();
     }
-    
+
     #[test]
     fn generic_params() {
         let model = Model::new()
@@ -1934,7 +1938,7 @@ mod tests {
             .set_param("display/verblevel", 0)
             .set_param("limits/time", 0.0)
             .set_param("limits/memory", 0.0);
-        
+
         assert_eq!(model.param::<i32>("display/verblevel"), 0);
         assert_eq!(model.param::<f64>("limits/time"), 0.0);
         assert_eq!(model.param::<f64>("limits/memory"), 0.0);
