@@ -1,6 +1,7 @@
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
+use crate::param::ScipParameter;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
@@ -1319,6 +1320,25 @@ impl<T> Model<T> {
             .to_string()
     }
 
+    /// Returns the value of a SCIP paramter.
+    pub fn param<P: ScipParameter>(&self, param: &str) -> P {
+        P::get(self, param)
+    }
+
+    /// Tries to set the value of a SCIP parameter and returns the same `Model` instance if successful.
+    pub fn try_set_param<P: ScipParameter>(
+        self,
+        param: &str,
+        value: P,
+    ) -> Result<Model<T>, Retcode> {
+        P::set(self, param, value)
+    }
+
+    /// Sets the value of a SCIP parameter.
+    pub fn set_param<P: ScipParameter>(self, param: &str, value: P) -> Model<T> {
+        P::set(self, param, value).expect("Failed to set parameter")
+    }
+
     /// Returns the value of a SCIP boolean parameter.
     pub fn bool_param(&self, param: &str) -> bool {
         self.scip
@@ -1906,6 +1926,22 @@ mod tests {
             .solve()
             .set_int_param("display/verblevel", 0)
             .unwrap();
+    }
+
+    #[test]
+    fn generic_params() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize)
+            .set_param("display/verblevel", 0)
+            .set_param("limits/time", 0.0)
+            .set_param("limits/memory", 0.0);
+
+        assert_eq!(model.param::<i32>("display/verblevel"), 0);
+        assert_eq!(model.param::<f64>("limits/time"), 0.0);
+        assert_eq!(model.param::<f64>("limits/memory"), 0.0);
     }
 
     #[test]
