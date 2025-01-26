@@ -120,6 +120,18 @@ impl Model<ProblemCreated> {
         self
     }
 
+    /// Sets the objective sense of the model to maximize
+    #[allow(unused_mut)]
+    pub fn maximize(mut self) -> Self {
+        self.set_obj_sense(ObjSense::Maximize)
+    }
+
+    /// Sets the objective sense of the model to minimize
+    #[allow(unused_mut)]
+    pub fn minimize(mut self) -> Self {
+        self.set_obj_sense(ObjSense::Minimize)
+    }
+
     /// Sets the constraint as modifiable or not.
     pub fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool) {
         self.scip
@@ -1549,7 +1561,7 @@ mod tests {
             .hide_output()
             .include_default_plugins()
             .create_prob("test")
-            .set_obj_sense(ObjSense::Maximize);
+            .maximize();
         let x1_id = model
             .add_var(0., f64::INFINITY, 3., "x1", VarType::Integer)
             .index();
@@ -1691,7 +1703,7 @@ mod tests {
             .hide_output()
             .include_default_plugins()
             .create_prob("test")
-            .set_obj_sense(ObjSense::Minimize);
+            .minimize();
 
         let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
         let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
