@@ -1,3 +1,4 @@
+use crate::builder::CanBeAddedToModel;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
@@ -11,7 +12,6 @@ use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
 use std::rc::Rc;
-use crate::builder::CanBeAddedToModel;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -172,8 +172,8 @@ impl Model<ProblemCreated> {
         }
     }
 
-    /// Adds anything that could be added to the model (variables, constraints, etc).
-    pub fn add<R, O: CanBeAddedToModel<Return=R>>(&mut self, object: O) -> R {
+    /// Adds anything that could be added to the model (variables, constraints, etc.).
+    pub fn add<R, O: CanBeAddedToModel<Return = R>>(&mut self, object: O) -> R {
         object.add(self)
     }
 

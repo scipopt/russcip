@@ -83,7 +83,7 @@ impl CanBeAddedToModel for VarBuilder {
             format!("x{}", n_vars)
         });
 
-        model.add_var(self.lb, self.ub, self.obj, &name,  self.var_type)
+        model.add_var(self.lb, self.ub, self.obj, &name, self.var_type)
     }
 }
 
@@ -106,8 +106,7 @@ mod tests {
 
     #[test]
     fn test_var_builder_add() {
-        let mut model = Model::default()
-            .set_obj_sense(crate::ObjSense::Maximize);
+        let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
         let var = VarBuilder::default()
             .name("x".to_string())
             .obj(1.0)
