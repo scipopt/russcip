@@ -11,6 +11,7 @@ use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
 use std::rc::Rc;
+use crate::builder::CanBeAddedToModel;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -169,6 +170,11 @@ impl Model<ProblemCreated> {
             raw: var,
             scip: self.scip.clone(),
         }
+    }
+
+    /// Adds anything that could be added to the model (variables, constraints, etc).
+    pub fn add<R, O: CanBeAddedToModel<Return=R>>(&mut self, object: O) -> R {
+        object.add(self)
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -551,7 +557,8 @@ pub trait ModelWithProblem {
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
 }
 
-trait ModelStageWithProblem {}
+/// A trait for model stages that have a problem.
+pub trait ModelStageWithProblem {}
 impl ModelStageWithProblem for ProblemCreated {}
 impl ModelStageWithProblem for Solved {}
 impl ModelStageWithProblem for Solving {}
@@ -803,7 +810,9 @@ pub trait ProblemOrSolving {
         name: &str,
     ) -> Constraint;
 }
-trait ModelStageProblemOrSolving {}
+
+/// A trait for model stages that have a problem or are during solving.
+pub trait ModelStageProblemOrSolving {}
 impl ModelStageProblemOrSolving for ProblemCreated {}
 impl ModelStageProblemOrSolving for Solving {}
 
