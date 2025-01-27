@@ -1,7 +1,7 @@
-/// This module contains `VarBuilder` for easily creating variables.
-pub mod var;
 /// This module contains `ConsBuilder` for easily creating constraints.
 pub mod cons;
+/// This module contains `VarBuilder` for easily creating variables.
+pub mod var;
 
 use crate::{Model, ProblemCreated};
 
@@ -23,4 +23,3 @@ where
         self.into_iter().map(|x| x.add(model)).collect()
     }
 }
-

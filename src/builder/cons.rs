@@ -6,7 +6,7 @@ use crate::{Constraint, Model, ModelWithProblem, ProblemCreated, ProblemOrSolvin
 pub struct ConsBuilder<'a> {
     lhs: f64,
     rhs: f64,
-    name: Option<String>,
+    name: Option<&'a str>,
     coefs: Vec<(&'a Variable, f64)>,
 }
 
@@ -49,7 +49,7 @@ impl<'a> ConsBuilder<'a> {
     }
 
     /// Sets the name of the constraint.
-    pub fn name(mut self, name: String) -> Self {
+    pub fn name(mut self, name: &'a str) -> Self {
         self.name = Some(name);
         self
     }
@@ -71,7 +71,7 @@ impl CanBeAddedToModel for ConsBuilder<'_> {
             coefs.push(coef);
         }
 
-        let name = self.name.unwrap_or_else(|| {
+        let name = self.name.map(|s| s.to_string()).unwrap_or_else(|| {
             let n_cons = model.n_conss();
             format!("cons{}", n_cons)
         });
@@ -89,9 +89,9 @@ mod tests {
     fn test_cons_builder() {
         let mut model = minimal_model().hide_output();
         let var = model.add(var().binary().obj(1.));
-        let cons = cons().name("c".to_string()).eq(1.0).coef(&var, 1.0);
+        let cons = cons().name("c").eq(1.0).coef(&var, 1.0);
 
-        assert_eq!(cons.name, Some("c".to_string()));
+        assert_eq!(cons.name, Some("c"));
         assert_eq!(cons.lhs, 1.0);
         assert_eq!(cons.rhs, 1.0);
         assert_eq!(cons.coefs.len(), 1);
