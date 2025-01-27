@@ -3,7 +3,7 @@
 //!
 //! For usage, please refer to the [README](https://github.com/scipopt/russcip).
 //!
-//! # Example 
+//! # Example
 //! ```rust
 //! use russcip::prelude::*;
 //!
@@ -18,8 +18,6 @@
 //!   assert_eq!(solve.obj_val(), 1.0);
 //! }
 //! ```
-
-
 
 #![deny(missing_docs)]
 #![allow(clippy::macro_metavars_in_unsafe)]
