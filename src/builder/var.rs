@@ -1,23 +1,5 @@
+use crate::builder::CanBeAddedToModel;
 use crate::{Model, ModelWithProblem, ProblemCreated, VarType, Variable};
-
-/// A trait for adding two values together.
-pub trait CanBeAddedToModel {
-    /// The return type after adding to the model (e.g. `Variable` / `Constraint` ).
-    type Return;
-    /// How to add the value to the model.
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return;
-}
-
-impl<T, I> CanBeAddedToModel for I
-where
-    T: CanBeAddedToModel,
-    I: IntoIterator<Item = T>,
-{
-    type Return = Vec<T::Return>;
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
-        self.into_iter().map(|x| x.add(model)).collect()
-    }
-}
 
 /// A builder for variables.
 pub struct VarBuilder {
