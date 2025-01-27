@@ -1,5 +1,7 @@
 /// This module contains `VarBuilder` for easily creating variables.
 pub mod var;
+/// This module contains `ConsBuilder` for easily creating constraints.
+pub mod cons;
 
 use crate::{Model, ProblemCreated};
 

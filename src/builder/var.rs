@@ -10,6 +10,11 @@ pub struct VarBuilder {
     var_type: VarType,
 }
 
+/// Creates a new default `VarBuilder`.
+pub fn var() -> VarBuilder {
+    VarBuilder::default()
+}
+
 impl Default for VarBuilder {
     fn default() -> Self {
         VarBuilder {
@@ -122,18 +127,9 @@ mod tests {
     fn test_var_add_all() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
         let vars = vec![
-            VarBuilder::default()
-                .name("1".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
-            VarBuilder::default()
-                .name("2".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
-            VarBuilder::default()
-                .name("3".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
+            var().name("1".to_string()).obj(1.0).continuous(0.0, 1.0),
+            var().name("2".to_string()).obj(1.0).continuous(0.0, 1.0),
+            var().name("3".to_string()).obj(1.0).continuous(0.0, 1.0),
         ];
 
         let vars = model.add(vars);
