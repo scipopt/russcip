@@ -1,3 +1,5 @@
+pub use crate::builder::cons::cons;
+pub use crate::builder::var::var;
 pub use crate::model::Model;
 pub use crate::model::ModelWithProblem;
 pub use crate::model::ObjSense;

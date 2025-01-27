@@ -1,7 +1,21 @@
 //! # russcip
 //! Safe Rust interface for [SCIP](https://scipopt.org/) optimization suite.
 //!
-//! For examples and usage, please refer to the [repository](https://github.com/scipopt/russcip).
+//! For usage, please refer to the [README](https://github.com/scipopt/russcip).
+//!
+//! # Example
+//! ```rust
+//! use russcip::prelude::*;
+//!
+//! let mut model = Model::default().minimize();
+//! let x = model.add(var().binary().obj(1.0));
+//! let y = model.add(var().binary().obj(2.0));
+//! model.add(cons().coef(&x, 1.0).coef(&y, 1.0).eq(1.0));
+//!
+//! let solve = model.solve();
+//! assert_eq!(solve.status(), Status::Optimal);
+//! assert_eq!(solve.obj_val(), 1.0);
+//! ```
 
 #![deny(missing_docs)]
 #![allow(clippy::macro_metavars_in_unsafe)]

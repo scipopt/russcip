@@ -1,34 +1,21 @@
+use crate::builder::CanBeAddedToModel;
 use crate::{Model, ModelWithProblem, ProblemCreated, VarType, Variable};
 
-/// A trait for adding two values together.
-pub trait CanBeAddedToModel {
-    /// The return type after adding to the model (e.g. `Variable` / `Constraint` ).
-    type Return;
-    /// How to add the value to the model.
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return;
-}
-
-impl<T, I> CanBeAddedToModel for I
-where
-    T: CanBeAddedToModel,
-    I: IntoIterator<Item = T>,
-{
-    type Return = Vec<T::Return>;
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
-        self.into_iter().map(|x| x.add(model)).collect()
-    }
-}
-
 /// A builder for variables.
-pub struct VarBuilder {
-    name: Option<String>,
+pub struct VarBuilder<'a> {
+    name: Option<&'a str>,
     obj: f64,
     lb: f64,
     ub: f64,
     var_type: VarType,
 }
 
-impl Default for VarBuilder {
+/// Creates a new default `VarBuilder`.
+pub fn var<'a>() -> VarBuilder<'a> {
+    VarBuilder::default()
+}
+
+impl Default for VarBuilder<'_> {
     fn default() -> Self {
         VarBuilder {
             name: None,
@@ -40,7 +27,7 @@ impl Default for VarBuilder {
     }
 }
 
-impl VarBuilder {
+impl<'a> VarBuilder<'a> {
     /// Sets the variable to be an integer variable.
     pub fn integer(mut self, lb: isize, ub: isize) -> Self {
         self.lb = lb as f64;
@@ -74,7 +61,7 @@ impl VarBuilder {
     }
 
     /// Sets the name of the variable.
-    pub fn name(mut self, name: String) -> Self {
+    pub fn name(mut self, name: &'a str) -> Self {
         self.name = Some(name);
         self
     }
@@ -86,10 +73,10 @@ impl VarBuilder {
     }
 }
 
-impl CanBeAddedToModel for VarBuilder {
+impl CanBeAddedToModel for VarBuilder<'_> {
     type Return = Variable;
     fn add(self, model: &mut Model<ProblemCreated>) -> Variable {
-        let name = self.name.clone().unwrap_or_else(|| {
+        let name = self.name.map(|s| s.to_string()).unwrap_or_else(|| {
             let n_vars = model.n_vars();
             format!("x{}", n_vars)
         });
@@ -105,11 +92,11 @@ mod tests {
     #[test]
     fn test_var_builder() {
         let var = VarBuilder::default()
-            .name("x".to_string())
+            .name("x")
             .obj(1.0)
             .continuous(0.0, 1.0);
 
-        assert_eq!(var.name, Some("x".to_string()));
+        assert_eq!(var.name, Some("x"));
         assert_eq!(var.obj, 1.0);
         assert_eq!(var.lb, 0.0);
         assert_eq!(var.ub, 1.0);
@@ -118,10 +105,7 @@ mod tests {
     #[test]
     fn test_var_builder_add() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
-        let var = VarBuilder::default()
-            .name("x".to_string())
-            .obj(1.0)
-            .continuous(0.0, 1.0);
+        let var = var().name("x").obj(1.0).continuous(0.0, 1.0);
 
         let var = model.add(var);
 
@@ -140,18 +124,9 @@ mod tests {
     fn test_var_add_all() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
         let vars = vec![
-            VarBuilder::default()
-                .name("1".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
-            VarBuilder::default()
-                .name("2".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
-            VarBuilder::default()
-                .name("3".to_string())
-                .obj(1.0)
-                .continuous(0.0, 1.0),
+            var().name("1").obj(1.0).continuous(0.0, 1.0),
+            var().name("2").obj(1.0).continuous(0.0, 1.0),
+            var().name("3").obj(1.0).continuous(0.0, 1.0),
         ];
 
         let vars = model.add(vars);
