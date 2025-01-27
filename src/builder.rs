@@ -5,7 +5,18 @@ pub trait CanBeAddedToModel {
     /// The return type after adding to the model (e.g. `Variable` / `Constraint` ).
     type Return;
     /// How to add the value to the model.
-    fn add(&self, model: &mut Model<ProblemCreated>) -> Self::Return;
+    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return;
+}
+
+impl<T, I> CanBeAddedToModel for I
+where
+    T: CanBeAddedToModel,
+    I: IntoIterator<Item = T>,
+{
+    type Return = Vec<T::Return>;
+    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
+        self.into_iter().map(|x| x.add(model)).collect()
+    }
 }
 
 /// A builder for variables.
@@ -77,7 +88,7 @@ impl VarBuilder {
 
 impl CanBeAddedToModel for VarBuilder {
     type Return = Variable;
-    fn add(&self, model: &mut Model<ProblemCreated>) -> Variable {
+    fn add(self, model: &mut Model<ProblemCreated>) -> Variable {
         let name = self.name.clone().unwrap_or_else(|| {
             let n_vars = model.n_vars();
             format!("x{}", n_vars)
@@ -123,5 +134,36 @@ mod tests {
         let solved = model.solve();
         assert_eq!(solved.status(), crate::Status::Optimal);
         assert_eq!(solved.obj_val(), 1.0);
+    }
+
+    #[test]
+    fn test_var_add_all() {
+        let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
+        let vars = vec![
+            VarBuilder::default()
+                .name("1".to_string())
+                .obj(1.0)
+                .continuous(0.0, 1.0),
+            VarBuilder::default()
+                .name("2".to_string())
+                .obj(1.0)
+                .continuous(0.0, 1.0),
+            VarBuilder::default()
+                .name("3".to_string())
+                .obj(1.0)
+                .continuous(0.0, 1.0),
+        ];
+
+        let vars = model.add(vars);
+        for (i, var) in vars.iter().enumerate() {
+            assert_eq!(var.name(), (i + 1).to_string());
+            assert_eq!(var.obj(), 1.0);
+            assert_eq!(var.lb(), 0.0);
+            assert_eq!(var.ub(), 1.0);
+        }
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        assert_eq!(solved.obj_val(), 3.0);
     }
 }
