@@ -19,52 +19,17 @@ A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). Th
 SCIP's C-API through the `ffi` module.
 The project is currently actively developed, issues/pull-requests are very welcome.
 
-## Installation
-
-By running
-
+### Installation
+The easiest way is to run this in your crate directory
 ```bash
 cargo add russcip --features bundled
 ```
+for other installation methods, please check [INSTALL.md](INSTALL.md).
 
-The `bundled` feature will download a precompiled SCIP as part of the build process.
-This is the easiest to get started with russcip, instead you could try the [from-source](#from-source-feature)
-or if you want to link against your custom SCIP installation check the [section](#custom-scip-installation) below.
-
-### `from-source` feature
-
-To build SCIP from source, you can enable the `from-source` feature. This will download the SCIP source code and build
-it as part of the build process.
-
-```bash
-cargo add russcip --features from-source
-```
-
-This is currently the most relaiable way to get a statically-linked build of SCIP. However, it only includes SCIP with
-SoPlex so can only handle linear constraints.
-
-### Custom SCIP installation
-
-If no feature is not enabled, `russcip` will look for a scip installation in the current conda environment,
-to install SCIP using conda run the following command
-
-```bash
-conda install --channel conda-forge scip
-```
-
-Alternatively, you can specify the installation directory through the `SCIPOPTDIR` environment variable.
-
-*russcip* is tested against SCIP 9.0.0 but it might work for other versions depending on which functionality you use.
-
-### Examples
+### Usage
 
 An [example](examples/create_and_solve.rs) on how to model and solve an integer program can be found in
 the [examples](examples) directory.
-To run the example, you can use the following command
-
-```bash
-cargo run --example create_and_solve
-```
 
 ## Accessing unsafe functions
 
