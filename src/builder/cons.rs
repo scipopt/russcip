@@ -118,16 +118,18 @@ mod tests {
         assert_eq!(solved.obj_val(), 1.0);
     }
 
-
     #[test]
     fn test_cons_builder_expr() {
         let mut model = minimal_model().hide_output();
         let vars = [
             model.add(var().binary().obj(1.)),
-            model.add(var().binary().obj(1.))
+            model.add(var().binary().obj(1.)),
         ];
 
-        let cons = cons().name("c").eq(1.0).expr(vars.iter().map(|var| (var, 1.0)));
+        let cons = cons()
+            .name("c")
+            .eq(1.0)
+            .expr(vars.iter().map(|var| (var, 1.0)));
 
         assert_eq!(cons.name, Some("c"));
 
