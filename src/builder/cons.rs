@@ -59,6 +59,15 @@ impl<'a> ConsBuilder<'a> {
         self.coefs.push((var, coef));
         self
     }
+
+    /// Adds multiple coefficients to the constraint.
+    pub fn expr<I>(mut self, iter: I) -> Self
+    where
+        I: IntoIterator<Item = (&'a Variable, f64)>,
+    {
+        self.coefs.extend(iter);
+        self
+    }
 }
 
 impl CanBeAddedToModel for ConsBuilder<'_> {
@@ -96,6 +105,37 @@ mod tests {
         assert_eq!(cons.rhs, 1.0);
         assert_eq!(cons.coefs.len(), 1);
         assert_eq!(cons.coefs[0].1, 1.0);
+
+        model.add(cons);
+
+        assert_eq!(model.n_conss(), 1);
+        let cons = &model.conss()[0];
+        assert_eq!(cons.name(), "c");
+
+        let solved = model.solve();
+
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        assert_eq!(solved.obj_val(), 1.0);
+    }
+
+
+    #[test]
+    fn test_cons_builder_expr() {
+        let mut model = minimal_model().hide_output();
+        let vars = [
+            model.add(var().binary().obj(1.)),
+            model.add(var().binary().obj(1.))
+        ];
+
+        let cons = cons().name("c").eq(1.0).expr(vars.iter().map(|var| (var, 1.0)));
+
+        assert_eq!(cons.name, Some("c"));
+
+        assert_eq!(cons.lhs, 1.0);
+        assert_eq!(cons.rhs, 1.0);
+        assert_eq!(cons.coefs.len(), 2);
+        assert_eq!(cons.coefs[0].1, 1.0);
+        assert_eq!(cons.coefs[1].1, 1.0);
 
         model.add(cons);
 
