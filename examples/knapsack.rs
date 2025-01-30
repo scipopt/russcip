@@ -1,16 +1,23 @@
 use russcip::minimal_model;
 use russcip::prelude::*;
 
+/// 0-1 Knapsack problem
 #[derive(Debug)]
 struct Knapsack {
+    /// Sizes of the items
     sizes: Vec<usize>,
+    /// Values of the items
     values: Vec<usize>,
+    /// Capacity of the knapsack
     capacity: usize,
 }
 
+/// Solution to the knapsack problem
 #[derive(Debug)]
 struct KnapsackSolution {
+    /// Indices of the items in the solution
     items: Vec<usize>,
+    /// Total value of the solution
     value: f64,
 }
 
@@ -32,29 +39,27 @@ impl Knapsack {
     fn solve(&self) -> KnapsackSolution {
         let mut model = minimal_model().maximize();
 
-        let vars: Vec<_> = self
-            .values
-            .iter()
-            .map(|&value| model.add(var().binary().obj(value as f64)))
-            .collect();
+        let mut vars = Vec::with_capacity(self.sizes.len());
+        for i in 0..self.sizes.len() {
+            vars.push(model.add(var().binary().obj(self.values[i] as f64)));
+        }
 
-        let var_sizes = vars
-            .iter()
-            .zip(self.sizes.iter())
-            .map(|(var, &size)| (var, size as f64));
-        model.add(cons().le(self.capacity as f64).expr(var_sizes));
+        let mut capacity_cons = cons().le(self.capacity as f64);
+        for (i, var) in vars.iter().enumerate() {
+            capacity_cons = capacity_cons.coef(var, self.sizes[i] as f64);
+        }
+        model.add(capacity_cons);
 
         let solved_model = model.solve();
 
         let sol = solved_model.best_sol().unwrap();
-        let items: Vec<_> = vars
-            .iter()
-            .enumerate()
-            .filter(|(_, v)| sol.val(v) > 1e-6)
-            .map(|(i, _)| i)
-            .collect();
+        let mut items = vec![];
+        for (i, var) in vars.iter().enumerate() {
+            if sol.val(var) > 0.5 {
+                items.push(i);
+            }
+        }
         let value = sol.obj_val();
-
         KnapsackSolution { items, value }
     }
 }
