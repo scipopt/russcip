@@ -45,8 +45,8 @@ impl Knapsack {
         }
 
         let mut capacity_cons = cons().le(self.capacity as f64);
-        for i in 0..self.sizes.len() {
-            capacity_cons = capacity_cons.coef(&vars[i], self.sizes[i] as f64);
+        for (i, var) in vars.iter().enumerate() {
+            capacity_cons = capacity_cons.coef(var, self.sizes[i] as f64);
         }
         model.add(capacity_cons);
 
