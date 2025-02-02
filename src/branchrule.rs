@@ -205,10 +205,7 @@ mod tests {
             .unwrap();
 
         let br = FirstBranchingRule;
-        model.add(branchrule(br)
-            .name("FirstBranchingRule")
-            .maxdepth(1000)
-        );
+        model.add(branchrule(br).name("FirstBranchingRule").maxdepth(1000));
         let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
