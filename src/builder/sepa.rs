@@ -10,7 +10,7 @@ pub struct SepaBuilder<S: Separator> {
     maxbounddist: f64,
     usesubscip: bool,
     delay: bool,
-    sepa: S
+    sepa: S,
 }
 
 impl<S: Separator> SepaBuilder<S> {
@@ -24,7 +24,7 @@ impl<S: Separator> SepaBuilder<S> {
             maxbounddist: 1.0,
             usesubscip: false,
             delay: false,
-            sepa
+            sepa,
         }
     }
 }
@@ -64,9 +64,8 @@ impl<S: Separator> SepaBuilder<S> {
         self
     }
 
-
-    /// Sets the priority of the separator. 
-    /// When SCIP decides which separator to call, it considers their priorities. 
+    /// Sets the priority of the separator.
+    /// When SCIP decides which separator to call, it considers their priorities.
     /// A higher value indicates a higher priority.
     pub fn priority(mut self, priority: i32) -> Self {
         self.priority = priority;
@@ -116,7 +115,7 @@ impl<S: Separator + 'static> CanBeAddedToModel for SepaBuilder<S> {
             self.maxbounddist,
             self.usesubscip,
             self.delay,
-            sepa
+            sepa,
         );
     }
 }

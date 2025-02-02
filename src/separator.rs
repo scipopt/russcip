@@ -266,7 +266,7 @@ mod tests {
             .unwrap();
 
         let sep = InternalSeparatorDataTester;
-        
+
         model.add(
             sepa(sep)
                 .name("InternalSeparatorDataTester")
