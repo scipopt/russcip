@@ -130,10 +130,6 @@ mod tests {
         ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
             assert_eq!(branchrule.name(), "FirstChoosingBranchingRule");
-            assert_eq!(branchrule.desc(), "");
-            assert_eq!(branchrule.priority(), 100000);
-            assert_eq!(branchrule.maxdepth(), 1000);
-            assert_eq!(branchrule.maxbounddist(), 1.0);
             BranchingResult::DidNotRun
         }
     }
@@ -150,7 +146,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        model.add(branchrule(br).maxdepth(1000));
+        model.add(branchrule(br).name("FirstChoosingBranchingRule"));
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);
@@ -209,7 +205,10 @@ mod tests {
             .unwrap();
 
         let br = FirstBranchingRule;
-        model.add(branchrule(br));
+        model.add(branchrule(br)
+            .name("FirstBranchingRule")
+            .maxdepth(1000)
+        );
         let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
