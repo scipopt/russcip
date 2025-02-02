@@ -200,26 +200,21 @@ impl Model<ProblemCreated> {
     /// * `maxbounddist` - The maximum relative distance from the current node's dual bound to primal bound compared to the best node's dual bound for applying the branching rule. A value of 0.0 means the rule can only be applied on the current best node, while 1.0 means it can be applied on all nodes.
     /// * `rule` - The branching rule to be included. This should be a mutable reference to an object that implements the `BranchRule` trait, and represents the branching rule data.
     ///
-    /// # Returns
-    ///
-    /// This function returns the `Model` instance for which the branching rule was included. This allows for method chaining.
-    ///
     /// # Panics
     ///
     /// This method will panic if the inclusion of the branching rule fails. This can happen if another branching rule with the same name already exists.
     pub fn include_branch_rule(
-        self,
+        &mut self,
         name: &str,
         desc: &str,
         priority: i32,
         maxdepth: i32,
         maxbounddist: f64,
         rule: Box<dyn BranchRule>,
-    ) -> Self {
+    ) {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
-        self
     }
 
     /// Include a new primal heuristic in the model.
@@ -236,12 +231,8 @@ impl Model<ProblemCreated> {
     /// * `timing` - The timing mask of the heuristic.
     /// * `usessubscip` - Should the heuristic use a secondary SCIP instance?
     /// * `heur` - The heuristic to be included. This should be a Box of an object that implements the `Heur` trait, and represents the heuristic data.
-    ///
-    /// # Returns
-    ///
-    /// This function returns the `Model` instance for which the heuristic was included. This allows for method chaining.
     pub fn include_heur(
-        self,
+        &mut self,
         name: &str,
         desc: &str,
         priority: i32,
@@ -252,7 +243,7 @@ impl Model<ProblemCreated> {
         timing: HeurTiming,
         usessubscip: bool,
         heur: Box<dyn Heuristic>,
-    ) -> Self {
+    ) {
         self.scip
             .include_heur(
                 name,
@@ -267,7 +258,6 @@ impl Model<ProblemCreated> {
                 heur,
             )
             .expect("Failed to include heuristic at state ProblemCreated");
-        self
     }
 
     /// Includes a new separator in the model.
@@ -282,10 +272,6 @@ impl Model<ProblemCreated> {
     /// * `usesubscip` - Does the separator use a secondary SCIP instance?
     /// * `delay` - A boolean indicating whether the separator should be delayed.
     /// * `separator`- The separator to be included. This should be a mutable reference to an object that implements the `Separator` trait, and represents the separator data.
-    ///
-    /// # Returns
-    ///
-    /// This function returns the `Model` instance for which the separator was included. This allows for method chaining.
     pub fn include_separator(
         &mut self,
         name: &str,
@@ -318,15 +304,10 @@ impl Model<ProblemCreated> {
     /// * `name` - The name of the event handler. This should be a unique identifier.
     /// * `desc` - A brief description of the event handler. This is used for informational purposes.
     /// * `eventhdlr` - The event handler to be included. This should be a mutable reference to an object that implements the `EventHdlr` trait, and represents the event handling logic.
-    ///
-    /// # Returns
-    ///
-    /// This function returns the `Model` instance for which the event handler was included. This allows for method chaining.
-    pub fn include_eventhdlr(self, name: &str, desc: &str, eventhdlr: Box<dyn Eventhdlr>) -> Self {
+    pub fn include_eventhdlr(&mut self, name: &str, desc: &str, eventhdlr: Box<dyn Eventhdlr>) {
         self.scip
             .include_eventhdlr(name, desc, eventhdlr)
             .expect("Failed to include event handler at state ProblemCreated");
-        self
     }
 
     /// Includes a new pricer in the SCIP data structure.
@@ -339,25 +320,20 @@ impl Model<ProblemCreated> {
     /// * `delay` - A boolean indicating whether the pricer should be delayed. If true, the pricer is only called when no other pricers or already existing problem variables with negative reduced costs are found. If this is set to false, the pricer may produce columns that already exist in the problem.
     /// * `pricer` - The pricer to be included. This should be a mutable reference to an object that implements the `Pricer` trait.
     ///
-    /// # Returns
-    ///
-    /// This function returns the `Model` instance for which the pricer was included. This allows for method chaining.
-    ///
     /// # Panics
     ///
     /// This method will panic if the inclusion of the pricer fails. This can happen if another pricer with the same name already exists.
     pub fn include_pricer(
-        self,
+        &mut self,
         name: &str,
         desc: &str,
         priority: i32,
         delay: bool,
         pricer: Box<dyn Pricer>,
-    ) -> Self {
+    ) {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)
             .expect("Failed to include pricer at state ProblemCreated");
-        self
     }
 
     /// Solves the model and returns a new `Model` instance with a `Solved` state.

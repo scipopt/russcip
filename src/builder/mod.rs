@@ -1,5 +1,13 @@
+/// This module contains `BranchRuleBuilder` for easily creating branch rules.
+pub mod branchrule;
 /// This module contains `ConsBuilder` for easily creating constraints.
 pub mod cons;
+/// This module contains `EventHdlrBuilder` for easily creating event handlers.
+pub mod eventhdlr;
+/// This module contains `HeurBuilder` for easily creating heuristics.
+pub mod heur;
+/// This module contains `PricerBuilder` for easily creating pricers.
+pub mod pricer;
 /// This module contains `SepaBuilder` for easily creating separators.
 pub mod sepa;
 /// This module contains `VarBuilder` for easily creating variables.

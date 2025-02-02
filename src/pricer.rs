@@ -100,6 +100,7 @@ impl SCIPPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::pricer;
     use crate::{
         model::ModelWithProblem, status::Status, variable::VarType, Model, ProblemOrSolving,
         Solving,
@@ -124,15 +125,14 @@ mod tests {
     #[test]
     #[should_panic]
     fn nothing_pricer() {
-        let pricer = LyingPricer {};
+        let pr = LyingPricer {};
 
-        let model = crate::model::Model::new()
+        let mut model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
-
+            .unwrap();
+        model.add(pricer(pr));
         model.solve();
     }
 
@@ -156,15 +156,15 @@ mod tests {
     #[should_panic]
     /// Stops pricing early then throws an error that no branching can be performed
     fn early_stopping_pricer() {
-        let pricer = EarlyStoppingPricer {};
+        let pr = EarlyStoppingPricer {};
 
-        let model = crate::model::Model::new()
+        let mut model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
+            .unwrap();
 
+        model.add(pricer(pr));
         model.solve();
     }
 
@@ -186,14 +186,15 @@ mod tests {
 
     #[test]
     fn optimal_pricer() {
-        let pricer = OptimalPricer {};
+        let pr = OptimalPricer {};
 
-        let model = crate::model::Model::new()
+        let mut model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("", "", 9999999, false, Box::new(pricer));
+            .unwrap();
+
+        model.add(pricer(pr));
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
@@ -255,7 +256,7 @@ mod tests {
             model.set_cons_modifiable(&c, true);
         }
 
-        let pricer = AddSameColumnPricer {
+        let pr = AddSameColumnPricer {
             added: false,
             data: ComplexData {
                 a: (0..1000).collect::<Vec<usize>>(),
@@ -264,9 +265,8 @@ mod tests {
             },
         };
 
-        let solved = model
-            .include_pricer("", "", 9999999, false, Box::new(pricer))
-            .solve();
+        model.add(pricer(pr));
+        let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
     }
 
@@ -293,15 +293,21 @@ mod tests {
 
     #[test]
     fn internal_pricer() {
-        let pricer = InternalSCIPPricerTester {};
+        let pr = InternalSCIPPricerTester {};
 
-        let model = crate::model::Model::new()
+        let mut model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_pricer("internal", "internal pricer", 100, false, Box::new(pricer));
+            .unwrap();
 
+        model.add(
+            pricer(pr)
+                .name("internal")
+                .desc("internal pricer")
+                .priority(100)
+                .delay(false),
+        );
         model.solve();
     }
 }

@@ -119,9 +119,3 @@ impl<S: Separator + 'static> CanBeAddedToModel for SepaBuilder<S> {
         );
     }
 }
-
-impl<S: Separator> From<S> for SepaBuilder<S> {
-    fn from(sepa: S) -> Self {
-        SepaBuilder::default(sepa)
-    }
-}

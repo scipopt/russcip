@@ -187,6 +187,7 @@ impl PartialEq for Col {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::eventhdlr;
     use crate::{
         minimal_model, BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem,
         ProblemOrSolving, SCIPEventhdlr, Solving, VarType,
@@ -238,9 +239,8 @@ mod tests {
         let cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(&cons, true);
 
-        let eventhdlr = Box::new(ColTesterEventHandler);
-        model = model.include_eventhdlr("ColTesterEventHandler", "", eventhdlr);
-
+        let e = ColTesterEventHandler;
+        model.add(eventhdlr(e).name("ColTesterEventHandler"));
         model.solve();
     }
 }

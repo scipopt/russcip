@@ -102,9 +102,9 @@ impl From<HeurResult> for SCIP_Result {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Model, ModelWithProblem, ProblemOrSolving};
-
     use super::*;
+    use crate::prelude::heur;
+    use crate::{Model, ModelWithProblem, ProblemOrSolving};
 
     struct NoSolutionFoundHeur;
 
@@ -121,29 +121,22 @@ mod tests {
 
     #[test]
     fn test_heur() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = NoSolutionFoundHeur;
+        let hr = NoSolutionFoundHeur;
         let mut timing = HeurTiming::BEFORE_PRESOL;
         timing |= HeurTiming::AFTER_PROP_LOOP;
-        model
-            .include_heur(
-                "no_sol_found_heur",
-                "",
-                9999999,
-                'n',
-                1,
-                0,
-                -1,
-                timing,
-                false,
-                Box::new(heur),
-            )
-            .solve();
+        model.add(
+            heur(hr)
+                .name("no_sol_found_heur")
+                .timing(timing)
+                .dispchar('n'),
+        );
+        model.solve();
     }
 
     struct ImpostorHeur;
@@ -162,27 +155,33 @@ mod tests {
     #[test]
     #[should_panic]
     fn impostor_heur() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = ImpostorHeur;
-        model
-            .include_heur(
-                "impostor_heur",
-                "",
-                9999999,
-                'n',
-                1,
-                0,
-                -1,
-                HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE,
-                false,
-                Box::new(heur),
-            )
-            .solve();
+        let h = ImpostorHeur;
+        // model
+        //     .include_heur(
+        //         "impostor_heur",
+        //         "",
+        //         9999999,
+        //         'n',
+        //         1,
+        //         0,
+        //         -1,
+        //         HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE,
+        //         false,
+        //         Box::new(heur),
+        //     )
+
+        model.add(
+            heur(h)
+                .name("impostor_heur")
+                .timing(HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE),
+        );
+        model.solve();
     }
 
     struct DelayedHeur;
@@ -200,27 +199,29 @@ mod tests {
 
     #[test]
     fn delayed_heur() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = DelayedHeur;
-        model
-            .include_heur(
-                "delayed_heur",
-                "",
-                9999999,
-                'n',
-                1,
-                0,
-                -1,
-                HeurTiming::BEFORE_NODE,
-                false,
-                Box::new(heur),
-            )
-            .solve();
+        let h = DelayedHeur;
+        // model
+        //     .include_heur(
+        //         "delayed_heur",
+        //         "",
+        //         9999999,
+        //         'n',
+        //         1,
+        //         0,
+        //         -1,
+        //         HeurTiming::BEFORE_NODE,
+        //         false,
+        //         Box::new(heur),
+        //     )
+
+        model.add(heur(h).name("delayed_heur").timing(HeurTiming::BEFORE_NODE));
+        model.solve();
     }
 
     struct DidNotRunHeur;
@@ -238,27 +239,15 @@ mod tests {
 
     #[test]
     fn did_not_run_heur() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = DidNotRunHeur;
-        model
-            .include_heur(
-                "did_not_run_heur",
-                "",
-                9999999,
-                'n',
-                1,
-                0,
-                -1,
-                HeurTiming::BEFORE_NODE,
-                false,
-                Box::new(heur),
-            )
-            .solve();
+        let h = DidNotRunHeur;
+        model.add(heur(h).name("did_not_run_heur"));
+        model.solve();
     }
 
     struct FoundSolHeur;
@@ -282,26 +271,14 @@ mod tests {
 
     #[test]
     fn found_sol_heur() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
             .unwrap();
 
-        let heur = FoundSolHeur;
-        model
-            .include_heur(
-                "found_sol_heur",
-                "",
-                9999999,
-                'n',
-                1,
-                0,
-                -1,
-                HeurTiming::BEFORE_NODE,
-                false,
-                Box::new(heur),
-            )
-            .solve();
+        let h = FoundSolHeur;
+        model.add(heur(h).name("found_sol_heur"));
+        model.solve();
     }
 }
