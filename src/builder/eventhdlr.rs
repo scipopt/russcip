@@ -10,7 +10,7 @@ pub struct EventHdlrBuilder<E: Eventhdlr> {
 
 impl<E: Eventhdlr> EventHdlrBuilder<E> {
     /// Creates a new `EventHdlrBuilder` with the given event handler.
-    /// 
+    ///
     /// # Defaults
     /// - `name`: empty string
     /// - `desc`: empty string

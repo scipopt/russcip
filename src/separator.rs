@@ -214,17 +214,11 @@ mod tests {
 
         let sep = ConsAddingSeparator {};
 
-        model.include_separator(
-            "ConsAddingSeparator",
-            "",
-            1000000,
-            1,
-            1.0,
-            false,
-            false,
-            Box::new(sep),
+        model.add(
+            sepa(sep)
+                .name("ConsAddingSeparator")
+                .desc("Adds a constraint to the model"),
         );
-
         let solved = model.solve();
 
         assert_eq!(solved.status(), crate::Status::Infeasible);

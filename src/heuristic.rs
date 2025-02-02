@@ -162,19 +162,6 @@ mod tests {
             .unwrap();
 
         let h = ImpostorHeur;
-        // model
-        //     .include_heur(
-        //         "impostor_heur",
-        //         "",
-        //         9999999,
-        //         'n',
-        //         1,
-        //         0,
-        //         -1,
-        //         HeurTiming::BEFORE_NODE | HeurTiming::AFTER_LP_NODE,
-        //         false,
-        //         Box::new(heur),
-        //     )
 
         model.add(
             heur(h)
@@ -206,20 +193,6 @@ mod tests {
             .unwrap();
 
         let h = DelayedHeur;
-        // model
-        //     .include_heur(
-        //         "delayed_heur",
-        //         "",
-        //         9999999,
-        //         'n',
-        //         1,
-        //         0,
-        //         -1,
-        //         HeurTiming::BEFORE_NODE,
-        //         false,
-        //         Box::new(heur),
-        //     )
-
         model.add(heur(h).name("delayed_heur").timing(HeurTiming::BEFORE_NODE));
         model.solve();
     }

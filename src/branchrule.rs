@@ -150,14 +150,7 @@ mod tests {
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
 
-        model.include_branch_rule(
-            "FirstChoosingBranchingRule",
-            "",
-            100000,
-            1000,
-            1.,
-            Box::new(br),
-        );
+        model.add(branchrule(br).maxdepth(1000));
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);
@@ -322,15 +315,7 @@ mod tests {
             .unwrap();
 
         let br = InternalBranchRuleDataTester;
-
-        model.include_branch_rule(
-            "InternalBranchRuleDataTester",
-            "Internal branch rule data tester",
-            1000000,
-            1,
-            1.0,
-            Box::new(br),
-        );
+        model.add(branchrule(br).maxdepth(1));
         model.solve();
     }
 }
