@@ -1,5 +1,6 @@
 use crate::builder::CanBeAddedToModel;
 use crate::{Model, ModelWithProblem, ProblemCreated, VarType, Variable};
+use std::ops::RangeBounds;
 
 /// A builder for variables.
 pub struct VarBuilder<'a> {
@@ -10,7 +11,22 @@ pub struct VarBuilder<'a> {
     var_type: VarType,
 }
 
-/// Creates a new default `VarBuilder`.
+/// Creates a new default `VarBuilder`. It can be chained with other methods to set the properties of the variable.
+///
+/// # Example
+///
+/// ```rust
+/// use russcip::prelude::*;
+///
+/// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
+/// let binary_var = var().name("y").bin(); // Binary variable
+/// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
+///
+/// let mut model = Model::default();
+/// model.add(integer_var);
+/// model.add(binary_var);
+/// model.add(continuous_var);
+/// ```
 pub fn var<'a>() -> VarBuilder<'a> {
     VarBuilder::default()
 }
@@ -29,15 +45,36 @@ impl Default for VarBuilder<'_> {
 
 impl<'a> VarBuilder<'a> {
     /// Sets the variable to be an integer variable.
-    pub fn integer(mut self, lb: isize, ub: isize) -> Self {
-        self.lb = lb as f64;
-        self.ub = ub as f64;
+    /// The bounds are inclusive.
+    /// 
+    /// # Example
+    /// 
+    /// ```rust
+    /// use russcip::prelude::*;
+    /// 
+    /// let var = var().int(0..=10);
+    /// ```
+    pub fn int<B: RangeBounds<isize>>(mut self, bounds: B) -> Self {
+        match bounds.start_bound() {
+            std::ops::Bound::Included(&lb) => self.lb = lb as f64,
+            std::ops::Bound::Excluded(&lb) => self.lb = lb as f64 + 1.0,
+            std::ops::Bound::Unbounded => {
+                self.lb = f64::NEG_INFINITY;
+            }
+        }
+        match bounds.end_bound() {
+            std::ops::Bound::Included(&ub) => self.ub = ub as f64,
+            std::ops::Bound::Excluded(&ub) => self.ub = ub as f64 - 1.0,
+            std::ops::Bound::Unbounded => {
+                self.ub = f64::INFINITY;
+            }
+        }
         self.var_type = VarType::Integer;
         self
     }
 
     /// Sets the variable to be a binary variable.
-    pub fn binary(mut self) -> Self {
+    pub fn bin(mut self) -> Self {
         self.lb = 0.0;
         self.ub = 1.0;
         self.var_type = VarType::Binary;
@@ -45,17 +82,41 @@ impl<'a> VarBuilder<'a> {
     }
 
     /// Sets the variable to be a continuous variable.
-    pub fn continuous(mut self, lb: f64, ub: f64) -> Self {
-        self.lb = lb;
-        self.ub = ub;
+    pub fn cont<B: RangeBounds<f64>>(mut self, bounds: B) -> Self {
+        match bounds.start_bound() {
+            std::ops::Bound::Included(&lb) => self.lb = lb,
+            std::ops::Bound::Excluded(&lb) => self.lb = lb + 1e-6,
+            std::ops::Bound::Unbounded => {
+                self.lb = f64::NEG_INFINITY;
+            }
+        }
+        match bounds.end_bound() {
+            std::ops::Bound::Included(&ub) => self.ub = ub,
+            std::ops::Bound::Excluded(&ub) => self.ub = ub - 1e-6,
+            std::ops::Bound::Unbounded => {
+                self.ub = f64::INFINITY;
+            }
+        }
         self.var_type = VarType::Continuous;
         self
     }
 
     /// Sets the variable to be an implicit integer variable.
-    pub fn impl_int(mut self, lb: f64, ub: f64) -> Self {
-        self.lb = lb;
-        self.ub = ub;
+    pub fn impl_int<B: RangeBounds<f64>>(mut self, bounds: B) -> Self {
+        match bounds.start_bound() {
+            std::ops::Bound::Included(&lb) => self.lb = lb,
+            std::ops::Bound::Excluded(&lb) => self.lb = lb + 1.0,
+            std::ops::Bound::Unbounded => {
+                self.lb = f64::NEG_INFINITY;
+            }
+        }
+        match bounds.end_bound() {
+            std::ops::Bound::Included(&ub) => self.ub = ub,
+            std::ops::Bound::Excluded(&ub) => self.ub = ub - 1.0,
+            std::ops::Bound::Unbounded => {
+                self.ub = f64::INFINITY;
+            }
+        }
         self.var_type = VarType::ImplInt;
         self
     }
@@ -91,10 +152,7 @@ mod tests {
 
     #[test]
     fn test_var_builder() {
-        let var = VarBuilder::default()
-            .name("x")
-            .obj(1.0)
-            .continuous(0.0, 1.0);
+        let var = VarBuilder::default().name("x").obj(1.0).cont(0.0..1.0);
 
         assert_eq!(var.name, Some("x"));
         assert_eq!(var.obj, 1.0);
@@ -105,7 +163,7 @@ mod tests {
     #[test]
     fn test_var_builder_add() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
-        let var = var().name("x").obj(1.0).continuous(0.0, 1.0);
+        let var = var().name("x").obj(1.0).cont(0.0..1.0);
 
         let var = model.add(var);
 
@@ -124,9 +182,9 @@ mod tests {
     fn test_var_add_all() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
         let vars = vec![
-            var().name("1").obj(1.0).continuous(0.0, 1.0),
-            var().name("2").obj(1.0).continuous(0.0, 1.0),
-            var().name("3").obj(1.0).continuous(0.0, 1.0),
+            var().name("1").obj(1.0).cont(0.0..1.0),
+            var().name("2").obj(1.0).cont(0.0..1.0),
+            var().name("3").obj(1.0).cont(0.0..1.0),
         ];
 
         let vars = model.add(vars);

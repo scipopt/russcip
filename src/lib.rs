@@ -19,6 +19,7 @@
 
 #![deny(missing_docs)]
 #![allow(clippy::macro_metavars_in_unsafe)]
+extern crate core;
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
