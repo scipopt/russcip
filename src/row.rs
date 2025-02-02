@@ -245,6 +245,7 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::eventhdlr;
     use crate::Event;
     use crate::{
         minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving, Solving,
@@ -306,9 +307,8 @@ mod tests {
         let cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
         model.set_cons_modifiable(&cons, true);
 
-        let eventhdlr = Box::new(RowTesterEventHandler);
-        model = model.include_eventhdlr("RowTesterEventHandler", "", eventhdlr);
-
+        let e = RowTesterEventHandler;
+        model.add(eventhdlr(e).name("RowTesterEventHandler"));
         model.solve();
     }
 }

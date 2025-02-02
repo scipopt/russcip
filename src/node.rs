@@ -46,6 +46,7 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
+    use crate::prelude::branchrule;
     use crate::{
         branchrule::{BranchRule, BranchingResult},
         model::Model,
@@ -77,7 +78,7 @@ mod tests {
 
     #[test]
     fn node_after_solving() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 3)
             .unwrap() // only call brancher once
@@ -86,9 +87,7 @@ mod tests {
             .unwrap();
 
         let br = NodeDataBranchRule;
-
-        model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+        model.add(branchrule(br));
+        model.solve();
     }
 }

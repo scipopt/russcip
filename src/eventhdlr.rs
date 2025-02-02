@@ -215,6 +215,7 @@ impl Event {
 mod tests {
     use crate::eventhdlr::{EventMask, Eventhdlr};
     use crate::model::Model;
+    use crate::prelude::eventhdlr;
     use crate::{Event, Solving};
     use std::cell::RefCell;
     use std::rc::Rc;
@@ -245,14 +246,15 @@ mod tests {
             counter: counter.clone(),
         };
 
-        Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_eventhdlr("PanickingEventHdlr", "", Box::new(eh))
-            .solve();
+            .unwrap();
 
+        model.add(eventhdlr(eh).name("CountingEventHdlr"));
+
+        model.solve();
         assert!(*counter.borrow() > 1);
     }
 
@@ -276,16 +278,12 @@ mod tests {
 
     #[test]
     fn test_internal_eventhdlr() {
-        Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/simple.lp")
-            .unwrap()
-            .include_eventhdlr(
-                "InternalSCIPEventHdlrTester",
-                "",
-                Box::new(InternalSCIPEventHdlrTester),
-            )
-            .solve();
+            .unwrap();
+        model.add(eventhdlr(InternalSCIPEventHdlrTester).name("InternalSCIPEventHdlrTester"));
+        model.solve();
     }
 }

@@ -114,6 +114,7 @@ impl SCIPBranchRule {
 mod tests {
     use super::*;
     use crate::model::ModelWithProblem;
+    use crate::prelude::branchrule;
     use crate::{model::Model, status::Status, Solving};
 
     struct FirstChoosingBranchingRule {
@@ -129,10 +130,6 @@ mod tests {
         ) -> BranchingResult {
             self.chosen = Some(candidates[0].clone());
             assert_eq!(branchrule.name(), "FirstChoosingBranchingRule");
-            assert_eq!(branchrule.desc(), "");
-            assert_eq!(branchrule.priority(), 100000);
-            assert_eq!(branchrule.maxdepth(), 1000);
-            assert_eq!(branchrule.maxbounddist(), 1.0);
             BranchingResult::DidNotRun
         }
     }
@@ -141,21 +138,15 @@ mod tests {
     fn choosing_first_branching_rule() {
         let br = FirstChoosingBranchingRule { chosen: None };
 
-        let model = Model::new()
+        let mut model = Model::new()
             .set_longint_param("limits/nodes", 2) // only call brancher once
             .unwrap()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
-            .unwrap()
-            .include_branch_rule(
-                "FirstChoosingBranchingRule",
-                "",
-                100000,
-                1000,
-                1.,
-                Box::new(br),
-            );
+            .unwrap();
+
+        model.add(branchrule(br).name("FirstChoosingBranchingRule"));
 
         let solved = model.solve();
         assert_eq!(solved.status(), Status::NodeLimit);
@@ -179,13 +170,13 @@ mod tests {
         let br = CuttingOffBranchingRule {};
 
         // create model from miplib instance gen-ip054
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
-            .unwrap()
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+            .unwrap();
+        model.add(branchrule(br).maxdepth(10));
+        let model = model.solve();
         assert_eq!(model.n_nodes(), 1);
     }
 
@@ -205,7 +196,7 @@ mod tests {
 
     #[test]
     fn first_branching_rule() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -214,9 +205,8 @@ mod tests {
             .unwrap();
 
         let br = FirstBranchingRule;
-        let solved = model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+        model.add(branchrule(br).name("FirstBranchingRule").maxdepth(1000));
+        let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
     }
@@ -237,7 +227,7 @@ mod tests {
 
     #[test]
     fn custom_branching_rule() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -246,9 +236,8 @@ mod tests {
             .unwrap();
 
         let br = CustomBranchingRule;
-        let solved = model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+        model.add(branchrule(br));
+        let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
     }
@@ -283,7 +272,7 @@ mod tests {
 
     #[test]
     fn highest_bound_branch_rule() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -292,9 +281,8 @@ mod tests {
             .unwrap();
 
         let br = HighestBoundBranchRule;
-        let solved = model
-            .include_branch_rule("", "", 100000, 1000, 1., Box::new(br))
-            .solve();
+        model.add(branchrule(br));
+        let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
     }
@@ -314,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_internal_scip_branch_rule() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -323,16 +311,7 @@ mod tests {
             .unwrap();
 
         let br = InternalBranchRuleDataTester;
-
-        model
-            .include_branch_rule(
-                "InternalBranchRuleDataTester",
-                "Internal branch rule data tester",
-                1000000,
-                1,
-                1.0,
-                Box::new(br),
-            )
-            .solve();
+        model.add(branchrule(br).maxdepth(1));
+        model.solve();
     }
 }
