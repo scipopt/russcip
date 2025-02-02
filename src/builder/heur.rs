@@ -138,7 +138,7 @@ impl<H: Heuristic + 'static> CanBeAddedToModel for HeurBuilder<H> {
         let name = self.name.unwrap_or_else(|| "".into());
         let desc = self.desc.unwrap_or_else(|| "".into());
         let dispchar = self.dispchar.unwrap_or('?');
-        let timing = self.timing.unwrap_or_else(|| HeurTiming::BEFORE_NODE);
+        let timing = self.timing.unwrap_or(HeurTiming::BEFORE_NODE);
         let heur_box = Box::new(self.heur);
         model.include_heur(
             &name,
