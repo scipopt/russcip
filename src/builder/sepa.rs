@@ -15,7 +15,7 @@ pub struct SepaBuilder<S: Separator> {
 
 impl<S: Separator> SepaBuilder<S> {
     /// Create a new `SepaBuilder` with the given separator.
-    /// 
+    ///
     /// # Defaults
     /// - `name`: empty string
     /// - `desc`: empty string
