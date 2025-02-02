@@ -2,7 +2,17 @@ use crate::builder::CanBeAddedToModel;
 use crate::{Model, ModelWithProblem, ProblemCreated, VarType, Variable};
 use std::ops::RangeBounds;
 
-/// A builder for variables.
+/// A builder for variables. It can be easily created using the `var` function.
+///
+/// # Example
+///
+/// ```rust
+/// use russcip::prelude::*;
+///
+/// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
+/// let binary_var = var().name("y").bin(); // Binary variable
+/// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
+/// ```
 pub struct VarBuilder<'a> {
     name: Option<&'a str>,
     obj: f64,
@@ -175,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_var_builder() {
-        let var = VarBuilder::default().name("x").obj(1.0).cont(0.0..1.0);
+        let var = VarBuilder::default().name("x").obj(1.0).cont(0.0..=1.0);
 
         assert_eq!(var.name, Some("x"));
         assert_eq!(var.obj, 1.0);
@@ -186,7 +196,7 @@ mod tests {
     #[test]
     fn test_var_builder_add() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
-        let var = var().name("x").obj(1.0).cont(0.0..1.0);
+        let var = var().name("x").obj(1.0).cont(0.0..=1.0);
 
         let var = model.add(var);
 
@@ -205,9 +215,9 @@ mod tests {
     fn test_var_add_all() {
         let mut model = Model::default().set_obj_sense(crate::ObjSense::Maximize);
         let vars = vec![
-            var().name("1").obj(1.0).cont(0.0..1.0),
-            var().name("2").obj(1.0).cont(0.0..1.0),
-            var().name("3").obj(1.0).cont(0.0..1.0),
+            var().name("1").obj(1.0).cont(0.0..=1.0),
+            var().name("2").obj(1.0).cont(0.0..=1.0),
+            var().name("3").obj(1.0).cont(0.0..=1.0),
         ];
 
         let vars = model.add(vars);

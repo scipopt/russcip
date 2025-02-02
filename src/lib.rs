@@ -8,8 +8,8 @@
 //! use russcip::prelude::*;
 //!
 //! let mut model = Model::default().minimize();
-//! let x = model.add(var().binary().obj(1.0));
-//! let y = model.add(var().binary().obj(2.0));
+//! let x = model.add(var().bin().obj(1.0));
+//! let y = model.add(var().bin().obj(2.0));
 //! model.add(cons().coef(&x, 1.0).coef(&y, 1.0).eq(1.0));
 //!
 //! let solved = model.solve();
