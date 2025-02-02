@@ -2,6 +2,8 @@
 pub mod cons;
 /// This module contains `VarBuilder` for easily creating variables.
 pub mod var;
+/// This module contains `SepaBuilder` for easily creating separators.
+pub mod sepa;
 
 use crate::{Model, ProblemCreated};
 

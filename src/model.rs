@@ -287,7 +287,7 @@ impl Model<ProblemCreated> {
     ///
     /// This function returns the `Model` instance for which the separator was included. This allows for method chaining.
     pub fn include_separator(
-        self,
+        &mut self,
         name: &str,
         desc: &str,
         priority: i32,
@@ -296,7 +296,7 @@ impl Model<ProblemCreated> {
         usesubscip: bool,
         delay: bool,
         separator: Box<dyn Separator>,
-    ) -> Self {
+    ) {
         self.scip
             .include_separator(
                 name,
@@ -309,7 +309,6 @@ impl Model<ProblemCreated> {
                 separator,
             )
             .expect("Failed to include separator at state ProblemCreated");
-        self
     }
 
     /// Includes a new event handler in the model.

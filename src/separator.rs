@@ -148,6 +148,7 @@ impl SCIPSeparator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prelude::sepa;
     use crate::{
         minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
         Variable,
@@ -163,7 +164,7 @@ mod tests {
 
     #[test]
     fn test_not_running_separator() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -173,18 +174,13 @@ mod tests {
 
         let sep = NotRunningSeparator;
 
-        model
-            .include_separator(
-                "NotRunningSeparator",
-                "",
-                1000000,
-                1,
-                1.0,
-                false,
-                false,
-                Box::new(sep),
-            )
-            .solve();
+        model.add(
+            sepa(sep)
+                .name("NotRunningSeparator")
+                .desc("Does not run the separation routine"),
+        );
+
+        model.solve();
     }
 
     struct ConsAddingSeparator {}
@@ -218,18 +214,18 @@ mod tests {
 
         let sep = ConsAddingSeparator {};
 
-        let solved = model
-            .include_separator(
-                "ConsAddingSeparator",
-                "",
-                1000000,
-                1,
-                1.0,
-                false,
-                false,
-                Box::new(sep),
-            )
-            .solve();
+        model.include_separator(
+            "ConsAddingSeparator",
+            "",
+            1000000,
+            1,
+            1.0,
+            false,
+            false,
+            Box::new(sep),
+        );
+
+        let solved = model.solve();
 
         assert_eq!(solved.status(), crate::Status::Infeasible);
     }
@@ -261,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_internal_scip_separator() {
-        let model = Model::new()
+        let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 2)
             .unwrap() // only call brancher once
@@ -270,19 +266,19 @@ mod tests {
             .unwrap();
 
         let sep = InternalSeparatorDataTester;
+        
+        model.add(
+            sepa(sep)
+                .name("InternalSeparatorDataTester")
+                .desc("Internal separator data tester")
+                .priority(1000000)
+                .freq(1)
+                .maxbounddist(1.0)
+                .usesubscip(false)
+                .delay(false),
+        );
 
-        model
-            .include_separator(
-                "InternalSeparatorDataTester",
-                "Internal separator data tester",
-                1000000,
-                1,
-                1.0,
-                false,
-                false,
-                Box::new(sep),
-            )
-            .solve();
+        model.solve();
     }
 
     struct CutsAddingSeparator;
@@ -318,19 +314,12 @@ mod tests {
         model.add_cons(vec![&x, &y], &[1.0, 1.0], 1.0, 1.0, "cons1");
 
         let sep = CutsAddingSeparator {};
-
-        let solved = model
-            .include_separator(
-                "CutsAddingSeparator",
-                "",
-                1000000,
-                1,
-                1.0,
-                false,
-                false,
-                Box::new(sep),
-            )
-            .solve();
+        model.add(
+            sepa(sep)
+                .name("CutsAddingSeparator")
+                .desc("Adds a cut to the model"),
+        );
+        let solved = model.solve();
 
         assert_eq!(solved.status(), crate::Status::Infeasible);
     }
