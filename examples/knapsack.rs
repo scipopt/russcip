@@ -41,7 +41,7 @@ impl Knapsack {
 
         let mut vars = Vec::with_capacity(self.sizes.len());
         for i in 0..self.sizes.len() {
-            vars.push(model.add(var().binary().obj(self.values[i] as f64)));
+            vars.push(model.add(var().bin().obj(self.values[i] as f64)));
         }
 
         let mut capacity_cons = cons().le(self.capacity as f64);

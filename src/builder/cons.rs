@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn test_cons_builder() {
         let mut model = minimal_model().hide_output();
-        let var = model.add(var().binary().obj(1.));
+        let var = model.add(var().bin().obj(1.));
         let cons = cons().name("c").eq(1.0).coef(&var, 1.0);
 
         assert_eq!(cons.name, Some("c"));
@@ -122,8 +122,8 @@ mod tests {
     fn test_cons_builder_expr() {
         let mut model = minimal_model().hide_output();
         let vars = [
-            model.add(var().binary().obj(1.)),
-            model.add(var().binary().obj(1.)),
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
         ];
 
         let cons = cons()

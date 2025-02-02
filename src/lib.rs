@@ -8,8 +8,8 @@
 //! use russcip::prelude::*;
 //!
 //! let mut model = Model::default().minimize();
-//! let x = model.add(var().binary().obj(1.0));
-//! let y = model.add(var().binary().obj(2.0));
+//! let x = model.add(var().bin().obj(1.0));
+//! let y = model.add(var().bin().obj(2.0));
 //! model.add(cons().coef(&x, 1.0).coef(&y, 1.0).eq(1.0));
 //!
 //! let solved = model.solve();
@@ -19,6 +19,7 @@
 
 #![deny(missing_docs)]
 #![allow(clippy::macro_metavars_in_unsafe)]
+extern crate core;
 
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;

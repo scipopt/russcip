@@ -5,8 +5,8 @@ fn main() {
     let mut model = Model::default().maximize();
 
     // Add variables
-    let x1 = model.add(var().integer(0, isize::MAX).obj(3.).name("x1"));
-    let x2 = model.add(var().integer(0, isize::MAX).obj(2.).name("x2"));
+    let x1 = model.add(var().int(0..).obj(3.).name("x1"));
+    let x2 = model.add(var().int(0..).obj(2.).name("x2"));
 
     // Add constraints
     model.add(cons().name("c1").coef(&x1, 2.).coef(&x2, 1.).le(100.));
