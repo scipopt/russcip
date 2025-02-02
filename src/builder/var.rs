@@ -45,14 +45,13 @@ impl Default for VarBuilder<'_> {
 
 impl<'a> VarBuilder<'a> {
     /// Sets the variable to be an integer variable.
-    /// The bounds are inclusive.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```rust
     /// use russcip::prelude::*;
-    /// 
-    /// let var = var().int(0..=10);
+    ///
+    /// let var = var().int(0..=10); // Integer variable with bounds [0, 10]
     /// ```
     pub fn int<B: RangeBounds<isize>>(mut self, bounds: B) -> Self {
         match bounds.start_bound() {
@@ -74,6 +73,13 @@ impl<'a> VarBuilder<'a> {
     }
 
     /// Sets the variable to be a binary variable.
+    ///
+    /// # Example
+    /// ```rust
+    /// use russcip::prelude::*;
+    ///
+    /// let var = var().bin(); // Binary variable
+    /// ```
     pub fn bin(mut self) -> Self {
         self.lb = 0.0;
         self.ub = 1.0;
@@ -82,6 +88,15 @@ impl<'a> VarBuilder<'a> {
     }
 
     /// Sets the variable to be a continuous variable.
+    ///
+    /// # Example
+    /// ```rust
+    /// use russcip::prelude::*;
+    ///
+    /// let v1 = var().cont(0.0..); // Continuous variable with lower bound 0.0
+    /// let v2 = var().cont(..=10.0); // Continuous variable with upper bound 10.0
+    /// let v3 = var().cont(0.0..=10.0); // Continuous variable with bounds [0.0, 10.0]
+    /// ```
     pub fn cont<B: RangeBounds<f64>>(mut self, bounds: B) -> Self {
         match bounds.start_bound() {
             std::ops::Bound::Included(&lb) => self.lb = lb,
@@ -102,17 +117,25 @@ impl<'a> VarBuilder<'a> {
     }
 
     /// Sets the variable to be an implicit integer variable.
-    pub fn impl_int<B: RangeBounds<f64>>(mut self, bounds: B) -> Self {
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use russcip::prelude::*;
+    ///
+    /// let var = var().impl_int(0..=10); // Implicit integer variable with bounds [0, 10]
+    /// ```
+    pub fn impl_int<B: RangeBounds<isize>>(mut self, bounds: B) -> Self {
         match bounds.start_bound() {
-            std::ops::Bound::Included(&lb) => self.lb = lb,
-            std::ops::Bound::Excluded(&lb) => self.lb = lb + 1.0,
+            std::ops::Bound::Included(&lb) => self.lb = lb as f64,
+            std::ops::Bound::Excluded(&lb) => self.lb = (lb + 1) as f64,
             std::ops::Bound::Unbounded => {
                 self.lb = f64::NEG_INFINITY;
             }
         }
         match bounds.end_bound() {
-            std::ops::Bound::Included(&ub) => self.ub = ub,
-            std::ops::Bound::Excluded(&ub) => self.ub = ub - 1.0,
+            std::ops::Bound::Included(&ub) => self.ub = ub as f64,
+            std::ops::Bound::Excluded(&ub) => self.ub = (ub - 1) as f64,
             std::ops::Bound::Unbounded => {
                 self.ub = f64::INFINITY;
             }
