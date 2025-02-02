@@ -19,19 +19,20 @@ impl<H: Heuristic> HeurBuilder<H> {
     /// Creates a new `HeurBuilder` with the given heuristic.
     ///
     /// # Defaults
-    /// - `priority`: 0
+    /// - `name`: empty string
+    /// - `desc`: empty string
+    /// - `dispchar`: '?'
+    /// - `timing`: `HeurTiming::BEFORE_NODE`
+    /// - `priority`: 100000
     /// - `freq`: 1 (called at every node)
     /// - `freqofs`: 0
     /// - `maxdepth`: -1 (unlimited depth)
     /// - `usessubscip`: false
-    ///
-    /// For fields without a provided default (e.g. `name`, `desc`, `dispchar`, `timing`),
-    /// empty strings or reasonable defaults are used if not explicitly set.
     pub fn new(heur: H) -> Self {
         HeurBuilder {
             name: None,
             desc: None,
-            priority: 0,
+            priority: 100000,
             dispchar: None,
             freq: 1,
             freqofs: 0,
@@ -134,7 +135,6 @@ impl<H: Heuristic + 'static> CanBeAddedToModel for HeurBuilder<H> {
     type Return = ();
 
     fn add(self, model: &mut Model<ProblemCreated>) {
-        // Provide default values if not set:
         let name = self.name.unwrap_or_else(|| "".into());
         let desc = self.desc.unwrap_or_else(|| "".into());
         let dispchar = self.dispchar.unwrap_or('?');

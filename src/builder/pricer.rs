@@ -14,13 +14,15 @@ impl<P: Pricer> PricerBuilder<P> {
     /// Creates a new `PricerBuilder` with the given pricer.
     ///
     /// # Defaults
-    /// - `priority`: 0
+    /// - `name`: empty string
+    /// - `desc`: empty string
+    /// - `priority`: 100000
     /// - `delay`: false
     pub fn new(pricer: P) -> Self {
         PricerBuilder {
             name: None,
             desc: None,
-            priority: 0,
+            priority: 100000,
             delay: false,
             pricer,
         }

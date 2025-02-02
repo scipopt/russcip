@@ -15,7 +15,16 @@ pub struct SepaBuilder<S: Separator> {
 
 impl<S: Separator> SepaBuilder<S> {
     /// Create a new `SepaBuilder` with the given separator.
-    pub fn default(sepa: S) -> SepaBuilder<S> {
+    /// 
+    /// # Defaults
+    /// - `name`: empty string
+    /// - `desc`: empty string
+    /// - `priority`: 100000
+    /// - `freq`: 1 (called at every node)
+    /// - `maxbounddist`: 1.0
+    /// - `usesubscip`: false
+    /// - `delay`: false
+    pub fn new(sepa: S) -> SepaBuilder<S> {
         SepaBuilder {
             name: None,
             desc: None,
@@ -48,7 +57,7 @@ impl<S: Separator> SepaBuilder<S> {
 /// model.add(sepa);
 /// ```
 pub fn sepa<S: Separator>(sepa: S) -> SepaBuilder<S> {
-    SepaBuilder::default(sepa)
+    SepaBuilder::new(sepa)
 }
 
 impl<S: Separator> SepaBuilder<S> {

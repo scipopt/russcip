@@ -15,7 +15,9 @@ impl<R: BranchRule> BranchRuleBuilder<R> {
     /// Creates a new `BranchRuleBuilder` with the given branch rule.
     ///
     /// Defaults:
-    /// - `priority`: 0
+    /// - `name`: empty string
+    /// - `desc`: empty string
+    /// - `priority`: 100000
     /// - `maxdepth`: -1 (unlimited)
     /// - `maxbounddist`: 1.0 (applies on all nodes)
     pub fn new(rule: R) -> Self {
