@@ -204,6 +204,11 @@ pub struct Event {
 }
 
 impl Event {
+    /// Returns the internal raw pointer of the event.
+    pub fn inner(&self) -> *mut ffi::SCIP_EVENT {
+        self.raw
+    }
+
     /// Returns the event type of the event.
     pub fn event_type(&self) -> EventMask {
         let event_type = unsafe { ffi::SCIPeventGetType(self.raw) };
