@@ -1,5 +1,8 @@
-use crate::{ffi, Model, Solving};
+use crate::scip::ScipPtr;
+use crate::{ffi, Model, Solving, Variable};
+use scip_sys::SCIPeventGetVar;
 use std::ops::{BitOr, BitOrAssign};
+use std::rc::Rc;
 
 /// Trait used to define custom event handlers.
 pub trait Eventhdlr {
@@ -201,6 +204,7 @@ impl SCIPEventhdlr {
 /// Wrapper for the internal SCIP event.
 pub struct Event {
     pub(crate) raw: *mut ffi::SCIP_EVENT,
+    pub(crate) scip: Rc<ScipPtr>,
 }
 
 impl Event {
@@ -213,6 +217,23 @@ impl Event {
     pub fn event_type(&self) -> EventMask {
         let event_type = unsafe { ffi::SCIPeventGetType(self.raw) };
         EventMask(event_type)
+    }
+
+    /// Returns the associated variable for a variable event
+    pub fn var(&self) -> Option<Variable> {
+        if self
+            .event_type()
+            .matches(EventMask::VAR_EVENT | EventMask::VAR_FIXED | EventMask::VAR_DELETED)
+        {
+            let var_ptr = unsafe { SCIPeventGetVar(self.raw) };
+            assert!(!var_ptr.is_null());
+            Some(Variable {
+                raw: var_ptr,
+                scip: self.scip.clone(),
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -278,6 +299,7 @@ mod tests {
         ) {
             assert!(self.get_type().matches(event.event_type()));
             assert_eq!(eventhdlr.name(), "InternalSCIPEventHdlrTester");
+            assert!(event.var().is_none())
         }
     }
 

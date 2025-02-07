@@ -640,13 +640,16 @@ impl ScipPtr {
             let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
             assert!(!data_ptr.is_null());
             let eventhdlr_ptr = data_ptr as *mut Box<dyn Eventhdlr>;
-            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
             let model = Model {
-                scip: Rc::new(scip_ptr),
+                scip: scip_ptr.clone(),
                 state: Solving,
             };
             let eventhdlr = SCIPEventhdlr { raw: eventhdlr };
-            let event = Event { raw: event };
+            let event = Event {
+                raw: event,
+                scip: scip_ptr.clone(),
+            };
             unsafe { (*eventhdlr_ptr).execute(model, eventhdlr, event) };
             Retcode::Okay.into()
         }
