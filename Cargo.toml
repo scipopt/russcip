@@ -4,7 +4,7 @@ authors = ["Mohammed Ghannam <ghannam@zib.de>"]
 description = "Rust interface for SCIP"
 license = "Apache-2.0"
 repository = "https://github.com/scipopt/russcip"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 exclude = ["data/test/*"]
 
@@ -13,7 +13,7 @@ bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 
 [dependencies]
-scip-sys = "0.1.17"
+scip-sys = "0.1.18"
 
 [dev-dependencies]
 rayon = "1.5.1"
