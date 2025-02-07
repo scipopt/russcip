@@ -57,6 +57,16 @@ impl Variable {
     pub fn ub(&self) -> f64 {
         unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
     }
+    
+    /// Returns the local lower bound of the variable.
+    pub fn lb_local(&self) -> f64 {
+        unsafe { ffi::SCIPvarGetLbLocal(self.raw) }
+    }
+    
+    /// Returns the local upper bound of the variable.
+    pub fn ub_local(&self) -> f64 {
+        unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
+    }
 
     /// Returns the type of the variable.
     pub fn var_type(&self) -> VarType {
@@ -177,7 +187,9 @@ mod tests {
 
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
+        assert_eq!(var.lb_local(), 0.0);
         assert_eq!(var.ub(), 1.0);
+        assert_eq!(var.ub_local(), 1.0);
         assert_eq!(var.obj(), 2.0);
         assert_eq!(var.name(), "x");
         assert_eq!(var.var_type(), VarType::ImplInt);
