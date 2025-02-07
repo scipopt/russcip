@@ -57,12 +57,12 @@ impl Variable {
     pub fn ub(&self) -> f64 {
         unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
     }
-    
+
     /// Returns the local lower bound of the variable.
     pub fn lb_local(&self) -> f64 {
         unsafe { ffi::SCIPvarGetLbLocal(self.raw) }
     }
-    
+
     /// Returns the local upper bound of the variable.
     pub fn ub_local(&self) -> f64 {
         unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
