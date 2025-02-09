@@ -140,3 +140,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Check Clippy Linter
         run: cargo clippy --all-features --all-targets -- -D warnings
+
+  semver-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Check Semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
