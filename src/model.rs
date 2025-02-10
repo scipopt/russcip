@@ -382,17 +382,16 @@ impl Model<Solving> {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> Rc<Variable> {
+    ) -> Variable {
         let var = self
             .scip
             .create_var_solving(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Variable {
+
+        Variable {
             raw: var,
             scip: self.scip.clone(),
-        };
-
-        Rc::new(var)
+        }
     }
 
     /// Returns the current node of the model.
@@ -445,17 +444,16 @@ impl Model<Solving> {
         obj: f64,
         name: &str,
         var_type: VarType,
-    ) -> Rc<Variable> {
+    ) -> Variable {
         let var = self
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        let var = Variable {
+
+        Variable {
             raw: var,
             scip: self.scip.clone(),
-        };
-
-        Rc::new(var)
+        }
     }
 
     /// Gets the variable in current problem given its index (in the problem).
