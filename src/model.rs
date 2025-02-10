@@ -449,7 +449,7 @@ impl Model<Solving> {
             .scip
             .create_priced_var(lb, ub, obj, name, var_type)
             .expect("Failed to create variable in state ProblemCreated");
-        
+
         Variable {
             raw: var,
             scip: self.scip.clone(),
