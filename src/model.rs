@@ -1202,6 +1202,11 @@ impl<T> Model<T> {
         self.scip.raw
     }
 
+    /// Returns a mutable reference to the SCIP instance. This is useful for calling functions in the `ffi` module.
+    pub fn inner(&self) -> *mut SCIP {
+        self.scip.raw
+    }
+
     /// Returns the status of the optimization model.
     pub fn status(&self) -> Status {
         self.scip.status()
