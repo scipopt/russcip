@@ -485,6 +485,11 @@ impl Model<Solving> {
             .add_row(cut, force_cut)
             .expect("Failed to add row in state ProblemCreated")
     }
+
+    /// Gets the dual solution of a linear constraint
+    pub fn dual_sol(&self, cons: Constraint) -> f64 {
+        self.scip.dual_sol(cons)
+    }
 }
 
 impl Model<Solved> {
@@ -535,6 +540,9 @@ pub trait ModelWithProblem {
     /// Returns the number of constraints in the optimization model.
     fn n_conss(&self) -> usize;
 
+    /// Finds a constraint by name
+    fn find_cons(&self, name: &str) -> Option<Constraint>;
+
     /// Returns a vector of all constraints in the optimization model.
     fn conss(&self) -> Vec<Constraint>;
 
@@ -584,6 +592,13 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns the number of constraints in the optimization model.
     fn n_conss(&self) -> usize {
         self.scip.n_conss()
+    }
+
+    fn find_cons(&self, name: &str) -> Option<Constraint> {
+        self.scip.find_cons(name).map(|cons| Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        })
     }
 
     /// Returns a vector of all constraints in the optimization model.
