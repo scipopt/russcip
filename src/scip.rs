@@ -377,10 +377,6 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
-    pub(crate) fn dual_sol(&self, cons: &Constraint) -> f64 {
-        unsafe { ffi::SCIPgetDualsolLinear(self.raw, cons.raw) }
-    }
-
     /// Create set partitioning constraint
     pub(crate) fn create_cons_set_part(
         &self,

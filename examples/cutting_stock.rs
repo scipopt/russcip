@@ -145,20 +145,12 @@ impl Pricer for CSPPricer<'_> {
         // render the LP feasible again. This is beyond the scope of this example.
         assert!(!farkas, "Farkas pricing not supported.");
 
-        // Pricing has no idea what branching decisions were made by scip, so we only want to run the pricer at the root node
-        // if model.focus_node().depth() > 0 {
-        //     return PricerResult {
-        //         state: PricerResultState::DidNotRun,
-        //         lower_bound: None,
-        //     };
-        // }
-
         let mut pricing_model = Model::default().hide_output().maximize();
 
         let vars = (0..self.item_sizes.len())
             .map(|i| {
                 let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
-                let dual_val = model.dual_sol(&cons);
+                let dual_val = cons.dual_sol();
                 pricing_model.add(
                     var()
                         .int(0..)

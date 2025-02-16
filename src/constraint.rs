@@ -38,6 +38,11 @@ impl Constraint {
             })
         }
     }
+
+    /// Returns the dual solution of the linear constraint in the current LP.
+    pub fn dual_sol(&self) -> f64 {
+        unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) }
+    }
 }
 
 #[cfg(test)]
