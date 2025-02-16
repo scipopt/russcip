@@ -487,7 +487,7 @@ impl Model<Solving> {
     }
 
     /// Gets the dual solution of a linear constraint
-    pub fn dual_sol(&self, cons: Constraint) -> f64 {
+    pub fn dual_sol(&self, cons: &Constraint) -> f64 {
         self.scip.dual_sol(cons)
     }
 }

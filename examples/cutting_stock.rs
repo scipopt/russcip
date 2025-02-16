@@ -1,3 +1,4 @@
+use russcip::prelude::*;
 use russcip::*;
 
 /// Consider the cutting stock problem: Given large paper rolls of width `W` and demand `b_i` for rolls of width `w_i` (`i` \in 1..m), how
@@ -94,36 +95,27 @@ fn main() {
                 .map(|x| if x == i { "1" } else { "0" })
                 .collect::<Vec<_>>()
                 .join("-");
-            main_problem.add_var(
-                0.0,
-                f64::INFINITY,
-                1.0,
-                &format!("pattern_{pattern}"),
-                VarType::Integer,
-            )
+            main_problem.add(var().int(0..).obj(1.0).name(&format!("pattern_{pattern}")))
         })
         .collect();
 
     demand.iter().enumerate().for_each(|(i, &count)| {
-        let cons = main_problem.add_cons(
-            cutting_pattern_vars.iter().collect(),
-            &initial_cutting_patterns
-                .iter()
-                .map(|pattern| pattern[i] as f64)
-                .collect::<Vec<f64>>(),
-            count as f64,
-            f64::INFINITY,
-            &format!("demand_for_item_{i}"),
+        let demand_constraint = main_problem.add(
+            cons()
+                .name(&format!("demand_for_item_{i}"))
+                .coef(&cutting_pattern_vars[i], 1.0)
+                .ge(count as f64),
         );
-        main_problem.set_cons_modifiable(&cons, true);
+
+        main_problem.set_cons_modifiable(&demand_constraint, true);
     });
 
-    let pricer = CSPPricer {
+    let csp_pricer = CSPPricer {
         stock_length,
         item_sizes,
     };
 
-    main_problem.include_pricer("CSPPricer", "CSPPricer", 1, false, Box::new(pricer));
+    main_problem.add(pricer(csp_pricer).name("CSPPricer"));
     let solved_model = main_problem.solve();
 
     println!("\nSolution");
@@ -153,34 +145,44 @@ impl Pricer for CSPPricer<'_> {
         // render the LP feasible again. This is beyond the scope of this example.
         assert!(!farkas, "Farkas pricing not supported.");
 
+        // Pricing has no idea what branching decisions were made by scip, so we only want to run the pricer at the root node
+        // if model.focus_node().depth() > 0 {
+        //     return PricerResult {
+        //         state: PricerResultState::DidNotRun,
+        //         lower_bound: None,
+        //     };
+        // }
+
         let mut pricing_model = Model::default().hide_output().maximize();
 
         let vars = (0..self.item_sizes.len())
             .map(|i| {
                 let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
-                let dual_val = model.dual_sol(cons);
-                pricing_model.add_var(
-                    0.0,
-                    f64::INFINITY,
-                    dual_val,
-                    &format!("demand_for_item_{i}"),
-                    VarType::Integer,
+                let dual_val = model.dual_sol(&cons);
+                pricing_model.add(
+                    var()
+                        .int(0..)
+                        .name(&format!("demand_for_item_{i}"))
+                        .obj(dual_val),
                 )
             })
             .collect::<Vec<Variable>>();
 
-        pricing_model.add_cons(
-            vars.iter().collect(),
-            self.item_sizes,
-            f64::NEG_INFINITY,
-            self.stock_length as f64,
-            "knapsack_constraint",
+        pricing_model.add(
+            cons()
+                .name("is_valid_pattern_constraint")
+                .expr(
+                    vars.iter()
+                        .enumerate()
+                        .map(|(idx, var)| (var, self.item_sizes[idx])),
+                )
+                .le(self.stock_length as f64),
         );
 
         let solved_model = pricing_model.solve();
 
         let reduced_cost = solved_model.best_sol().map(|sol| 1.0 - sol.obj_val());
-        if reduced_cost.is_some_and(|rc| rc < 0.0) {
+        if reduced_cost.is_some_and(|rc| rc < -1e-6) {
             let solution = solved_model.best_sol().unwrap();
             let pattern = vars
                 .iter()

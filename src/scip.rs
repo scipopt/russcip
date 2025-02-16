@@ -377,7 +377,7 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
-    pub(crate) fn dual_sol(&self, cons: Constraint) -> f64 {
+    pub(crate) fn dual_sol(&self, cons: &Constraint) -> f64 {
         unsafe { ffi::SCIPgetDualsolLinear(self.raw, cons.raw) }
     }
 
