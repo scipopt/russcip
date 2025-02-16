@@ -1,6 +1,5 @@
 use russcip::*;
 
-
 /// Consider the cutting stock problem: Given large paper rolls of width `W` and demand `b_i` for rolls of width `w_i` (`i` \in 1..m), how
 /// many large rolls are needed to resolve the order.
 ///
@@ -77,24 +76,45 @@ fn main() {
 
     // Vector of cutting_patterns, initially populated with the trivial ones that contain exactly
     // one item. cutting_patterns[i][j] indicates how often item j is in pattern i.
-    let initial_cutting_patterns: Vec<Vec<i32>> = (0..item_sizes.len()).map(|i|
-        (0..item_sizes.len()).map(|j| if i == j { 1 } else { 0 }).collect::<Vec<i32>>()
-    ).collect();
+    let initial_cutting_patterns: Vec<Vec<i32>> = (0..item_sizes.len())
+        .map(|i| {
+            (0..item_sizes.len())
+                .map(|j| if i == j { 1 } else { 0 })
+                .collect::<Vec<i32>>()
+        })
+        .collect();
 
     let mut main_problem = Model::default().minimize();
 
-    let cutting_pattern_vars: Vec<Variable> = initial_cutting_patterns.iter().enumerate().map(|(i, &ref _pattern)| {
-        let pattern = (0..10).map(|x| if x == i { "1" } else { "0" }).collect::<Vec<_>>().join("-");
-        main_problem.add_var(0.0, f64::INFINITY, 1.0, &format!("pattern_{pattern}"), VarType::Integer)
-    }).collect();
+    let cutting_pattern_vars: Vec<Variable> = initial_cutting_patterns
+        .iter()
+        .enumerate()
+        .map(|(i, &ref _pattern)| {
+            let pattern = (0..10)
+                .map(|x| if x == i { "1" } else { "0" })
+                .collect::<Vec<_>>()
+                .join("-");
+            main_problem.add_var(
+                0.0,
+                f64::INFINITY,
+                1.0,
+                &format!("pattern_{pattern}"),
+                VarType::Integer,
+            )
+        })
+        .collect();
 
     demand.iter().enumerate().for_each(|(i, &count)| {
         let cons = main_problem.add_cons(
             cutting_pattern_vars.iter().collect(),
-            &initial_cutting_patterns.iter().map(|pattern| pattern[i] as f64).collect::<Vec<f64>>(),
+            &initial_cutting_patterns
+                .iter()
+                .map(|pattern| pattern[i] as f64)
+                .collect::<Vec<f64>>(),
             count as f64,
             f64::INFINITY,
-            &format!("demand_for_item_{i}"));
+            &format!("demand_for_item_{i}"),
+        );
         main_problem.set_cons_modifiable(&cons, true);
     });
 
@@ -123,34 +143,66 @@ struct CSPPricer<'a> {
 }
 
 impl Pricer for CSPPricer<'_> {
-    fn generate_columns(&mut self, mut model: Model<Solving>, _pricer: SCIPPricer, farkas: bool) -> PricerResult {
-
+    fn generate_columns(
+        &mut self,
+        mut model: Model<Solving>,
+        _pricer: SCIPPricer,
+        farkas: bool,
+    ) -> PricerResult {
         // If the current LP relaxation is infeasible, it is the task of the pricer to generate additional variables that can potentially
         // render the LP feasible again. This is beyond the scope of this example.
         assert!(!farkas, "Farkas pricing not supported.");
 
         let mut pricing_model = Model::default().hide_output().maximize();
 
-        let vars = (0..self.item_sizes.len()).map(|i| {
-            let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
-            let dual_val = model.dual_sol(cons);
-            pricing_model.add_var(0.0, f64::INFINITY, dual_val, &format!("demand_for_item_{i}"), VarType::Integer)
-        }).collect::<Vec<Variable>>();
+        let vars = (0..self.item_sizes.len())
+            .map(|i| {
+                let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
+                let dual_val = model.dual_sol(cons);
+                pricing_model.add_var(
+                    0.0,
+                    f64::INFINITY,
+                    dual_val,
+                    &format!("demand_for_item_{i}"),
+                    VarType::Integer,
+                )
+            })
+            .collect::<Vec<Variable>>();
 
-        pricing_model.add_cons(vars.iter().collect(), self.item_sizes, f64::NEG_INFINITY, self.stock_length as f64, "knapsack_constraint");
+        pricing_model.add_cons(
+            vars.iter().collect(),
+            self.item_sizes,
+            f64::NEG_INFINITY,
+            self.stock_length as f64,
+            "knapsack_constraint",
+        );
 
         let solved_model = pricing_model.solve();
 
         let reduced_cost = solved_model.best_sol().map(|sol| 1.0 - sol.obj_val());
         if reduced_cost.is_some_and(|rc| rc < 0.0) {
             let solution = solved_model.best_sol().unwrap();
-            let pattern = vars.iter().map(|var| (solution.val(var) as u32).to_string()).collect::<Vec<String>>();
+            let pattern = vars
+                .iter()
+                .map(|var| (solution.val(var) as u32).to_string())
+                .collect::<Vec<String>>();
 
             // add variable for new cutting pattern
             let new_variable_name = &format!("pattern_{}", pattern.join("-"));
-            if model.vars().iter().find(|var| &var.name() == new_variable_name).is_none() {
+            if model
+                .vars()
+                .iter()
+                .find(|var| &var.name() == new_variable_name)
+                .is_none()
+            {
                 println!("    Adding {new_variable_name}");
-                let new_variable = model.add_priced_var(0.0, f64::INFINITY, 1.0, new_variable_name, VarType::Integer);
+                let new_variable = model.add_priced_var(
+                    0.0,
+                    f64::INFINITY,
+                    1.0,
+                    new_variable_name,
+                    VarType::Integer,
+                );
 
                 (0..self.item_sizes.len()).for_each(|i| {
                     let constraint = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
@@ -169,7 +221,10 @@ impl Pricer for CSPPricer<'_> {
                 }
             }
         } else {
-            println!("    Didn't find column (obj_value = {}, reduced_cost = {reduced_cost:?})", model.obj_val());
+            println!(
+                "    Didn't find column (obj_value = {}, reduced_cost = {reduced_cost:?})",
+                model.obj_val()
+            );
             PricerResult {
                 state: PricerResultState::NoColumns,
                 lower_bound: None,
