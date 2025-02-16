@@ -89,7 +89,7 @@ fn main() {
     let cutting_pattern_vars: Vec<Variable> = initial_cutting_patterns
         .iter()
         .enumerate()
-        .map(|(i, &ref _pattern)| {
+        .map(|(i, _pattern)| {
             let pattern = (0..10)
                 .map(|x| if x == i { "1" } else { "0" })
                 .collect::<Vec<_>>()
@@ -189,11 +189,10 @@ impl Pricer for CSPPricer<'_> {
 
             // add variable for new cutting pattern
             let new_variable_name = &format!("pattern_{}", pattern.join("-"));
-            if model
+            if !model
                 .vars()
                 .iter()
-                .find(|var| &var.name() == new_variable_name)
-                .is_none()
+                .any(|var| &var.name() == new_variable_name)
             {
                 println!("    Adding {new_variable_name}");
                 let new_variable = model.add_priced_var(
