@@ -624,6 +624,9 @@ pub trait ProblemOrSolving {
     /// Creates a new solution initialized to zero.
     fn create_sol(&self) -> Solution;
 
+    /// Create a solution in the original space
+    fn create_orig_sol(&self) -> Solution;
+
     /// Adds a solution to the model
     ///
     /// # Returns
@@ -820,7 +823,20 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     fn create_sol(&self) -> Solution {
         let sol_ptr = self
             .scip
-            .create_sol()
+            .create_sol(false)
+            .expect("Failed to create solution in state ProblemCreated");
+        Solution {
+            scip_ptr: self.scip.clone(),
+            raw: sol_ptr,
+        }
+    }
+    
+    
+    /// Create a new solution in the original space
+    fn create_orig_sol(&self) -> Solution {
+        let sol_ptr = self
+            .scip
+            .create_sol(true)
             .expect("Failed to create solution in state ProblemCreated");
         Solution {
             scip_ptr: self.scip.clone(),
@@ -1984,4 +2000,7 @@ mod tests {
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
     }
+    
+    #[test]
+    
 }
