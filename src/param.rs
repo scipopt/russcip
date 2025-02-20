@@ -59,3 +59,61 @@ impl ScipParameter for String {
         model.str_param(name)
     }
 }
+
+impl ScipParameter for &str {
+    fn set<T>(model: Model<T>, name: &str, value: &str) -> Result<Model<T>, Retcode> {
+        let model = model.set_str_param(name, value)?;
+        Ok(model)
+    }
+
+    fn get<'a, T>(model: &'a Model<T>, name: &'a str) -> &'a str {
+        &model.str_param(name)
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_bool() {
+        let model = Model::default();
+        let model = bool::set(model, "display/allviols", true).unwrap();
+        assert!(model.param::<bool>("display/allviols"));
+        let model = model.set_param("display/allviols", false);
+        assert!(!bool::get(&model, "display/allviols"));
+    }
+
+    #[test]
+    fn test_i64() {
+        let model = Model::default();
+        assert_eq!(model.param::<i64>("constraints/components/nodelimit"), 10000i64);
+        let model = model.set_param("constraints/components/nodelimit", 100i64);
+        assert_eq!(model.param::<i64>("constraints/components/nodelimit"), 100i64);
+    }
+
+    #[test]
+    fn test_i32() {
+        let model = Model::default();
+        assert_eq!(model.param::<i32>("conflict/minmaxvars"), 0i32);
+        let model = model.set_param("conflict/minmaxvars", 100i32);
+        assert_eq!(model.param::<i32>("conflict/minmaxvars"), 100i32);
+    }
+
+    #[test]
+    fn test_f64() {
+        let model = Model::default();
+        assert_eq!(model.param::<f64>("limits/time"), 1e+20);
+        let model = model.set_param("limits/time", 100.0);
+        assert_eq!(model.param::<f64>("limits/time"), 100.0);
+    }
+
+    #[test]
+    fn test_str() {
+        let model = Model::default();
+        assert_eq!(model.param::<String>("visual/vbcfilename"), "-".to_string());
+        let model = model.set_param("display/verblevel", "test");
+        assert_eq!(model.param::<String>("display/verblevel"), "test".to_string());
+    }
+}
