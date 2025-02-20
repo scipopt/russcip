@@ -101,7 +101,7 @@ mod tests {
     fn test_str() {
         let model = Model::default();
         assert_eq!(model.param::<String>("visual/vbcfilename"), "-".to_string());
-        let model = model.set_param("display/verblevel", "test".to_string());
-        assert_eq!(model.param::<String>("display/verblevel"), "test".to_string());
+        let model = model.set_param("visual/vbcfilename", "test".to_string());
+        assert_eq!(model.param::<String>("visual/vbcfilename"), "test".to_string());
     }
 }

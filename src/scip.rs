@@ -145,7 +145,7 @@ impl ScipPtr {
             std::ptr::null_mut()
         ));
         // capture vars and cons since they were not created by the user (and SCIP will free them later)
-        self.vars(true);
+        self.vars(false, true);
         self.conss(true);
         Ok(())
     }
@@ -194,11 +194,15 @@ impl ScipPtr {
         Ok(())
     }
 
-    pub(crate) fn vars(&self, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
+    pub(crate) fn vars(&self, original: bool, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = self.n_vars();
         let mut vars = BTreeMap::new();
-        let scip_vars = unsafe { ffi::SCIPgetVars(self.raw) };
+        let scip_vars = if original {
+            unsafe { ffi::SCIPgetOrigVars(self.raw) }
+        } else {
+            unsafe { ffi::SCIPgetVars(self.raw) }
+        };
         for i in 0..n_vars {
             let scip_var = unsafe { *scip_vars.add(i) };
             if capture {

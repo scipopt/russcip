@@ -525,6 +525,8 @@ impl Model<Solved> {
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
     fn vars(&self) -> Vec<Variable>;
+    /// Returns a vector of all original variables in the optimization model.
+    fn orig_vars(&self) -> Vec<Variable>;
 
     /// Returns the variable with the given ID, if it exists.
     fn var(&self, var_id: VarId) -> Option<Variable>;
@@ -551,7 +553,19 @@ impl ModelStageWithProblem for Solving {}
 impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns a vector of all variables in the optimization model.
     fn vars(&self) -> Vec<Variable> {
-        let scip_vars = self.scip.vars(false);
+        let scip_vars = self.scip.vars(false, false);
+        scip_vars
+            .into_values()
+            .map(|v| Variable {
+                raw: v,
+                scip: self.scip.clone(),
+            })
+            .collect()
+    }
+    
+    /// Returns a vector of all original variables in the optimization model.
+    fn orig_vars(&self) -> Vec<Variable> {
+        let scip_vars = self.scip.vars(true, false);
         scip_vars
             .into_values()
             .map(|v| Variable {
@@ -563,7 +577,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 
     /// Returns the variable with the given ID, if it exists.
     fn var(&self, var_id: VarId) -> Option<Variable> {
-        let vars = self.scip.vars(false);
+        let vars = self.scip.vars(false, false);
         for (i, v) in vars {
             if i == var_id {
                 return Some(Variable {
