@@ -60,18 +60,6 @@ impl ScipParameter for String {
     }
 }
 
-impl ScipParameter for &str {
-    fn set<T>(model: Model<T>, name: &str, value: &str) -> Result<Model<T>, Retcode> {
-        let model = model.set_str_param(name, value)?;
-        Ok(model)
-    }
-
-    fn get<'a, T>(model: &'a Model<T>, name: &'a str) -> &'a str {
-        &model.str_param(name)
-    }
-}
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
