@@ -1421,6 +1421,36 @@ impl<T> Model<T> {
             .expect("Failed to set heuristics with valid value");
         self
     }
+
+    /// Checks equality using tolerance.
+    pub fn eq(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisEQ(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is less than b using tolerance.
+    pub fn lt(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisLT(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is less than or equal to b using tolerance.
+    pub fn le(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisLE(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is greater than b using tolerance.
+    pub fn gt(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisGT(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is greater than or equal to b using tolerance.
+    pub fn ge(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisGE(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Returns SCIP's epsilon value.
+    pub fn eps(&self) -> f64 {
+        unsafe { ffi::SCIPepsilon(self.scip.raw) }
+    }
 }
 
 /// The default implementation for a `Model` instance in the `ProblemCreated` state.
@@ -1998,5 +2028,16 @@ mod tests {
         let best_bound = solved_model.best_bound();
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
+    }
+
+    #[test]
+    fn comparison() {
+        let model = Model::new();
+        let eps = model.eps();
+        assert!(model.eq(1.0, 1. - eps));
+        assert!(model.lt(1.0 - 2.0 * eps, 1.0));
+        assert!(model.gt(1.0, 1.0 - 2.0 * eps));
+        assert!(model.le(1.0 - eps, 1.0));
+        assert!(model.ge(1.0, 1.0 - eps));
     }
 }
