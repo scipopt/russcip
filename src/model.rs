@@ -562,7 +562,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
             })
             .collect()
     }
-    
+
     /// Returns a vector of all original variables in the optimization model.
     fn orig_vars(&self) -> Vec<Variable> {
         let scip_vars = self.scip.vars(true, false);

@@ -76,9 +76,15 @@ mod tests {
     #[test]
     fn test_i64() {
         let model = Model::default();
-        assert_eq!(model.param::<i64>("constraints/components/nodelimit"), 10000i64);
+        assert_eq!(
+            model.param::<i64>("constraints/components/nodelimit"),
+            10000i64
+        );
         let model = model.set_param("constraints/components/nodelimit", 100i64);
-        assert_eq!(model.param::<i64>("constraints/components/nodelimit"), 100i64);
+        assert_eq!(
+            model.param::<i64>("constraints/components/nodelimit"),
+            100i64
+        );
     }
 
     #[test]
@@ -102,6 +108,9 @@ mod tests {
         let model = Model::default();
         assert_eq!(model.param::<String>("visual/vbcfilename"), "-".to_string());
         let model = model.set_param("visual/vbcfilename", "test".to_string());
-        assert_eq!(model.param::<String>("visual/vbcfilename"), "test".to_string());
+        assert_eq!(
+            model.param::<String>("visual/vbcfilename"),
+            "test".to_string()
+        );
     }
 }

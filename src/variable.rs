@@ -108,32 +108,32 @@ impl Variable {
     pub fn is_deleted(&self) -> bool {
         unsafe { ffi::SCIPvarIsDeleted(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is transformed.
     pub fn is_transformed(&self) -> bool {
         unsafe { ffi::SCIPvarIsTransformed(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is original.
     pub fn is_original(&self) -> bool {
         unsafe { ffi::SCIPvarIsOriginal(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is negated.
     pub fn is_negated(&self) -> bool {
         unsafe { ffi::SCIPvarIsNegated(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is removable (due to aging in the LP).
     pub fn is_removable(&self) -> bool {
         unsafe { ffi::SCIPvarIsRemovable(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is a directed counterpart of an original variable.
     pub fn is_trans_from_orig(&self) -> bool {
         unsafe { ffi::SCIPvarIsTransformedOrigvar(self.raw) != 0 }
     }
-    
+
     /// Returns whether the variable is active (i.e., neither fixed nor aggregated).
     pub fn is_active(&self) -> bool {
         unsafe { ffi::SCIPvarIsActive(self.raw) != 0 }
