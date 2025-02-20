@@ -562,9 +562,13 @@ impl ScipPtr {
     }
 
     /// Create solution
-    pub(crate) fn create_sol(&self) -> Result<*mut SCIP_SOL, Retcode> {
+    pub(crate) fn create_sol(&self, original: bool) -> Result<*mut SCIP_SOL, Retcode> {
         let mut sol = MaybeUninit::uninit();
-        scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        if original {
+            scip_call! { ffi::SCIPcreateOrigSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        } else {
+            scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        }
         let sol = unsafe { sol.assume_init() };
         Ok(sol)
     }
