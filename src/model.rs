@@ -830,8 +830,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             raw: sol_ptr,
         }
     }
-    
-    
+
     /// Create a new solution in the original space
     fn create_orig_sol(&self) -> Solution {
         let sol_ptr = self
@@ -2000,7 +1999,4 @@ mod tests {
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
     }
-    
-    #[test]
-    
 }
