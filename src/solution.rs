@@ -13,6 +13,11 @@ pub struct Solution {
 }
 
 impl Solution {
+    /// Returns a raw pointer to the underlying `ffi::SCIP_SOL` struct.
+    pub fn inner(&self) -> *mut ffi::SCIP_SOL {
+        self.raw
+    }
+
     /// Returns the objective value of the solution.
     pub fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr.raw, self.raw) }
@@ -117,6 +122,7 @@ mod tests {
 
         //test solution values
         let sol = model.best_sol().unwrap();
+        assert!(!sol.inner().is_null());
 
         let debug_str = format!("{:?}", sol);
         assert!(debug_str.contains("Solution with obj val: 200"));
