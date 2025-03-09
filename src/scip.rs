@@ -168,6 +168,16 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetNConss(self.raw) as usize }
     }
 
+    pub(crate) fn find_cons(&self, name: &str) -> Option<*mut SCIP_Cons> {
+        let c_name = CString::new(name).unwrap();
+        let scip_cons = unsafe { ffi::SCIPfindCons(self.raw, c_name.as_ptr()) };
+        if scip_cons.is_null() {
+            None
+        } else {
+            Some(scip_cons)
+        }
+    }
+
     pub(crate) fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.into()
