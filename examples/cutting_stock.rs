@@ -150,8 +150,10 @@ impl Pricer for CSPPricer<'_> {
         }
 
         if farkas {
-            unreachable!("Unexpected infeasibility, root node should be feasible by construction and
-            the pricer is not expected to be called in deeper nodes.");
+            unreachable!(
+                "Unexpected infeasibility, root node should be feasible by construction and
+            the pricer is not expected to be called in deeper nodes."
+            );
         }
 
         let mut pricing_model = Model::default().hide_output().maximize();
@@ -159,7 +161,9 @@ impl Pricer for CSPPricer<'_> {
         let vars = (0..self.item_sizes.len())
             .map(|i| {
                 let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
-                let dual_val = cons.dual_sol().expect("No dual value found for linear constraint");
+                let dual_val = cons
+                    .dual_sol()
+                    .expect("No dual value found for linear constraint");
                 pricing_model.add(
                     var()
                         .int(0..)
