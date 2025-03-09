@@ -145,6 +145,14 @@ impl Pricer for CSPPricer<'_> {
         // render the LP feasible again. This is beyond the scope of this example.
         assert!(!farkas, "Farkas pricing not supported.");
 
+        // Pricing has no idea what branching decisions were made by scip, so we only want to run the pricer at the root node
+        if model.focus_node().depth() > 0 {
+            return PricerResult {
+                state: PricerResultState::NoColumns,
+                lower_bound: None,
+            };
+        }
+        
         let mut pricing_model = Model::default().hide_output().maximize();
 
         let vars = (0..self.item_sizes.len())
