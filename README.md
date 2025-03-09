@@ -28,8 +28,7 @@ for other installation methods, please check [INSTALL.md](INSTALL.md).
 
 ### Usage
 
-An [example](examples/create_and_solve.rs) on how to model and solve an integer program can be found in
-the [examples](examples) directory.
+We provide multiple examples listed [here](examples/README.md), and you can also check the [documentation](https://docs.rs/russcip/).
 
 ## Accessing unsafe functions
 
