@@ -141,10 +141,6 @@ impl Pricer for CSPPricer<'_> {
         _pricer: SCIPPricer,
         farkas: bool,
     ) -> PricerResult {
-        // If the current LP relaxation is infeasible, it is the task of the pricer to generate additional variables that can potentially
-        // render the LP feasible again. This is beyond the scope of this example.
-        assert!(!farkas, "Farkas pricing not supported.");
-
         // Pricing has no idea what branching decisions were made by scip, so we only want to run the pricer at the root node
         if model.focus_node().depth() > 0 {
             return PricerResult {
@@ -152,7 +148,12 @@ impl Pricer for CSPPricer<'_> {
                 lower_bound: None,
             };
         }
-        
+
+        if farkas {
+            unreachable!("Unexpected infeasibility, root node should be feasible by construction and
+            the pricer is not expected to be called in deeper nodes.");
+        }
+
         let mut pricing_model = Model::default().hide_output().maximize();
 
         let vars = (0..self.item_sizes.len())
