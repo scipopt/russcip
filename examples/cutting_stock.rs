@@ -159,7 +159,7 @@ impl Pricer for CSPPricer<'_> {
         let vars = (0..self.item_sizes.len())
             .map(|i| {
                 let cons = model.find_cons(&format!("demand_for_item_{i}")).unwrap();
-                let dual_val = cons.dual_sol();
+                let dual_val = cons.dual_sol().expect("No dual value found for linear constraint");
                 pricing_model.add(
                     var()
                         .int(0..)

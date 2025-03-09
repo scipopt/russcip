@@ -40,8 +40,22 @@ impl Constraint {
     }
 
     /// Returns the dual solution of the linear constraint in the current LP.
-    pub fn dual_sol(&self) -> f64 {
-        unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) }
+    /// Returns `None` if the constraint is not a linear constraint.
+    pub fn dual_sol(&self) -> Option<f64> {
+        let cons_handler = unsafe { ffi::SCIPconsGetHdlr(self.raw) };
+        if cons_handler.is_null() {
+            return None;
+        }
+        let cons_handler_name = unsafe { ffi::SCIPconshdlrGetName(cons_handler) };
+        if cons_handler_name.is_null() {
+            return None;
+        }
+        let cons_handler_name = unsafe { std::ffi::CStr::from_ptr(cons_handler_name) };
+        if cons_handler_name.to_str().unwrap() != "linear" {
+            return None;
+        }
+
+        Some(unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) })
     }
 }
 
