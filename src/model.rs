@@ -525,6 +525,8 @@ impl Model<Solved> {
 pub trait ModelWithProblem {
     /// Returns a vector of all variables in the optimization model.
     fn vars(&self) -> Vec<Variable>;
+    /// Returns a vector of all original variables in the optimization model.
+    fn orig_vars(&self) -> Vec<Variable>;
 
     /// Returns the variable with the given ID, if it exists.
     fn var(&self, var_id: VarId) -> Option<Variable>;
@@ -554,7 +556,19 @@ impl ModelStageWithProblem for Solving {}
 impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns a vector of all variables in the optimization model.
     fn vars(&self) -> Vec<Variable> {
-        let scip_vars = self.scip.vars(false);
+        let scip_vars = self.scip.vars(false, false);
+        scip_vars
+            .into_values()
+            .map(|v| Variable {
+                raw: v,
+                scip: self.scip.clone(),
+            })
+            .collect()
+    }
+
+    /// Returns a vector of all original variables in the optimization model.
+    fn orig_vars(&self) -> Vec<Variable> {
+        let scip_vars = self.scip.vars(true, false);
         scip_vars
             .into_values()
             .map(|v| Variable {
@@ -566,7 +580,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 
     /// Returns the variable with the given ID, if it exists.
     fn var(&self, var_id: VarId) -> Option<Variable> {
-        let vars = self.scip.vars(false);
+        let vars = self.scip.vars(false, false);
         for (i, v) in vars {
             if i == var_id {
                 return Some(Variable {
@@ -619,6 +633,9 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 pub trait ProblemOrSolving {
     /// Creates a new solution initialized to zero.
     fn create_sol(&self) -> Solution;
+
+    /// Create a solution in the original space
+    fn create_orig_sol(&self) -> Solution;
 
     /// Adds a solution to the model
     ///
@@ -816,7 +833,19 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     fn create_sol(&self) -> Solution {
         let sol_ptr = self
             .scip
-            .create_sol()
+            .create_sol(false)
+            .expect("Failed to create solution in state ProblemCreated");
+        Solution {
+            scip_ptr: self.scip.clone(),
+            raw: sol_ptr,
+        }
+    }
+
+    /// Create a new solution in the original space
+    fn create_orig_sol(&self) -> Solution {
+        let sol_ptr = self
+            .scip
+            .create_sol(true)
             .expect("Failed to create solution in state ProblemCreated");
         Solution {
             scip_ptr: self.scip.clone(),
@@ -1402,6 +1431,36 @@ impl<T> Model<T> {
             .expect("Failed to set heuristics with valid value");
         self
     }
+
+    /// Checks equality using tolerance.
+    pub fn eq(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisEQ(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is less than b using tolerance.
+    pub fn lt(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisLT(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is less than or equal to b using tolerance.
+    pub fn le(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisLE(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is greater than b using tolerance.
+    pub fn gt(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisGT(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Checks if a is greater than or equal to b using tolerance.
+    pub fn ge(&self, a: f64, b: f64) -> bool {
+        unsafe { ffi::SCIPisGE(self.scip.raw, a, b) != 0 }
+    }
+
+    /// Returns SCIP's epsilon value.
+    pub fn eps(&self) -> f64 {
+        unsafe { ffi::SCIPepsilon(self.scip.raw) }
+    }
 }
 
 /// The default implementation for a `Model` instance in the `ProblemCreated` state.
@@ -1979,5 +2038,16 @@ mod tests {
         let best_bound = solved_model.best_bound();
         let obj_val = solved_model.obj_val();
         assert!((best_bound - obj_val) < 1e-6);
+    }
+
+    #[test]
+    fn comparison() {
+        let model = Model::new();
+        let eps = model.eps();
+        assert!(model.eq(1.0, 1. - eps));
+        assert!(model.lt(1.0 - 2.0 * eps, 1.0));
+        assert!(model.gt(1.0, 1.0 - 2.0 * eps));
+        assert!(model.le(1.0 - eps, 1.0));
+        assert!(model.ge(1.0, 1.0 - eps));
     }
 }

@@ -103,6 +103,41 @@ impl Variable {
     pub fn sol_val(&self) -> f64 {
         unsafe { ffi::SCIPgetVarSol(self.scip.raw, self.raw) }
     }
+
+    /// Returns whether the variable is deleted.
+    pub fn is_deleted(&self) -> bool {
+        unsafe { ffi::SCIPvarIsDeleted(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is transformed.
+    pub fn is_transformed(&self) -> bool {
+        unsafe { ffi::SCIPvarIsTransformed(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is original.
+    pub fn is_original(&self) -> bool {
+        unsafe { ffi::SCIPvarIsOriginal(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is negated.
+    pub fn is_negated(&self) -> bool {
+        unsafe { ffi::SCIPvarIsNegated(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is removable (due to aging in the LP).
+    pub fn is_removable(&self) -> bool {
+        unsafe { ffi::SCIPvarIsRemovable(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is a directed counterpart of an original variable.
+    pub fn is_trans_from_orig(&self) -> bool {
+        unsafe { ffi::SCIPvarIsTransformedOrigvar(self.raw) != 0 }
+    }
+
+    /// Returns whether the variable is active (i.e., neither fixed nor aggregated).
+    pub fn is_active(&self) -> bool {
+        unsafe { ffi::SCIPvarIsActive(self.raw) != 0 }
+    }
 }
 
 /// The type of variable in an optimization problem.
@@ -194,6 +229,13 @@ mod tests {
         assert_eq!(var.name(), "x");
         assert_eq!(var.var_type(), VarType::ImplInt);
         assert_eq!(var.status(), VarStatus::Original);
+        assert!(!var.is_in_lp());
+        assert!(!var.is_deleted());
+        assert!(!var.is_transformed());
+        assert!(var.is_original());
+        assert!(!var.is_negated());
+        assert!(!var.is_removable());
+        assert!(var.is_active());
 
         assert!(!var.inner().is_null());
     }
