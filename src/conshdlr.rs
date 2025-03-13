@@ -44,6 +44,7 @@ pub enum LockDirection {
     Both,
 }
 
+/// Wrapper for the internal SCIP constraint handler.
 pub struct SCIPConshdlr {
     pub(crate) raw: *mut ffi::SCIP_CONSHDLR,
     pub(crate) scip: Rc<ScipPtr>,
