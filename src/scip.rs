@@ -1146,9 +1146,7 @@ impl ScipPtr {
                 state: Solving,
             };
 
-            let scip_conshdlr = SCIPConshdlr {
-                raw: conshdlr,
-            };
+            let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
 
             unsafe {
                 *result = (*conshdlr_ptr).enforce(model, scip_conshdlr).into();
@@ -1179,9 +1177,7 @@ impl ScipPtr {
                 state: Solving,
             };
 
-            let scip_conshdlr = SCIPConshdlr {
-                raw: conshdlr,
-            };
+            let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
 
             assert!(!sol.is_null());
 
@@ -1224,9 +1220,7 @@ impl ScipPtr {
 
             let vars = model.vars();
             for var in vars {
-                let scip_conshdlr = SCIPConshdlr {
-                    raw: conshdlr,
-                };
+                let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
 
                 let model = Model {
                     scip: scip_ptr.clone(),
@@ -1238,7 +1232,12 @@ impl ScipPtr {
                 unsafe {
                     match lock_type {
                         LockDirection::Both => {
-                            ffi::SCIPaddVarLocks(scip, var.raw, nlockspos + nlocksneg, nlockspos + nlocksneg);
+                            ffi::SCIPaddVarLocks(
+                                scip,
+                                var.raw,
+                                nlockspos + nlocksneg,
+                                nlockspos + nlocksneg,
+                            );
                         }
                         LockDirection::Decrease => {
                             ffi::SCIPaddVarLocks(scip, var.raw, nlockspos, nlocksneg);

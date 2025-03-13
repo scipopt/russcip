@@ -1,4 +1,3 @@
-use crate::Conshdlr;
 use crate::builder::CanBeAddedToModel;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -9,6 +8,7 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
+use crate::Conshdlr;
 use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
@@ -358,11 +358,14 @@ impl Model<ProblemCreated> {
     ///     The integrality constraint handler has a checking priority of 0. That means, constraint
     ///     handlers with negative checking priorities only have to deal with integral solutions.
     /// * `conshdlr` - The constraint handler to be included.
-    pub fn include_conshdlr(&mut self,
-                            name: &str, desc: &str,
-                            enfopriority: i32,
-                            checkpriority: i32,
-                            conshdlr: Box<dyn Conshdlr>) {
+    pub fn include_conshdlr(
+        &mut self,
+        name: &str,
+        desc: &str,
+        enfopriority: i32,
+        checkpriority: i32,
+        conshdlr: Box<dyn Conshdlr>,
+    ) {
         self.scip
             .include_conshdlr(name, desc, enfopriority, checkpriority, conshdlr)
             .expect("Failed to include constraint handler at state ProblemCreated");

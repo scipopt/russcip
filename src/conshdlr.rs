@@ -1,10 +1,11 @@
-use scip_sys::SCIP_ROW;
 use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving, Variable};
+use scip_sys::SCIP_ROW;
 
 /// A trait for implementing custom constraint handlers.
 pub trait Conshdlr {
     /// Check if the (primal) solution satisfies the constraint.
-    fn check(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr, solution: &Solution) -> bool;
+    fn check(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr, solution: &Solution)
+        -> bool;
 
     /// Enforce the constraint for the current sub-problem's (LP) solution.
     fn enforce(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr) -> ConshdlrResult;
@@ -88,13 +89,15 @@ impl SCIPConshdlr {
     }
 
     /// Creates an empty row for the constraint handler.
-    pub fn create_empty_row(&self, model: &Model<Solving>,
-                            name: &str,
-                            lhs: f64,
-                            rhs: f64,
-                            local: bool,
-                            modifiable: bool,
-                            removable: bool,
+    pub fn create_empty_row(
+        &self,
+        model: &Model<Solving>,
+        name: &str,
+        lhs: f64,
+        rhs: f64,
+        local: bool,
+        modifiable: bool,
+        removable: bool,
     ) -> Result<Row, Retcode> {
         let name = std::ffi::CString::new(name).unwrap();
         let local = if local { 1 } else { 0 };
@@ -111,21 +114,29 @@ impl SCIPConshdlr {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use crate::Status;
     use super::*;
+    use crate::Status;
     #[test]
     fn all_inf_conshdlr() {
         struct AllInfeasibleConshdlr;
 
         impl Conshdlr for AllInfeasibleConshdlr {
-            fn check(&mut self, _model: Model<Solving>, _conshdlr: SCIPConshdlr, _solution: &Solution) -> bool {
+            fn check(
+                &mut self,
+                _model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                _solution: &Solution,
+            ) -> bool {
                 false
             }
 
-            fn enforce(&mut self, _model: Model<Solving>, _conshdlr: SCIPConshdlr) -> ConshdlrResult {
+            fn enforce(
+                &mut self,
+                _model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
                 ConshdlrResult::CutOff
             }
         }
@@ -135,7 +146,8 @@ mod tests {
         model.include_conshdlr(
             "AllInfeasibleConshdlr",
             "All infeasible constraint handler",
-            0, 0,
+            0,
+            0,
             Box::new(AllInfeasibleConshdlr {}),
         );
 
