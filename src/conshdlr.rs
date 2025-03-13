@@ -11,7 +11,12 @@ pub trait Conshdlr {
     fn enforce(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr) -> ConshdlrResult;
 
     /// Prevents rounding of variables in constraints.
-    fn locks(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr, var: &Variable) -> LockDirection {
+    fn locks(
+        &mut self,
+        model: Model<Solving>,
+        conshdlr: SCIPConshdlr,
+        var: &Variable,
+    ) -> LockDirection {
         LockDirection::Both
     }
 }
