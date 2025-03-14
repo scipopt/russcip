@@ -97,7 +97,7 @@ pub fn branchrule<R: BranchRule>(rule: R) -> BranchRuleBuilder<R> {
     BranchRuleBuilder::new(rule)
 }
 
-impl<R: BranchRule + 'static> CanBeAddedToModel for BranchRuleBuilder<R> {
+impl<R: BranchRule + 'static> CanBeAddedToModel<ProblemCreated> for BranchRuleBuilder<R> {
     type Return = ();
 
     fn add(self, model: &mut Model<ProblemCreated>) {

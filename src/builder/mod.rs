@@ -13,23 +13,23 @@ pub mod sepa;
 /// This module contains `VarBuilder` for easily creating variables.
 pub mod var;
 
-use crate::{Model, ProblemCreated};
+use crate::Model;
 
 /// A trait for adding two values together.
-pub trait CanBeAddedToModel {
+pub trait CanBeAddedToModel<Stage> {
     /// The return type after adding to the model (e.g. `Variable` / `Constraint` ).
     type Return;
     /// How to add the value to the model.
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return;
+    fn add(self, model: &mut Model<Stage>) -> Self::Return;
 }
 
-impl<T, I> CanBeAddedToModel for I
+impl<T, I, Stage> CanBeAddedToModel<Stage> for I
 where
-    T: CanBeAddedToModel,
+    T: CanBeAddedToModel<Stage>,
     I: IntoIterator<Item = T>,
 {
     type Return = Vec<T::Return>;
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
+    fn add(self, model: &mut Model<Stage>) -> Self::Return {
         self.into_iter().map(|x| x.add(model)).collect()
     }
 }
