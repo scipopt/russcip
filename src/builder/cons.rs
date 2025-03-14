@@ -64,8 +64,7 @@ impl<'a> ConsBuilder<'a> {
 
     /// Adds multiple coefficients to the constraint.
     pub fn coefs(mut self, var_refs: Vec<&'a Variable>, vals: Vec<f64>) -> Self {
-        self.coefs
-            .extend(var_refs.into_iter().zip(vals));
+        self.coefs.extend(var_refs.into_iter().zip(vals));
         self
     }
     /// Adds multiple coefficients to the constraint.
