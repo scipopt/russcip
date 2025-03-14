@@ -43,16 +43,6 @@ impl From<ConshdlrResult> for ffi::SCIP_Result {
     }
 }
 
-/// The direction in which a variable should be locked.
-pub enum LockDirection {
-    /// Decreasing the variable's value can cause infeasibility.
-    Decrease,
-    /// Increasing the variable's value can cause infeasibility.
-    Increase,
-    /// Both directions can cause infeasibility.
-    Both,
-}
-
 /// Wrapper for the internal SCIP constraint handler.
 pub struct SCIPConshdlr {
     pub(crate) raw: *mut ffi::SCIP_CONSHDLR,
