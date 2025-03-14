@@ -245,12 +245,9 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::eventhdlr;
+    use crate::prelude::{cons, eventhdlr, var};
     use crate::Event;
-    use crate::{
-        minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving, Solving,
-        VarType,
-    };
+    use crate::{minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, Solving};
 
     #[test]
     fn test_row() {
@@ -302,9 +299,9 @@ mod tests {
         }
 
         let mut model = minimal_model();
-        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+        let x = model.add(var().bin().name("x").obj(1.0));
 
-        let cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
+        let cons = model.add(cons().name("cons1").eq(1.0).coef(&x, 1.0));
         model.set_cons_modifiable(&cons, true);
 
         let e = RowTesterEventHandler;

@@ -107,7 +107,7 @@ impl<S: Separator> SepaBuilder<S> {
     }
 }
 
-impl<S: Separator + 'static> CanBeAddedToModel for SepaBuilder<S> {
+impl<S: Separator + 'static> CanBeAddedToModel<ProblemCreated> for SepaBuilder<S> {
     type Return = ();
     fn add(self, model: &mut Model<ProblemCreated>) {
         let name = self.name.clone().unwrap_or("".into());

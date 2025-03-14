@@ -80,8 +80,8 @@ impl fmt::Debug for Solution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let obj_val = self.obj_val();
         writeln!(f, "Solution with obj val: {obj_val}")?;
-        let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr.raw) };
-        let n_vars = unsafe { ffi::SCIPgetNVars(self.scip_ptr.raw) };
+        let vars = unsafe { ffi::SCIPgetOrigVars(self.scip_ptr.raw) };
+        let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.scip_ptr.raw) };
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
             let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
@@ -126,8 +126,8 @@ mod tests {
 
         let debug_str = format!("{:?}", sol);
         assert!(debug_str.contains("Solution with obj val: 200"));
-        assert!(debug_str.contains("Var t_x1=40"));
-        assert!(debug_str.contains("Var t_x2=20"));
+        assert!(debug_str.contains("Var x1=40"));
+        assert!(debug_str.contains("Var x2=20"));
 
         let vars = model.vars();
         assert_eq!(sol.val(&vars[0]), 40.);

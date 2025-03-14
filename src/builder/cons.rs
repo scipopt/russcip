@@ -1,5 +1,7 @@
 use crate::builder::CanBeAddedToModel;
-use crate::{Constraint, Model, ModelWithProblem, ProblemCreated, ProblemOrSolving, Variable};
+use crate::{
+    Constraint, Model, ModelWithProblem, ProblemCreated, ProblemOrSolving, Solving, Variable,
+};
 
 /// A builder for creating constraints.
 #[derive(Debug)]
@@ -61,6 +63,11 @@ impl<'a> ConsBuilder<'a> {
     }
 
     /// Adds multiple coefficients to the constraint.
+    pub fn coefs(mut self, var_refs: Vec<&'a Variable>, vals: Vec<f64>) -> Self {
+        self.coefs.extend(var_refs.into_iter().zip(vals));
+        self
+    }
+    /// Adds multiple coefficients to the constraint.
     pub fn expr<I>(mut self, iter: I) -> Self
     where
         I: IntoIterator<Item = (&'a Variable, f64)>,
@@ -70,9 +77,27 @@ impl<'a> ConsBuilder<'a> {
     }
 }
 
-impl CanBeAddedToModel for ConsBuilder<'_> {
+impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
     type Return = Constraint;
     fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
+        let mut vars = Vec::new();
+        let mut coefs = Vec::new();
+        for (var, coef) in self.coefs {
+            vars.push(var);
+            coefs.push(coef);
+        }
+
+        let name = self.name.map(|s| s.to_string()).unwrap_or_else(|| {
+            let n_cons = model.n_conss();
+            format!("cons{}", n_cons)
+        });
+        model.add_cons(vars, &coefs, self.lhs, self.rhs, &name)
+    }
+}
+
+impl CanBeAddedToModel<Solving> for ConsBuilder<'_> {
+    type Return = Constraint;
+    fn add(self, model: &mut Model<Solving>) -> Self::Return {
         let mut vars = Vec::new();
         let mut coefs = Vec::new();
         for (var, coef) in self.coefs {

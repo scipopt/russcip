@@ -148,7 +148,7 @@ impl SCIPSeparator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::sepa;
+    use crate::prelude::{cons, sepa, var};
     use crate::{
         minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
         Variable,
@@ -191,12 +191,11 @@ mod tests {
             mut model: Model<Solving>,
             _sepa: SCIPSeparator,
         ) -> SeparationResult {
-            // adds a row representing the sum of all variables >= 1
             let vars = model.vars();
             let var_refs: Vec<&Variable> = vars.iter().collect();
             let varlen = vars.len();
 
-            model.add_cons(var_refs, &vec![1.0; varlen], 5.0, 5.0, "cons_added");
+            model.add(cons().eq(5.0).coefs(var_refs, vec![1.0; varlen]));
             SeparationResult::ConsAdded
         }
     }
@@ -207,10 +206,10 @@ mod tests {
             .hide_output()
             .set_obj_sense(ObjSense::Maximize);
 
-        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-        let y = model.add_var(0.0, 1.0, 1.0, "y", VarType::Binary);
+        let x = model.add(var().bin().obj(1.0));
+        let y = model.add(var().bin().obj(1.0));
 
-        model.add_cons(vec![&x, &y], &[1.0, 1.0], 1.0, 1.0, "cons1");
+        model.add(cons().eq(1.0).coef(&x, 1.0).coef(&y, 1.0));
 
         let sep = ConsAddingSeparator {};
 
