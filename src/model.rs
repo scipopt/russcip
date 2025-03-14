@@ -1240,8 +1240,7 @@ impl<T> Model<T> {
     pub fn inner(&self) -> *mut SCIP {
         self.scip.raw
     }
-    
-    
+
     /// Adds anything that could be added to the model (variables, constraints, plugins, etc.).
     pub fn add<R, O: CanBeAddedToModel<T, Return = R>>(&mut self, object: O) -> R {
         object.add(self)

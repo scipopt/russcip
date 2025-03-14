@@ -1,5 +1,8 @@
 use crate::builder::CanBeAddedToModel;
-use crate::{Constraint, Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem, ProblemCreated, ProblemOrSolving, Solving, Variable};
+use crate::{
+    Constraint, Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem,
+    ProblemCreated, ProblemOrSolving, Solving, Variable,
+};
 
 /// A builder for creating constraints.
 #[derive(Debug)]
