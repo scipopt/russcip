@@ -131,7 +131,7 @@ pub fn heur<H: Heuristic>(heur: H) -> HeurBuilder<H> {
     HeurBuilder::new(heur)
 }
 
-impl<H: Heuristic + 'static> CanBeAddedToModel for HeurBuilder<H> {
+impl<H: Heuristic + 'static> CanBeAddedToModel<ProblemCreated> for HeurBuilder<H> {
     type Return = ();
 
     fn add(self, model: &mut Model<ProblemCreated>) {

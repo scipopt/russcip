@@ -86,7 +86,7 @@ pub fn pricer<P: Pricer>(pricer: P) -> PricerBuilder<P> {
     PricerBuilder::new(pricer)
 }
 
-impl<P: Pricer + 'static> CanBeAddedToModel for PricerBuilder<P> {
+impl<P: Pricer + 'static> CanBeAddedToModel<ProblemCreated> for PricerBuilder<P> {
     type Return = ();
 
     fn add(self, model: &mut Model<ProblemCreated>) {

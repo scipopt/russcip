@@ -184,11 +184,6 @@ impl Model<ProblemCreated> {
         }
     }
 
-    /// Adds anything that could be added to the model (variables, constraints, etc.).
-    pub fn add<R, O: CanBeAddedToModel<Return = R>>(&mut self, object: O) -> R {
-        object.add(self)
-    }
-
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
     ///
     /// # Arguments
@@ -1244,6 +1239,12 @@ impl<T> Model<T> {
     /// Returns a mutable reference to the SCIP instance. This is useful for calling functions in the `ffi` module.
     pub fn inner(&self) -> *mut SCIP {
         self.scip.raw
+    }
+    
+    
+    /// Adds anything that could be added to the model (variables, constraints, plugins, etc.).
+    pub fn add<R, O: CanBeAddedToModel<T, Return = R>>(&mut self, object: O) -> R {
+        object.add(self)
     }
 
     /// Returns the status of the optimization model.

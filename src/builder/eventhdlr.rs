@@ -60,7 +60,7 @@ pub fn eventhdlr<E: Eventhdlr>(ev: E) -> EventHdlrBuilder<E> {
     EventHdlrBuilder::new(ev)
 }
 
-impl<E: Eventhdlr + 'static> CanBeAddedToModel for EventHdlrBuilder<E> {
+impl<E: Eventhdlr + 'static> CanBeAddedToModel<ProblemCreated> for EventHdlrBuilder<E> {
     type Return = ();
 
     fn add(self, model: &mut Model<ProblemCreated>) {
