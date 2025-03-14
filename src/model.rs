@@ -8,6 +8,7 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
+use crate::Conshdlr;
 use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
@@ -329,6 +330,40 @@ impl Model<ProblemCreated> {
         self.scip
             .include_pricer(name, desc, priority, delay, pricer)
             .expect("Failed to include pricer at state ProblemCreated");
+    }
+
+    /// Includes a custom constraint handler in the SCIP data structure.
+    ///
+    /// # Arguments
+    /// * `name` - The name of the constraint handler. This should be a unique identifier.
+    /// * `desc` - A brief description of the constraint handler.
+    /// * `enfopriority` - Like the separation priority, the enforcement priorities define the order
+    ///     in which the different constraint handlers are called in the constraint enforcement step
+    ///     of the sub-problem processing. The constraint enforcement is called after the price-and-cut
+    ///     loop is executed (in the case that the LP is solved at the current subproblem).
+    ///     The integrality constraint handler has an enforcement priority of 0. That means, if a
+    ///     constraint handler has negative enforcement priority, it only has to deal with integral
+    ///     solutions in its enforcement methods, because for fractional solutions, the integrality
+    ///     constraint handler would have created a branching, thereby aborting the enforcement step.
+    ///     If you want to implement a constraint-depending branching rule (for example, SOS branching
+    ///     on special ordered set constraints), you have to assign a positive enforcement priority to
+    ///     your constraint handler. In this case, you have to be able to deal with fractional solutions.
+    /// * `checkpriority` - The checking priorities define the order in which the different constraint
+    ///     handlers are called to check the feasibility of a given primal solution candidate.
+    ///     The integrality constraint handler has a checking priority of 0. That means, constraint
+    ///     handlers with negative checking priorities only have to deal with integral solutions.
+    /// * `conshdlr` - The constraint handler to be included.
+    pub fn include_conshdlr(
+        &mut self,
+        name: &str,
+        desc: &str,
+        enfopriority: i32,
+        checkpriority: i32,
+        conshdlr: Box<dyn Conshdlr>,
+    ) {
+        self.scip
+            .include_conshdlr(name, desc, enfopriority, checkpriority, conshdlr)
+            .expect("Failed to include constraint handler at state ProblemCreated");
     }
 
     /// Solves the model and returns a new `Model` instance with a `Solved` state.

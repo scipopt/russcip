@@ -1,13 +1,16 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Constraint, Event, Eventhdlr, HeurResult, Model,
-    ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPEventhdlr, SCIPPricer, SCIPSeparator,
-    Separator, Solution, Solving, Status, VarType, Variable,
+    ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
+    Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr,
+    SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
-use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP_NODE, SCIP_SOL};
+use scip_sys::{
+    SCIP_Cons, SCIP_Var, Scip, SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_LOCKTYPE, SCIP_NODE,
+    SCIP_RESULT, SCIP_RETCODE, SCIP_SOL,
+};
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
@@ -1108,6 +1111,176 @@ impl ScipPtr {
             Some(sepexecsol),
             sep_faker,
         ));
+
+        Ok(())
+    }
+
+    pub(crate) fn include_conshdlr(
+        &self,
+        name: &str,
+        desc: &str,
+        enfopriority: i32,
+        checkpriority: i32,
+        conshdlr: Box<dyn Conshdlr>,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn consenfolp(
+            scip: *mut SCIP,
+            conshdlr: *mut SCIP_CONSHDLR,
+            _conss: *mut *mut SCIP_CONS,
+            _nconss: std::os::raw::c_int,
+            _nusefulconss: std::os::raw::c_int,
+            _solinfeasible: std::os::raw::c_uint,
+            result: *mut SCIP_RESULT,
+        ) -> SCIP_RETCODE {
+            let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
+            assert!(!data_ptr.is_null());
+            let conshdlr_ptr = data_ptr as *mut Box<dyn Conshdlr>;
+
+            let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
+            let model = Model {
+                scip: scip_ptr.clone(),
+                state: Solving,
+            };
+
+            let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
+
+            unsafe {
+                *result = (*conshdlr_ptr).enforce(model, scip_conshdlr).into();
+            }
+
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn conscheck(
+            scip: *mut SCIP,
+            conshdlr: *mut SCIP_CONSHDLR,
+            _conss: *mut *mut SCIP_CONS,
+            _nconss: ::std::os::raw::c_int,
+            sol: *mut SCIP_SOL,
+            _checkintegrality: ::std::os::raw::c_uint,
+            _checklprows: ::std::os::raw::c_uint,
+            _printreason: ::std::os::raw::c_uint,
+            _completely: ::std::os::raw::c_uint,
+            result: *mut SCIP_RESULT,
+        ) -> SCIP_RETCODE {
+            let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
+            assert!(!data_ptr.is_null());
+            let conshdlr_ptr = data_ptr as *mut Box<dyn Conshdlr>;
+
+            let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
+            let model = Model {
+                scip: scip_ptr.clone(),
+                state: Solving,
+            };
+
+            let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
+
+            assert!(!sol.is_null());
+
+            let solution = Solution {
+                raw: sol,
+                scip_ptr: scip_ptr.clone(),
+            };
+
+            let feasible = unsafe { (*conshdlr_ptr).check(model, scip_conshdlr, &solution) };
+
+            unsafe {
+                *result = if feasible {
+                    ffi::SCIP_Result_SCIP_FEASIBLE
+                } else {
+                    ffi::SCIP_Result_SCIP_INFEASIBLE
+                };
+            }
+
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn conslock(
+            _scip: *mut SCIP,
+            _conshdlr: *mut SCIP_CONSHDLR,
+            _cons: *mut SCIP_CONS,
+            _locktype: SCIP_LOCKTYPE,
+            _nlockspos: ::std::os::raw::c_int,
+            _nlocksneg: ::std::os::raw::c_int,
+        ) -> SCIP_RETCODE {
+            // // loops over all the variables and runs the lock method on them
+            // let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
+            // assert!(!data_ptr.is_null());
+            // let conshdlr_ptr = data_ptr as *mut Box<dyn Conshdlr>;
+            //
+            // let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
+            // let model = Model {
+            //     scip: scip_ptr.clone(),
+            //     state: Solving,
+            // };
+            //
+            // let vars = model.vars();
+            // for var in vars {
+            //     let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
+            //
+            //     let model = Model {
+            //         scip: scip_ptr.clone(),
+            //         state: Solving,
+            //     };
+            //
+            //     let lock_type = unsafe { (*conshdlr_ptr).lock(model, scip_conshdlr, &var) };
+            //
+            //     unsafe {
+            //         match lock_type {
+            //             LockDirection::Both => {
+            //                 ffi::SCIPaddVarLocks(
+            //                     scip,
+            //                     var.raw,
+            //                     nlockspos + nlocksneg,
+            //                     nlockspos + nlocksneg,
+            //                 );
+            //             }
+            //             LockDirection::Decrease => {
+            //                 ffi::SCIPaddVarLocks(scip, var.raw, nlockspos, nlocksneg);
+            //             }
+            //             LockDirection::Increase => {
+            //                 ffi::SCIPaddVarLocks(scip, var.raw, nlocksneg, nlockspos);
+            //             }
+            //         }
+            //     }
+            // }
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn consfree(
+            _scip: *mut ffi::SCIP,
+            conshdlr: *mut ffi::SCIP_CONSHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Conshdlr>) });
+            Retcode::Okay.into()
+        }
+
+        let ptr = Box::into_raw(Box::new(conshdlr));
+        let cons_faker = ptr as *mut ffi::SCIP_CONSHDLRDATA;
+
+        let mut conshdlr: *mut SCIP_CONSHDLR = std::ptr::null_mut();
+        scip_call!(ffi::SCIPincludeConshdlrBasic(
+            self.raw,
+            &mut conshdlr,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            enfopriority,
+            checkpriority,
+            0,
+            false.into(),
+            Some(consenfolp),
+            None,
+            Some(conscheck),
+            Some(conslock),
+            cons_faker,
+        ));
+
+        scip_call!(ffi::SCIPsetConshdlrFree(self.raw, conshdlr, Some(consfree)));
 
         Ok(())
     }

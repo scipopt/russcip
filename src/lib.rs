@@ -88,6 +88,10 @@ pub mod row;
 /// Contains methods for creating scip objects in an ergonomic way.
 pub mod builder;
 
+/// Contains the `Conshdlr` trait used to define custom constraint handlers.
+pub mod conshdlr;
+pub use conshdlr::*;
+
 pub use row::*;
 
 /// A macro for calling a `SCIP` function and returning an error if the return code is not `SCIP_OKAY`.
