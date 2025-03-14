@@ -1,8 +1,5 @@
 use crate::builder::CanBeAddedToModel;
-use crate::{
-    Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem, ProblemCreated,
-    Solving, VarType, Variable,
-};
+use crate::{Model, ModelWithProblem, ProblemCreated, Solving, VarType, Variable};
 use std::ops::RangeBounds;
 
 /// A builder for variables. It can be easily created using the `var` function.

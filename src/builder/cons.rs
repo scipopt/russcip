@@ -1,7 +1,6 @@
 use crate::builder::CanBeAddedToModel;
 use crate::{
-    Constraint, Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem,
-    ProblemCreated, ProblemOrSolving, Solving, Variable,
+    Constraint, Model, ModelWithProblem, ProblemCreated, ProblemOrSolving, Solving, Variable,
 };
 
 /// A builder for creating constraints.
@@ -63,6 +62,12 @@ impl<'a> ConsBuilder<'a> {
         self
     }
 
+    /// Adds multiple coefficients to the constraint.
+    pub fn coefs(mut self, var_refs: Vec<&'a Variable>, vals: Vec<f64>) -> Self {
+        self.coefs
+            .extend(var_refs.into_iter().zip(vals));
+        self
+    }
     /// Adds multiple coefficients to the constraint.
     pub fn expr<I>(mut self, iter: I) -> Self
     where
