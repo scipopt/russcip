@@ -1264,7 +1264,7 @@ impl ScipPtr {
         let ptr = Box::into_raw(Box::new(conshdlr));
         let cons_faker = ptr as *mut ffi::SCIP_CONSHDLRDATA;
 
-        let mut conshdlr: *mut SCIP_CONSHDLR = std::ptr::null_mut()g
+        let mut conshdlr: *mut SCIP_CONSHDLR = std::ptr::null_mut();
         scip_call!(ffi::SCIPincludeConshdlrBasic(
             self.raw,
             &mut conshdlr,
