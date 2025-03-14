@@ -1,4 +1,4 @@
-use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving, Variable};
+use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving};
 use scip_sys::SCIP_ROW;
 
 /// A trait for implementing custom constraint handlers.

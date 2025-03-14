@@ -2,7 +2,7 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
-    LockDirection, Model, ModelWithProblem, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule,
+    Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule,
     SCIPConshdlr, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status,
     VarType, Variable,
 };
@@ -1264,58 +1264,27 @@ impl ScipPtr {
         let ptr = Box::into_raw(Box::new(conshdlr));
         let cons_faker = ptr as *mut ffi::SCIP_CONSHDLRDATA;
 
-        // uses default values from SCIPincludeConshdlrBasic
-        scip_call!(ffi::SCIPincludeConshdlr(
+        let mut conshdlr: *mut SCIP_CONSHDLR = std::ptr::null_mut()g
+        scip_call!(ffi::SCIPincludeConshdlrBasic(
             self.raw,
+            &mut conshdlr,
             c_name.as_ptr(),
             c_desc.as_ptr(),
-            0,
             enfopriority,
             checkpriority,
-            -1,
-            -1,
-            -1,
             0,
             false.into(),
-            false.into(),
-            false.into(),
-            ffi::SCIP_PROPTIMING_BEFORELP,
-            ffi::SCIP_PRESOLTIMING_ALWAYS,
-            None,
-            Some(consfree),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
             Some(consenfolp),
             None,
-            None,
             Some(conscheck),
-            None,
-            None,
-            None,
             Some(conslock),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
             cons_faker,
+        ));
+
+        scip_call!(ffi::SCIPsetConshdlrFree(
+            self.raw,
+            conshdlr,
+            Some(consfree)
         ));
 
         Ok(())
