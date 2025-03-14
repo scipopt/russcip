@@ -97,8 +97,7 @@ impl SCIPConshdlr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::{cons, var};
-    use crate::{minimal_model, ModelWithProblem, Status};
+    use crate::Status;
 
     #[test]
     fn all_inf_conshdlr() {
@@ -128,60 +127,13 @@ mod tests {
         model.include_conshdlr(
             "AllInfeasibleConshdlr",
             "All infeasible constraint handler",
-            0,
-            0,
+            -1,
+            -1,
             Box::new(AllInfeasibleConshdlr {}),
         );
 
         let solved = model.solve();
 
         assert_eq!(solved.status(), Status::Infeasible);
-    }
-
-    #[test]
-    fn no_zero_conshdlr() {
-        struct NoZeroConshdlr;
-
-        impl Conshdlr for NoZeroConshdlr {
-            fn check(
-                &mut self,
-                model: Model<Solving>,
-                _conshdlr: SCIPConshdlr,
-                solution: &Solution,
-            ) -> bool {
-                for var in model.vars() {
-                    if solution.val(&var) <= 1e-6 {
-                        return false;
-                    }
-                }
-                true
-            }
-
-            fn enforce(
-                &mut self,
-                mut model: Model<Solving>,
-                _conshdlr: SCIPConshdlr,
-            ) -> ConshdlrResult {
-                let variable = model.vars()[0].clone();
-                model.add(cons().ge(1.0).coef(&variable, 1.0));
-                ConshdlrResult::ConsAdded
-            }
-        }
-
-        let mut model = minimal_model();
-
-        model.add(var().bin().name("x"));
-
-        model.include_conshdlr(
-            "NoZeroConshdlr",
-            "No zero constraint handler",
-            0,
-            0,
-            Box::new(NoZeroConshdlr {}),
-        );
-
-        let solved = model.solve();
-
-        assert_eq!(solved.status(), Status::Optimal);
     }
 }

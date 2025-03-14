@@ -2,9 +2,8 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
-    Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule,
-    SCIPConshdlr, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status,
-    VarType, Variable,
+    Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr,
+    SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -1281,11 +1280,7 @@ impl ScipPtr {
             cons_faker,
         ));
 
-        scip_call!(ffi::SCIPsetConshdlrFree(
-            self.raw,
-            conshdlr,
-            Some(consfree)
-        ));
+        scip_call!(ffi::SCIPsetConshdlrFree(self.raw, conshdlr, Some(consfree)));
 
         Ok(())
     }
