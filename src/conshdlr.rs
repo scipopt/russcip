@@ -9,16 +9,6 @@ pub trait Conshdlr {
 
     /// Enforce the constraint for the current sub-problem's (LP) solution.
     fn enforce(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr) -> ConshdlrResult;
-
-    /// Prevents increasing/decreasing the values of variables in the handler's constraints.
-    fn lock(
-        &mut self,
-        _model: Model<Solving>,
-        _conshdlr: SCIPConshdlr,
-        _var: &Variable,
-    ) -> LockDirection {
-        LockDirection::Both
-    }
 }
 
 /// The result of enforcing a constraint handler.
@@ -117,7 +107,9 @@ impl SCIPConshdlr {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Status;
+    use crate::prelude::{cons, var};
+    use crate::{minimal_model, ModelWithProblem, Status};
+
     #[test]
     fn all_inf_conshdlr() {
         struct AllInfeasibleConshdlr;
@@ -154,5 +146,52 @@ mod tests {
         let solved = model.solve();
 
         assert_eq!(solved.status(), Status::Infeasible);
+    }
+
+    #[test]
+    fn no_zero_conshdlr() {
+        struct NoZeroConshdlr;
+
+        impl Conshdlr for NoZeroConshdlr {
+            fn check(
+                &mut self,
+                model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                solution: &Solution,
+            ) -> bool {
+                for var in model.vars() {
+                    if solution.val(&var) <= 1e-6 {
+                        return false;
+                    }
+                }
+                true
+            }
+
+            fn enforce(
+                &mut self,
+                mut model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
+                let variable = model.vars()[0].clone();
+                model.add(cons().ge(1.0).coef(&variable, 1.0));
+                ConshdlrResult::ConsAdded
+            }
+        }
+
+        let mut model = minimal_model();
+
+        model.add(var().bin().name("x"));
+
+        model.include_conshdlr(
+            "NoZeroConshdlr",
+            "No zero constraint handler",
+            0,
+            0,
+            Box::new(NoZeroConshdlr {}),
+        );
+
+        let solved = model.solve();
+
+        assert_eq!(solved.status(), Status::Optimal);
     }
 }

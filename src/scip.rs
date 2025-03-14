@@ -1131,9 +1131,9 @@ impl ScipPtr {
             scip: *mut SCIP,
             conshdlr: *mut SCIP_CONSHDLR,
             _conss: *mut *mut SCIP_CONS,
-            _nconss: ::std::os::raw::c_int,
-            _nusefulconss: ::std::os::raw::c_int,
-            _solinfeasible: ::std::os::raw::c_uint,
+            _nconss: std::os::raw::c_int,
+            _nusefulconss: std::os::raw::c_int,
+            _solinfeasible: std::os::raw::c_uint,
             result: *mut SCIP_RESULT,
         ) -> SCIP_RETCODE {
             let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
@@ -1200,54 +1200,54 @@ impl ScipPtr {
         }
 
         extern "C" fn conslock(
-            scip: *mut SCIP,
-            conshdlr: *mut SCIP_CONSHDLR,
+            _scip: *mut SCIP,
+            _conshdlr: *mut SCIP_CONSHDLR,
             _cons: *mut SCIP_CONS,
             _locktype: SCIP_LOCKTYPE,
-            nlockspos: ::std::os::raw::c_int,
-            nlocksneg: ::std::os::raw::c_int,
+            _nlockspos: ::std::os::raw::c_int,
+            _nlocksneg: ::std::os::raw::c_int,
         ) -> SCIP_RETCODE {
-            // loops over all the variables and runs the lock method on them
-            let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
-            assert!(!data_ptr.is_null());
-            let conshdlr_ptr = data_ptr as *mut Box<dyn Conshdlr>;
-
-            let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
-            let model = Model {
-                scip: scip_ptr.clone(),
-                state: Solving,
-            };
-
-            let vars = model.vars();
-            for var in vars {
-                let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
-
-                let model = Model {
-                    scip: scip_ptr.clone(),
-                    state: Solving,
-                };
-
-                let lock_type = unsafe { (*conshdlr_ptr).lock(model, scip_conshdlr, &var) };
-
-                unsafe {
-                    match lock_type {
-                        LockDirection::Both => {
-                            ffi::SCIPaddVarLocks(
-                                scip,
-                                var.raw,
-                                nlockspos + nlocksneg,
-                                nlockspos + nlocksneg,
-                            );
-                        }
-                        LockDirection::Decrease => {
-                            ffi::SCIPaddVarLocks(scip, var.raw, nlockspos, nlocksneg);
-                        }
-                        LockDirection::Increase => {
-                            ffi::SCIPaddVarLocks(scip, var.raw, nlocksneg, nlockspos);
-                        }
-                    }
-                }
-            }
+            // // loops over all the variables and runs the lock method on them
+            // let data_ptr = unsafe { ffi::SCIPconshdlrGetData(conshdlr) };
+            // assert!(!data_ptr.is_null());
+            // let conshdlr_ptr = data_ptr as *mut Box<dyn Conshdlr>;
+            //
+            // let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
+            // let model = Model {
+            //     scip: scip_ptr.clone(),
+            //     state: Solving,
+            // };
+            //
+            // let vars = model.vars();
+            // for var in vars {
+            //     let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
+            //
+            //     let model = Model {
+            //         scip: scip_ptr.clone(),
+            //         state: Solving,
+            //     };
+            //
+            //     let lock_type = unsafe { (*conshdlr_ptr).lock(model, scip_conshdlr, &var) };
+            //
+            //     unsafe {
+            //         match lock_type {
+            //             LockDirection::Both => {
+            //                 ffi::SCIPaddVarLocks(
+            //                     scip,
+            //                     var.raw,
+            //                     nlockspos + nlocksneg,
+            //                     nlockspos + nlocksneg,
+            //                 );
+            //             }
+            //             LockDirection::Decrease => {
+            //                 ffi::SCIPaddVarLocks(scip, var.raw, nlockspos, nlocksneg);
+            //             }
+            //             LockDirection::Increase => {
+            //                 ffi::SCIPaddVarLocks(scip, var.raw, nlocksneg, nlockspos);
+            //             }
+            //         }
+            //     }
+            // }
             Retcode::Okay.into()
         }
 
