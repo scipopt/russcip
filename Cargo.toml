@@ -17,6 +17,7 @@ scip-sys = "0.1.20"
 
 [dev-dependencies]
 rayon = "1.5.1"
+petgraph = "0.7.1"
 
 [lints.clippy]
 too_many_arguments = "allow"
