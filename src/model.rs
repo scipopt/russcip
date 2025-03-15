@@ -515,6 +515,17 @@ impl Model<Solving> {
             .add_row(cut, force_cut)
             .expect("Failed to add row in state ProblemCreated")
     }
+
+    /// Returns the value of a variable in the current LP/pseudo solution.
+    ///
+    /// #Arguments
+    /// * `var` - Variable to obtain value for.
+    ///
+    /// #Returns
+    /// Value of the variable.
+    pub fn current_val(&self, var: &Variable) -> f64 {
+        return unsafe { ffi::SCIPgetSolVal(self.scip_ptr(), std::ptr::null_mut(), var.inner()) };
+    }
 }
 
 impl Model<Solved> {

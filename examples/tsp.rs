@@ -1,11 +1,8 @@
 use petgraph::algo::connected_components;
 use petgraph::prelude::*;
 use russcip::prelude::*;
-use russcip::{
-    ffi, minimal_model, Conshdlr, ConshdlrResult, SCIPConshdlr, Solution, Solving, Variable,
-};
+use russcip::{minimal_model, Conshdlr, ConshdlrResult, SCIPConshdlr, Solution, Solving, Variable};
 use std::collections::HashMap;
-use std::ptr::null_mut;
 
 /// Find all "subtours" in an undirected graph.
 /// A "subtour" here is defined as a connected component with fewer nodes
@@ -73,10 +70,7 @@ impl Conshdlr for SubtourConshdlr {
         let edges_in_lp_sol = self
             .vars
             .iter()
-            .filter(|v| {
-                let val = unsafe { ffi::SCIPgetSolVal(model.scip_ptr(), null_mut(), v.1.inner()) };
-                val > 0.5
-            })
+            .filter(|v| model.current_val(v.1) > 0.5)
             .collect::<Vec<_>>();
 
         let sol_graph = UnGraph::from_edges(
