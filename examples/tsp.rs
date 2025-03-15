@@ -1,9 +1,11 @@
+use petgraph::algo::connected_components;
 use petgraph::prelude::*;
 use russcip::prelude::*;
+use russcip::{
+    ffi, minimal_model, Conshdlr, ConshdlrResult, SCIPConshdlr, Solution, Solving, Variable,
+};
 use std::collections::HashMap;
 use std::ptr::null_mut;
-use petgraph::algo::connected_components;
-use russcip::{ffi, minimal_model, Conshdlr, ConshdlrResult, SCIPConshdlr, Solution, Solving, Variable};
 
 /// Find all "subtours" in an undirected graph.
 /// A "subtour" here is defined as a connected component with fewer nodes
@@ -50,11 +52,17 @@ struct SubtourConshdlr {
 }
 
 impl Conshdlr for SubtourConshdlr {
-    fn check(&mut self, _model: Model<Solving>, _conshdlr: SCIPConshdlr, solution: &Solution) -> bool {
+    fn check(
+        &mut self,
+        _model: Model<Solving>,
+        _conshdlr: SCIPConshdlr,
+        solution: &Solution,
+    ) -> bool {
         let sol_graph = UnGraph::from_edges(
-            self.vars.iter().filter(|(_, var)| solution.val(var) > 0.5).map(|(edge, _)| {
-                self.graph.edge_endpoints(*edge).unwrap()
-            }),
+            self.vars
+                .iter()
+                .filter(|(_, var)| solution.val(var) > 0.5)
+                .map(|(edge, _)| self.graph.edge_endpoints(*edge).unwrap()),
         );
 
         let subtours = find_subtours(&sol_graph);
@@ -62,18 +70,19 @@ impl Conshdlr for SubtourConshdlr {
     }
 
     fn enforce(&mut self, mut model: Model<Solving>, _conshdlr: SCIPConshdlr) -> ConshdlrResult {
-        let edges_in_lp_sol = self.vars.iter().filter(
-            |v| {
-                let val = unsafe { ffi::SCIPgetSolVal(model.scip_ptr(), null_mut(), v.1.inner())
-                };
+        let edges_in_lp_sol = self
+            .vars
+            .iter()
+            .filter(|v| {
+                let val = unsafe { ffi::SCIPgetSolVal(model.scip_ptr(), null_mut(), v.1.inner()) };
                 val > 0.5
-            }
-        ).collect::<Vec<_>>();
+            })
+            .collect::<Vec<_>>();
 
         let sol_graph = UnGraph::from_edges(
-            edges_in_lp_sol.iter().map(|(edge, _)| {
-                self.graph.edge_endpoints(**edge).unwrap()
-            }),
+            edges_in_lp_sol
+                .iter()
+                .map(|(edge, _)| self.graph.edge_endpoints(**edge).unwrap()),
         );
 
         let subtours = find_subtours(&sol_graph);
@@ -104,7 +113,6 @@ impl Conshdlr for SubtourConshdlr {
     }
 }
 
-
 /// Solve the TSP problem and return the edges in the solution.
 fn solve_tsp(graph: UnGraph<(), ()>) -> Vec<(usize, usize)> {
     let mut model = minimal_model();
@@ -129,9 +137,17 @@ fn solve_tsp(graph: UnGraph<(), ()>) -> Vec<(usize, usize)> {
         model.add(c);
     }
 
-
-    let conshdlr = SubtourConshdlr { vars: vars.clone(), graph: graph.clone() };
-    model.include_conshdlr("TSPConshdlr", "TSP constraint handler", -1, -1, Box::new(conshdlr));
+    let conshdlr = SubtourConshdlr {
+        vars: vars.clone(),
+        graph: graph.clone(),
+    };
+    model.include_conshdlr(
+        "TSPConshdlr",
+        "TSP constraint handler",
+        -1,
+        -1,
+        Box::new(conshdlr),
+    );
 
     let solved = model.solve();
     assert_eq!(solved.status(), Status::Optimal);
