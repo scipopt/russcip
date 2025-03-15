@@ -178,5 +178,15 @@ fn main() {
 
     let edges = solve_tsp(g);
     let sol_graph: Graph<usize, (), Undirected, usize> = Graph::from_edges(edges);
-    assert_eq!(connected_components(&sol_graph), 1)
+    assert_eq!(connected_components(&sol_graph), 1);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tsp() {
+        main();
+    }
 }

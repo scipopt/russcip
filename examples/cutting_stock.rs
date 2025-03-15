@@ -85,7 +85,9 @@ fn main() {
         })
         .collect();
 
-    let mut main_problem = Model::default().minimize();
+    let mut main_problem = Model::default()
+        .set_presolving(ParamSetting::Off)
+        .minimize();
 
     let cutting_pattern_vars: Vec<Variable> = initial_cutting_patterns
         .iter()
@@ -127,6 +129,8 @@ fn main() {
             println!("  {name}={value}")
         }
     }
+
+    assert_eq!(solution.obj_val().round() as usize, 13);
 }
 
 struct CSPPricer<'a> {
@@ -236,5 +240,15 @@ impl Pricer for CSPPricer<'_> {
                 lower_bound: None,
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_cutting_stock() {
+        main();
     }
 }

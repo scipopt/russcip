@@ -80,3 +80,17 @@ fn main() {
             .collect::<Vec<_>>()
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_knapsack() {
+        let knapsack = Knapsack::new(vec![2, 3, 4, 5], vec![3, 4, 5, 6], 6);
+        let solution = knapsack.solve();
+
+        assert_eq!(solution.items, vec![0, 2]);
+        assert_eq!(solution.value.round(), 8.0);
+    }
+}
