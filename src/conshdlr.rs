@@ -2,12 +2,28 @@ use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving};
 use scip_sys::SCIP_ROW;
 
 /// A trait for implementing custom constraint handlers.
+///
+/// # Example
+/// An example of using a custom constraint handler to enforce subtour elimination constraints in a TSP can be found
+/// [here](https://github.com/scipopt/russcip/blob/main/examples/README.md).
 pub trait Conshdlr {
     /// Check if the (primal) solution satisfies the constraint.
+    ///
+    /// # Arguments
+    /// * `model` - The current model in solving state.
+    /// * `conshdlr` - The internal SCIP constraint handler.
+    /// * `solution` - The solution to be checked.
     fn check(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr, solution: &Solution)
         -> bool;
 
     /// Enforce the constraint for the current sub-problem's (LP) solution.
+    ///
+    /// # Arguments
+    /// * `model` - The current model in solving state.
+    /// * `conshdlr` - The internal SCIP constraint handler.
+    ///
+    /// # Returns
+    /// * `ConshdlrResult` - The result of enforcing the constraint.
     fn enforce(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr) -> ConshdlrResult;
 }
 
