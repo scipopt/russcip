@@ -14,6 +14,8 @@ on:
       - main
       - development
   workflow_dispatch:
+  release:
+    types: [ published ]
 
 jobs:
   test-with-coverage:
@@ -143,7 +145,7 @@ jobs:
       - cargo-clippy
       - semver-check
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch' }}
+    if: ${{ (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || github.event_name == 'workflow_dispatch' || github.event_name == 'release' }}
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
