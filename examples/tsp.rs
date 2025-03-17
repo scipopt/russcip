@@ -479,7 +479,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tsp_a280() {
+    fn test_tsp() {
         main();
     }
 }
