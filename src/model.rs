@@ -524,7 +524,7 @@ impl Model<Solving> {
     /// #Returns
     /// Value of the variable.
     pub fn current_val(&self, var: &Variable) -> f64 {
-        return unsafe { ffi::SCIPgetSolVal(self.scip_ptr(), std::ptr::null_mut(), var.inner()) };
+        unsafe { ffi::SCIPgetSolVal(self.scip_ptr(), std::ptr::null_mut(), var.inner()) }
     }
 }
 
