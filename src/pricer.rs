@@ -28,6 +28,8 @@ pub enum PricerResultState {
     NoColumns,
     /// The pricer wants to perform early branching.
     StopEarly,
+    /// The pricer wants the lp to be solved again.
+    ResolveLp,
 }
 
 /// A struct representing the result of a pricer.
@@ -46,6 +48,7 @@ impl From<PricerResultState> for SCIP_Result {
             PricerResultState::FoundColumns
             | PricerResultState::StopEarly
             | PricerResultState::NoColumns => ffi::SCIP_Result_SCIP_SUCCESS,
+            PricerResultState::ResolveLp => ffi::SCIP_Result_SCIP_SOLVELP,
         }
     }
 }
