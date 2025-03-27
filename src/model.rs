@@ -862,6 +862,26 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Constraint;
+
+    /// Adds the given constraint to the model at the given node and its children.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons`      - The constraint to add.
+    /// * `validnode` - The node at which the constraint is valid.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_local(
+        &mut self,
+        cons: Constraint,
+        validnode: Node,
+    ) -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1182,6 +1202,34 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             scip: self.scip.clone(),
         }
     }
+
+    /// Adds the given constraint to the model at the given node and its children.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons`      - The constraint to add.
+    /// * `validnode` - The node at which the constraint is valid.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_local(
+        &mut self,
+        cons: Constraint,
+        validnode: Node,
+    ) -> Constraint {
+        let result = self
+            .scip
+            .add_cons_local(&cons, &validnode)
+            .expect("Failed to create constraint in state ProblemCreated");
+        
+        cons
+    }
+    
 }
 
 /// A trait for optimization models with any state that might have solutions.

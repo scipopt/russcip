@@ -1,4 +1,5 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
+use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
@@ -544,6 +545,7 @@ impl ScipPtr {
             Some(var)
         }
     }
+
     pub(crate) fn create_cons_indicator(
         &self,
         bin_var: &Variable,
@@ -573,6 +575,18 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(scip_cons)
     }
+
+    pub(crate) fn add_cons_local(
+        &self,
+        cons: &Constraint,
+        validnode: &Node,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let cons_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPaddConsLocal(self.raw, cons.raw, validnode.raw) };        
+        let cons_ptr = unsafe { cons_ptr.assume_init() };
+        Ok(cons_ptr)
+    }
+
 
     /// Create solution
     pub(crate) fn create_sol(&self, original: bool) -> Result<*mut SCIP_SOL, Retcode> {
