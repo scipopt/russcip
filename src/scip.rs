@@ -354,6 +354,7 @@ impl ScipPtr {
 
     pub(crate) fn create_cons(
         &self,
+        node: Option<Node>,
         vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,
@@ -380,16 +381,23 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
         if local {
-            if validnode.is_none() {
-                scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
-            } else {
-                scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, validnode.unwrap().raw) };
+            if node.is_none() { // adding to current node
+                if validnode.is_none() {
+                    scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
+                } else {
+                    scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, validnode.unwrap().raw) };
+                }
+            } else { // adding to given node
+                if validnode.is_none() {
+                    scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
+                } else {
+                    scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, validnode.unwrap().raw) };
+                }
             }
         } else {
             scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         }
 
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         let stage = unsafe { ffi::SCIPgetStage(self.raw) };
         if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
             scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
@@ -588,45 +596,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(scip_cons)
     }
-
-    /// Create local constraint at given node
-    pub(crate) fn create_cons_node(
-        &self,
-        node: Node,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Node,
-    ) -> Result<*mut SCIP_Cons, Retcode> {
-        assert_eq!(vars.len(), coefs.len());
-        let c_name = CString::new(name).unwrap();
-        let mut scip_cons = MaybeUninit::uninit();
-        let scip_node = node.raw;
-        let scip_validnode = validnode.raw;
-        scip_call! { ffi::SCIPcreateConsBasicLinear(
-            self.raw,
-            scip_cons.as_mut_ptr(),
-            c_name.as_ptr(),
-            0,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-            lhs,
-            rhs,
-        ) };
-        let mut scip_cons = unsafe { scip_cons.assume_init() };
-        for (i, var) in vars.iter().enumerate() {
-            scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
-        }
-        scip_call! { ffi::SCIPaddConsNode(self.raw, scip_node, scip_cons, scip_validnode) };
-        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
-        if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
-            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
-        }
-        Ok(scip_cons)
-    }
-
 
     /// Create solution
     pub(crate) fn create_sol(&self, original: bool) -> Result<*mut SCIP_SOL, Retcode> {

@@ -1081,7 +1081,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
-            .create_cons(vars, coefs, lhs, rhs, name, false, None)
+            .create_cons(None, vars, coefs, lhs, rhs, name, false, None)
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
@@ -1267,7 +1267,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
-            .create_cons_local(vars, coefs, lhs, rhs, name, validnode)
+            .create_cons(None, vars, coefs, lhs, rhs, name, true, Some(validnode))
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
@@ -1303,7 +1303,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
-            .create_cons_node(node, vars, coefs, lhs, rhs, name, validnode)
+            .create_cons(Some(node), vars, coefs, lhs, rhs, name, true, Some(validnode))
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
