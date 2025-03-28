@@ -1,4 +1,4 @@
-pub use crate::builder::cons::ConsBuilder;
+use crate::builder::cons::ConsBuilder;
 use crate::builder::CanBeAddedToModel;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;

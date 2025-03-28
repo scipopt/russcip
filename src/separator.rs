@@ -292,14 +292,13 @@ mod tests {
             }
             model.add_cut(row, true);
 
-            let cur_node = model.focus_node(); // need to start actually solving the problem
             model.add_cons_local(
                 cons().
                 ge(7.0).
                 coef(&(vars[0]), 2.).
                 coef(&(vars[1]), 1.)
             );
-            
+
             SeparationResult::Separated
         }
     }

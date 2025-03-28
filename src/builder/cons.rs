@@ -6,10 +6,14 @@ use crate::{
 /// A builder for creating constraints.
 #[derive(Debug)]
 pub struct ConsBuilder<'a> {
-    lhs: f64,
-    rhs: f64,
-    name: Option<&'a str>,
-    coefs: Vec<(&'a Variable, f64)>,
+    /// Left-hand side of constraint
+    pub lhs: f64,
+    /// Right-hand side of constraint
+    pub rhs: f64, 
+    /// (Optional) name of constraint
+    pub name: Option<&'a str>,
+    /// Coefficients of constraint
+    pub coefs: Vec<(&'a Variable, f64)>,
 }
 
 /// Creates a new default `ConsBuilder`.
