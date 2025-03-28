@@ -220,7 +220,12 @@ mod tests {
             _branchrule: SCIPBranchRule,
             _candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
-            model.create_child();
+            let child1 = model.create_child();
+            let child2 = model.create_child();
+
+            let vars = model.vars();
+            model.add_cons_node(child1, vec![&vars[0], &vars[1]], &[1., -1.], 0., 0., "eq", None);
+            model.add_cons_node(child2, vec![&vars[0], &vars[1]], &[1., 1.], 0., 1., "diff", None);
             BranchingResult::CustomBranching
         }
     }
@@ -237,6 +242,8 @@ mod tests {
 
         let br = CustomBranchingRule;
         model.add(branchrule(br));
+        model.add_var(0., 1., 1., "x", crate::variable::VarType::Binary);
+        model.add_var(0., 1., 1., "y", crate::variable::VarType::Binary);
         let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);

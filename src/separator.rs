@@ -286,10 +286,14 @@ mod tests {
             let mut row = sepa
                 .create_empty_row(&model, "test", 5.0, 5.0, true, false, false)
                 .unwrap();
-            for var in model.vars() {
+            let vars = model.vars();
+            for var in vars.clone() {
                 row.set_coeff(&var, 1.0);
             }
             model.add_cut(row, true);
+
+            let cur_node = model.focus_node(); // need to start actually solving the problem
+            model.add_cons_local(vec![&(vars[0]), &vars[1]], &[2., 1.], 7., f64::INFINITY, "c", Some(cur_node));
 
             SeparationResult::Separated
         }

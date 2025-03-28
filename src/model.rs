@@ -486,6 +486,77 @@ impl Model<Solving> {
         }
     }
 
+    /// Locally adds a constraint to the current node and its subnodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons`      - The constraint to add.
+    /// * `validnode` - The node with the lowest depth for which the constraint is valid.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_local(
+        &mut self,
+        vars: Vec<&Variable>,
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+        validnode: Option<Node>,
+    ) -> Constraint {
+        assert_eq!(vars.len(), coefs.len());
+        let cons = self
+            .scip
+            .create_cons(None, vars, coefs, lhs, rhs, name, true, validnode)
+            .expect("Failed to create constraint in state ProblemCreated");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
+    /// Locally adds a constraint to a given node and its children.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons`      - The constraint to add.
+    /// * `validnode` - The node at which the constraint is valid.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_node(
+        &mut self,
+        node: Node,
+        vars: Vec<&Variable>,
+        coefs: &[f64],
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+        validnode: Option<Node>,
+    ) -> Constraint {
+        assert_eq!(vars.len(), coefs.len());
+        let cons = self
+            .scip
+            .create_cons(Some(node), vars, coefs, lhs, rhs, name, true, validnode)
+            .expect("Failed to create constraint in state ProblemCreated");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
     /// Gets the variable in current problem given its index (in the problem).
     ///
     /// # Arguments
@@ -862,64 +933,6 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Constraint;
-
-    /// Locally adds a constraint to the current node and its subnodes.
-    ///
-    /// # Arguments
-    ///
-    /// * `vars` - The variables in the constraint.
-    /// * `coefs` - The coefficients of the variables in the constraint.
-    /// * `lhs` - The left-hand side of the constraint.
-    /// * `rhs` - The right-hand side of the constraint.
-    /// * `name` - The name of the constraint.
-    /// * `validnode` - The node at which the constraint is valid.
-    /// 
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    fn add_cons_local(
-        &mut self,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Node,
-    ) -> Constraint;
-
-    /// Locally adds a constraint to a given node and its children.
-    ///
-    /// # Arguments
-    ///
-    /// * `node` - The node to which the constraint will be added.
-    /// * `vars` - The variables in the constraint.
-    /// * `coefs` - The coefficients of the variables in the constraint.
-    /// * `lhs` - The left-hand side of the constraint.
-    /// * `rhs` - The right-hand side of the constraint.
-    /// * `name` - The name of the constraint.
-    /// * `validnode` - The node at which the constraint is valid.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    fn add_cons_node(
-        &mut self,
-        node: Node,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Node,
-    ) -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1233,77 +1246,6 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         let cons = self
             .scip
             .create_cons_indicator(bin_var, vars, coefs, rhs, name)
-            .expect("Failed to create constraint in state ProblemCreated");
-
-        Constraint {
-            raw: cons,
-            scip: self.scip.clone(),
-        }
-    }
-
-    /// Locally adds a constraint to the current node and its subnodes.
-    ///
-    /// # Arguments
-    ///
-    /// * `cons`      - The constraint to add.
-    /// * `validnode` - The node with the lowest depth for which the constraint is valid.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    fn add_cons_local(
-        &mut self,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Node,
-    ) -> Constraint {
-        assert_eq!(vars.len(), coefs.len());
-        let cons = self
-            .scip
-            .create_cons(None, vars, coefs, lhs, rhs, name, true, Some(validnode))
-            .expect("Failed to create constraint in state ProblemCreated");
-
-        Constraint {
-            raw: cons,
-            scip: self.scip.clone(),
-        }
-    }
-
-    /// Locally adds a constraint to a given node and its children.
-    ///
-    /// # Arguments
-    ///
-    /// * `cons`      - The constraint to add.
-    /// * `validnode` - The node at which the constraint is valid.
-    ///
-    /// # Returns
-    ///
-    /// A reference-counted pointer to the new constraint.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if the constraint cannot be created in the current state.
-    fn add_cons_node(
-        &mut self,
-        node: Node,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Node,
-    ) -> Constraint {
-        assert_eq!(vars.len(), coefs.len());
-        let cons = self
-            .scip
-            .create_cons(Some(node), vars, coefs, lhs, rhs, name, true, Some(validnode))
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
@@ -1999,25 +1941,6 @@ mod tests {
         assert_eq!(solution.val(&x1), 9.);
         assert_eq!(solution.val(&x2), 10.);
         assert_eq!(solution.val(&b), 1.);
-    }
-
-    #[test]
-    fn add_cons_local() {
-        let mut model = Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .create_prob("test")
-            .minimize();
-
-        let x1 = model.add_var(0., 3., 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., 3., 4., "x2", VarType::Integer);
-        let cur_node = model.focus_node(); // need to start actually solving the problem
-        let cons1 = model.add_cons_local(vec![&x1, &x2], &[2., 1.], 7., f64::INFINITY, "c", cur_node);
-
-        let solved_model = model.solve();
-        let status = solved_model.status();
-        assert_eq!(status, Status::Optimal);
-        assert_eq!(solved_model.obj_val(), 10.);
     }
 
     #[test]
