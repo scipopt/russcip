@@ -361,7 +361,6 @@ impl ScipPtr {
         rhs: f64,
         name: &str,
         local: bool,
-        validnode: Option<Node>,
     ) -> Result<*mut SCIP_Cons, Retcode> {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
@@ -382,18 +381,10 @@ impl ScipPtr {
         }
         if local {
             if node.is_none() { // adding to current node
-                if validnode.is_none() {
-                    scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
-                } else {
-                    scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, validnode.unwrap().raw) };
-                }
+                scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
             } else { // adding to given node
-                if validnode.is_none() {
-                    scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
-                } else {
-                    scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, validnode.unwrap().raw) };
-                }
-            }
+                scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
+            }  
         } else {
             scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         }

@@ -1,3 +1,4 @@
+pub use crate::builder::cons::ConsBuilder;
 use crate::builder::CanBeAddedToModel;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -502,19 +503,23 @@ impl Model<Solving> {
     /// This method panics if the constraint cannot be created in the current state.
     pub fn add_cons_local(
         &mut self,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Option<Node>,
+        cons_builder: ConsBuilder,
     ) -> Constraint {
-        assert_eq!(vars.len(), coefs.len());
+        let vars: Vec<&Variable> = cons_builder.coefs.iter().map(|(var, _)| *var).collect();
+        let coefs: Vec<f64> = cons_builder.coefs.iter().map(|(_, coef)| *coef).collect();
+    
         let cons = self
             .scip
-            .create_cons(None, vars, coefs, lhs, rhs, name, true, validnode)
+            .create_cons(
+                None,
+                vars,
+                &coefs,
+                cons_builder.lhs,
+                cons_builder.rhs,
+                cons_builder.name.unwrap_or(""),
+                true,
+            )
             .expect("Failed to create constraint in state ProblemCreated");
-
         Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -538,19 +543,24 @@ impl Model<Solving> {
     pub fn add_cons_node(
         &mut self,
         node: Node,
-        vars: Vec<&Variable>,
-        coefs: &[f64],
-        lhs: f64,
-        rhs: f64,
-        name: &str,
-        validnode: Option<Node>,
+        cons_builder: ConsBuilder,
     ) -> Constraint {
-        assert_eq!(vars.len(), coefs.len());
+        let vars: Vec<&Variable> = cons_builder.coefs.iter().map(|(var, _)| *var).collect();
+        let coefs: Vec<f64> = cons_builder.coefs.iter().map(|(_, coef)| *coef).collect();
+    
         let cons = self
             .scip
-            .create_cons(Some(node), vars, coefs, lhs, rhs, name, true, validnode)
+            .create_cons(
+                Some(node),
+                vars,
+                &coefs,
+                cons_builder.lhs,
+                cons_builder.rhs,
+                cons_builder.name.unwrap_or(""),
+                true,
+            )
             .expect("Failed to create constraint in state ProblemCreated");
-
+    
         Constraint {
             raw: cons,
             scip: self.scip.clone(),
@@ -1094,7 +1104,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
-            .create_cons(None, vars, coefs, lhs, rhs, name, false, None)
+            .create_cons(None, vars, coefs, lhs, rhs, name, false)
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
