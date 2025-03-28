@@ -2002,6 +2002,25 @@ mod tests {
     }
 
     #[test]
+    fn add_cons_local() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .minimize();
+
+        let x1 = model.add_var(0., 3., 3., "x1", VarType::Integer);
+        let x2 = model.add_var(0., 3., 4., "x2", VarType::Integer);
+        let cur_node = model.focus_node(); // need to start actually solving the problem
+        let cons1 = model.add_cons_local(vec![&x1, &x2], &[2., 1.], 7., f64::INFINITY, "c", cur_node);
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+        assert_eq!(solved_model.obj_val(), 10.);
+    }
+
+    #[test]
     fn create_sol() {
         let mut model = Model::new()
             .hide_output()
