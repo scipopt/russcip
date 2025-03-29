@@ -380,11 +380,13 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
         if local {
-            if node.is_none() { // adding to current node
+            if node.is_none() {
+                // adding to current node
                 scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
-            } else { // adding to given node
+            } else {
+                // adding to given node
                 scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
-            }  
+            }
         } else {
             scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         }

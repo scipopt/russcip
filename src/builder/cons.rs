@@ -9,7 +9,7 @@ pub struct ConsBuilder<'a> {
     /// Left-hand side of constraint
     pub lhs: f64,
     /// Right-hand side of constraint
-    pub rhs: f64, 
+    pub rhs: f64,
     /// (Optional) name of constraint
     pub name: Option<&'a str>,
     /// Coefficients of constraint

@@ -226,19 +226,10 @@ mod tests {
             let vars = model.vars();
             model.add_cons_node(
                 child1,
-                cons().
-                eq(0.0).
-                coef(&vars[0], 1.).
-                coef(&vars[1], -1.)
+                cons().eq(0.0).coef(&vars[0], 1.).coef(&vars[1], -1.),
             );
 
-            model.add_cons_node(
-                child2,
-                cons().
-                eq(1.0).
-                coef(&vars[0], 1.).
-                coef(&vars[1], 1.)
-            );
+            model.add_cons_node(child2, cons().eq(1.0).coef(&vars[0], 1.).coef(&vars[1], 1.));
 
             // model.add_cons_node(child1, vec![&vars[0], &vars[1]], &[1., -1.], 0., 0., "eq");
             // model.add_cons_node(child2, vec![&vars[0], &vars[1]], &[1., 1.], 0., 1., "diff");
