@@ -354,7 +354,7 @@ impl ScipPtr {
 
     pub(crate) fn create_cons(
         &self,
-        node: Option<Node>,
+        node: Option<&Node>,
         vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,

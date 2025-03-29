@@ -501,7 +501,7 @@ impl Model<Solving> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
-    pub fn add_cons_local(&mut self, cons_builder: ConsBuilder) -> Constraint {
+    pub fn add_cons_local(&mut self, cons_builder: &ConsBuilder) -> Constraint {
         let vars: Vec<&Variable> = cons_builder.coefs.iter().map(|(var, _)| *var).collect();
         let coefs: Vec<f64> = cons_builder.coefs.iter().map(|(_, coef)| *coef).collect();
 
@@ -537,7 +537,7 @@ impl Model<Solving> {
     /// # Panics
     ///
     /// This method panics if the constraint cannot be created in the current state.
-    pub fn add_cons_node(&mut self, node: Node, cons_builder: ConsBuilder) -> Constraint {
+    pub fn add_cons_node(&mut self, node: &Node, cons_builder: &ConsBuilder) -> Constraint {
         let vars: Vec<&Variable> = cons_builder.coefs.iter().map(|(var, _)| *var).collect();
         let coefs: Vec<f64> = cons_builder.coefs.iter().map(|(_, coef)| *coef).collect();
 
