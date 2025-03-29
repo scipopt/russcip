@@ -114,7 +114,7 @@ impl SCIPBranchRule {
 mod tests {
     use super::*;
     use crate::model::ModelWithProblem;
-    use crate::prelude::branchrule;
+    use crate::prelude::{branchrule, cons};
     use crate::{model::Model, status::Status, Solving};
 
     struct FirstChoosingBranchingRule {
@@ -220,7 +220,22 @@ mod tests {
             _branchrule: SCIPBranchRule,
             _candidates: Vec<BranchingCandidate>,
         ) -> BranchingResult {
-            model.create_child();
+            let child1 = model.create_child();
+            let child2 = model.create_child();
+
+            let vars = model.vars();
+            model.add_cons_node(
+                &child1,
+                &cons().eq(0.0).coef(&vars[0], 1.).coef(&vars[1], -1.),
+            );
+
+            model.add_cons_node(
+                &child2,
+                &cons().eq(1.0).coef(&vars[0], 1.).coef(&vars[1], 1.),
+            );
+
+            // model.add_cons_node(child1, vec![&vars[0], &vars[1]], &[1., -1.], 0., 0., "eq");
+            // model.add_cons_node(child2, vec![&vars[0], &vars[1]], &[1., 1.], 0., 1., "diff");
             BranchingResult::CustomBranching
         }
     }
@@ -237,6 +252,8 @@ mod tests {
 
         let br = CustomBranchingRule;
         model.add(branchrule(br));
+        model.add_var(0., 1., 1., "x", crate::variable::VarType::Binary);
+        model.add_var(0., 1., 1., "y", crate::variable::VarType::Binary);
         let solved = model.solve();
 
         assert!(solved.n_nodes() > 1);
