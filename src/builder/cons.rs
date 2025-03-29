@@ -7,13 +7,13 @@ use crate::{
 #[derive(Debug)]
 pub struct ConsBuilder<'a> {
     /// Left-hand side of constraint
-    pub lhs: f64,
+    pub(crate) lhs: f64,
     /// Right-hand side of constraint
-    pub rhs: f64,
+    pub(crate) rhs: f64,
     /// (Optional) name of constraint
-    pub name: Option<&'a str>,
+    pub(crate) name: Option<&'a str>,
     /// Coefficients of constraint
-    pub coefs: Vec<(&'a Variable, f64)>,
+    pub(crate) coefs: Vec<(&'a Variable, f64)>,
 }
 
 /// Creates a new default `ConsBuilder`.
