@@ -549,6 +549,14 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
+    /// Get number of constraints added in node
+    pub(crate) fn node_get_n_added_conss(
+        &self,
+        node: &Node,
+    ) -> usize {
+        unsafe { ffi::SCIPnodeGetNAddedConss(node.raw) as usize }
+    }
+
     pub(crate) unsafe fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
         let n_vars = ffi::SCIPgetNVars(scip) as usize;
         let var = *ffi::SCIPgetVars(scip).add(var_prob_id);

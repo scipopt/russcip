@@ -234,6 +234,8 @@ mod tests {
                 &cons().eq(1.0).coef(&vars[0], 1.).coef(&vars[1], 1.),
             );
 
+            assert_eq!(model.node_get_n_added_conss(&child1), 1);
+            assert_eq!(model.node_get_n_added_conss(&child2), 1);
             // model.add_cons_node(child1, vec![&vars[0], &vars[1]], &[1., -1.], 0., 0., "eq");
             // model.add_cons_node(child2, vec![&vars[0], &vars[1]], &[1., 1.], 0., 1., "diff");
             BranchingResult::CustomBranching

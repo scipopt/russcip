@@ -551,6 +551,19 @@ impl Model<Solving> {
         }
     }
 
+    /// Returns the number of added constraints to the given nodes
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node to which the constraints were added.
+    ///
+    /// # Returns
+    ///
+    /// The number of added constraints.
+    pub fn node_get_n_added_conss(&mut self, node: &Node) -> usize {
+        self.scip.node_get_n_added_conss(node)
+    }
+
     /// Gets the variable in current problem given its index (in the problem).
     ///
     /// # Arguments

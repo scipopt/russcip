@@ -147,6 +147,8 @@ impl SCIPSeparator {
 
 #[cfg(test)]
 mod tests {
+    use std::ptr::eq;
+
     use super::*;
     use crate::prelude::{cons, sepa, var};
     use crate::{
@@ -292,7 +294,9 @@ mod tests {
             }
             model.add_cut(row, true);
 
+            assert_eq!(model.node_get_n_added_conss(&model.focus_node()), 0);
             model.add_cons_local(&cons().ge(7.0).coef(&(vars[0]), 2.).coef(&(vars[1]), 1.));
+            assert_eq!(model.node_get_n_added_conss(&model.focus_node()), 1);
 
             SeparationResult::Separated
         }
