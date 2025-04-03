@@ -286,10 +286,14 @@ mod tests {
             let mut row = sepa
                 .create_empty_row(&model, "test", 5.0, 5.0, true, false, false)
                 .unwrap();
-            for var in model.vars() {
+            let vars = model.vars();
+            for var in vars.clone() {
                 row.set_coeff(&var, 1.0);
             }
             model.add_cut(row, true);
+            let n_conss_before = model.n_conss();
+            model.add_cons_local(&cons().ge(7.0).coef(&(vars[0]), 2.).coef(&(vars[1]), 1.));
+            assert_eq!(model.n_conss(), n_conss_before + 1);
 
             SeparationResult::Separated
         }

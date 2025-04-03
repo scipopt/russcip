@@ -1,3 +1,4 @@
+use crate::builder::cons::ConsBuilder;
 use crate::builder::CanBeAddedToModel;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
@@ -161,7 +162,7 @@ impl Model<ProblemCreated> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new variable.
+    /// The created `Variable`
     ///
     /// # Panics
     ///
@@ -400,7 +401,7 @@ impl Model<Solving> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new variable.
+    /// The created `Variable`
     ///
     /// # Panics
     ///
@@ -425,10 +426,6 @@ impl Model<Solving> {
     }
 
     /// Returns the current node of the model.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called in the `Solving` state, it should only be used from plugins implementations.
     pub fn focus_node(&self) -> Node {
         let scip_node = self.scip.focus_node().expect("Failed to get focus node");
         Node {
@@ -438,10 +435,6 @@ impl Model<Solving> {
     }
 
     /// Creates a new child node of the current node and returns it.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if not called from plugins implementations.
     pub fn create_child(&mut self) -> Node {
         let node_ptr = self
             .scip
@@ -466,7 +459,7 @@ impl Model<Solving> {
     ///
     /// # Returns
     ///
-    /// This function returns a reference-counted smart pointer (`Rc`) to the created `Variable` instance.
+    /// The created `Variable`
     pub fn add_priced_var(
         &mut self,
         lb: f64,
@@ -486,13 +479,98 @@ impl Model<Solving> {
         }
     }
 
+    /// Locally adds a constraint to the current node and its subnodes.
+    ///
+    /// # Arguments
+    ///
+    /// * `cons` - The constraint to add (can be built by calling the cons() function).
+    ///
+    /// # Returns
+    ///
+    /// The new constraint
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_local(&mut self, cons: &ConsBuilder) -> Constraint {
+        let vars: Vec<&Variable> = cons.coefs.iter().map(|(var, _)| *var).collect();
+        let coefs: Vec<f64> = cons.coefs.iter().map(|(_, coef)| *coef).collect();
+
+        let cons = self
+            .scip
+            .create_cons(
+                None,
+                vars,
+                &coefs,
+                cons.lhs,
+                cons.rhs,
+                cons.name.unwrap_or(""),
+                true,
+            )
+            .expect("Failed to create constraint in state Solving");
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
+    /// Locally adds a constraint to a given node and its children.
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node to which the constraint should be added.
+    /// * `cons` - The constraint to add.
+    ///
+    /// # Returns
+    ///
+    /// The created `Constraint`.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    pub fn add_cons_node(&mut self, node: &Node, cons: &ConsBuilder) -> Constraint {
+        let vars: Vec<&Variable> = cons.coefs.iter().map(|(var, _)| *var).collect();
+        let coefs: Vec<f64> = cons.coefs.iter().map(|(_, coef)| *coef).collect();
+
+        let cons = self
+            .scip
+            .create_cons(
+                Some(node),
+                vars,
+                &coefs,
+                cons.lhs,
+                cons.rhs,
+                cons.name.unwrap_or(""),
+                true,
+            )
+            .expect("Failed to create constraint in state ProblemCreated");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
+    /// Returns the number of added constraints to the given nodes
+    ///
+    /// # Arguments
+    ///
+    /// * `node` - The node to which the constraints were added.
+    ///
+    /// # Returns
+    ///
+    /// The number of added constraints.
+    pub fn node_get_n_added_conss(&mut self, node: &Node) -> usize {
+        self.scip.node_get_n_added_conss(node)
+    }
+
     /// Gets the variable in current problem given its index (in the problem).
     ///
     /// # Arguments
     /// * `var_prob_id` - The index of the variable in the problem.
     ///
     /// # Returns
-    /// A reference-counted pointer to the variable.
+    /// The `Variable` if it exists, otherwise `None`.
     pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
         unsafe {
             ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
@@ -1023,7 +1101,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         assert_eq!(vars.len(), coefs.len());
         let cons = self
             .scip
-            .create_cons(vars, coefs, lhs, rhs, name)
+            .create_cons(None, vars, coefs, lhs, rhs, name, false)
             .expect("Failed to create constraint in state ProblemCreated");
 
         Constraint {
@@ -1068,7 +1146,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// The new `Constraint`.
     ///
     /// # Panics
     ///
@@ -1095,7 +1173,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// The created `Constraint`
     ///
     /// # Panics
     ///
@@ -1123,7 +1201,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// The created `Constraint`
     ///
     /// # Panics
     ///
@@ -1157,7 +1235,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     ///
     /// # Returns
     ///
-    /// A reference-counted pointer to the new constraint.
+    /// The created `Constraint`
     ///
     /// # Panics
     ///

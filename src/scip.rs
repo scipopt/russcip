@@ -1,4 +1,5 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
+use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
@@ -353,11 +354,13 @@ impl ScipPtr {
 
     pub(crate) fn create_cons(
         &self,
+        node: Option<&Node>,
         vars: Vec<&Variable>,
         coefs: &[f64],
         lhs: f64,
         rhs: f64,
         name: &str,
+        local: bool,
     ) -> Result<*mut SCIP_Cons, Retcode> {
         assert_eq!(vars.len(), coefs.len());
         let c_name = CString::new(name).unwrap();
@@ -376,7 +379,18 @@ impl ScipPtr {
         for (i, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
-        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        if local {
+            if node.is_none() {
+                // adding to current node
+                scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
+            } else {
+                // adding to given node
+                scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
+            }
+        } else {
+            scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        }
+
         let stage = unsafe { ffi::SCIPgetStage(self.raw) };
         if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
             scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
@@ -535,6 +549,11 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
+    /// Get number of constraints added in node
+    pub(crate) fn node_get_n_added_conss(&self, node: &Node) -> usize {
+        unsafe { ffi::SCIPnodeGetNAddedConss(node.raw) as usize }
+    }
+
     pub(crate) unsafe fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
         let n_vars = ffi::SCIPgetNVars(scip) as usize;
         let var = *ffi::SCIPgetVars(scip).add(var_prob_id);
@@ -544,6 +563,8 @@ impl ScipPtr {
             Some(var)
         }
     }
+
+    /// Create indicator constraint
     pub(crate) fn create_cons_indicator(
         &self,
         bin_var: &Variable,
