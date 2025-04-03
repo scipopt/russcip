@@ -291,10 +291,9 @@ mod tests {
                 row.set_coeff(&var, 1.0);
             }
             model.add_cut(row, true);
-
-            assert_eq!(model.node_get_n_added_conss(&model.focus_node()), 0);
+            let n_conss_before = model.n_conss();
             model.add_cons_local(&cons().ge(7.0).coef(&(vars[0]), 2.).coef(&(vars[1]), 1.));
-            assert_eq!(model.node_get_n_added_conss(&model.focus_node()), 1);
+            assert_eq!(model.n_conss(), n_conss_before + 1);
 
             SeparationResult::Separated
         }
