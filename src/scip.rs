@@ -550,10 +550,7 @@ impl ScipPtr {
     }
 
     /// Get number of constraints added in node
-    pub(crate) fn node_get_n_added_conss(
-        &self,
-        node: &Node,
-    ) -> usize {
+    pub(crate) fn node_get_n_added_conss(&self, node: &Node) -> usize {
         unsafe { ffi::SCIPnodeGetNAddedConss(node.raw) as usize }
     }
 
