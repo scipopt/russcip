@@ -147,8 +147,6 @@ impl SCIPSeparator {
 
 #[cfg(test)]
 mod tests {
-    use std::ptr::eq;
-
     use super::*;
     use crate::prelude::{cons, sepa, var};
     use crate::{

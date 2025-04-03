@@ -507,7 +507,7 @@ impl Model<Solving> {
                 cons.name.unwrap_or(""),
                 true,
             )
-            .expect("Failed to create constraint in state ProblemCreated");
+            .expect("Failed to create constraint in state Solving");
         Constraint {
             raw: cons,
             scip: self.scip.clone(),
