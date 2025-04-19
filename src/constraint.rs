@@ -57,6 +57,18 @@ impl Constraint {
 
         Some(unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) })
     }
+
+    /// Returns the corresponding transformed constraint.
+    /// Returns `None` if the transformed constraint does not exist (yet).
+    pub fn transformed(&self) -> Option<Constraint> {
+        self.scip
+            .get_transformed_cons(self)
+            .ok()
+            .map(|raw| Constraint {
+                raw,
+                scip: self.scip.clone(),
+            })
+    }
 }
 
 #[cfg(test)]

@@ -182,6 +182,17 @@ impl ScipPtr {
         }
     }
 
+    pub(crate) fn get_transformed_cons(
+        &self,
+        cons: &Constraint,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let mut transformed_cons = std::mem::MaybeUninit::<*mut ffi::SCIP_Cons>::uninit();
+        scip_call! {
+            ffi::SCIPgetTransformedCons(self.raw, cons.raw, transformed_cons.as_mut_ptr())
+        };
+        Ok(unsafe { transformed_cons.assume_init() })
+    }
+
     pub(crate) fn status(&self) -> Status {
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.into()
@@ -1315,13 +1326,7 @@ impl ScipPtr {
         let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;
         let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.raw) } == 1;
         let cons_ptr = if !cons_is_transformed && var_is_transformed {
-            let mut transformed_cons = MaybeUninit::<*mut ffi::SCIP_Cons>::uninit();
-            scip_call!(ffi::SCIPgetTransformedCons(
-                self.raw,
-                cons.raw,
-                transformed_cons.as_mut_ptr()
-            ));
-            unsafe { transformed_cons.assume_init() }
+            self.get_transformed_cons(cons)?
         } else {
             cons.raw
         };
