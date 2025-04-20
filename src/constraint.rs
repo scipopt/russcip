@@ -64,6 +64,7 @@ impl Constraint {
         self.scip
             .get_transformed_cons(self)
             .ok()
+            .flatten()
             .map(|raw| Constraint {
                 raw,
                 scip: self.scip.clone(),
