@@ -35,7 +35,7 @@ pub enum HeurResult {
 }
 
 /// The Heur represents different timing masks for the execution of a heuristic.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct HeurTiming(u64);
 
 impl HeurTiming {

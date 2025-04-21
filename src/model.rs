@@ -425,6 +425,18 @@ impl Model<Solving> {
         }
     }
 
+    /// Creates a new solution initialized to zero.
+    pub fn create_sol(&self) -> Solution {
+        let sol_ptr = self
+            .scip
+            .create_sol(false)
+            .expect("Failed to create solution in state ProblemCreated");
+        Solution {
+            scip_ptr: self.scip.clone(),
+            raw: sol_ptr,
+        }
+    }
+
     /// Returns the current node of the model.
     pub fn focus_node(&self) -> Node {
         let scip_node = self.scip.focus_node().expect("Failed to get focus node");
@@ -750,9 +762,6 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
-    /// Creates a new solution initialized to zero.
-    fn create_sol(&self) -> Solution;
-
     /// Create a solution in the original space
     fn create_orig_sol(&self) -> Solution;
 
@@ -948,18 +957,6 @@ impl ModelStageProblemOrSolving for ProblemCreated {}
 impl ModelStageProblemOrSolving for Solving {}
 
 impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
-    /// Creates a new solution initialized to zero.
-    fn create_sol(&self) -> Solution {
-        let sol_ptr = self
-            .scip
-            .create_sol(false)
-            .expect("Failed to create solution in state ProblemCreated");
-        Solution {
-            scip_ptr: self.scip.clone(),
-            raw: sol_ptr,
-        }
-    }
-
     /// Create a new solution in the original space
     fn create_orig_sol(&self) -> Solution {
         let sol_ptr = self
@@ -1965,7 +1962,11 @@ mod tests {
 
         model.add_cons_set_pack(vec![&x2], "c");
 
-        let sol = model.create_sol();
+        let inf_sol = model.create_orig_sol();
+        inf_sol.set_val(&x1, 2.);
+        assert!(model.add_sol(inf_sol).is_err());
+
+        let sol = model.create_orig_sol();
         assert_eq!(sol.obj_val(), 0.);
 
         sol.set_val(&x1, 1.);
@@ -1974,8 +1975,11 @@ mod tests {
 
         assert!(model.add_sol(sol).is_ok());
 
-        let model = model.solve();
-        assert_eq!(model.n_sols(), 2);
+        assert_eq!(model.n_sols(), 1);
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!(solved.n_sols() >= 2);
     }
 
     #[test]

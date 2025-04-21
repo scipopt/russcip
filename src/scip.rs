@@ -604,6 +604,7 @@ impl ScipPtr {
             scip_call! { ffi::SCIPcreateSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
         }
         let sol = unsafe { sol.assume_init() };
+        assert!(!sol.is_null());
         Ok(sol)
     }
 
@@ -1391,14 +1392,35 @@ impl ScipPtr {
     }
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
-        let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSolFree(
-            self.raw,
-            &mut sol.raw,
-            stored.as_mut_ptr()
-        ));
-        let stored = unsafe { stored.assume_init() };
-        Ok(stored != 0)
+        let mut feasible = 0;
+        assert!(!sol.raw.is_null());
+        let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw) } == 1;
+        if is_orig {
+            scip_call!(ffi::SCIPcheckSolOrig(
+                self.raw,
+                sol.raw,
+                &mut feasible,
+                true.into(),
+                true.into(),
+            ));
+            if feasible == 1 {
+                scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            }
+            return Ok(feasible != 0);
+        } else {
+            scip_call!(ffi::SCIPtrySol(
+                self.raw,
+                sol.raw,
+                true.into(),
+                true.into(),
+                true.into(),
+                true.into(),
+                true.into(),
+                &mut feasible,
+            ));
+        }
+
+        Ok(feasible != 0)
     }
 
     pub(crate) fn free_transform(&self) -> Result<(), Retcode> {
