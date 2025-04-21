@@ -14,7 +14,7 @@ impl BranchRule for MostInfeasibleBranching {
         candidates: Vec<BranchingCandidate>,
     ) -> BranchingResult {
         // Find the candidate with the highest fractionality
-        let mut best_candidate = candidates.get(0).unwrap().clone();
+        let mut best_candidate = candidates.first().unwrap().clone();
         let mut best_fractionality = (best_candidate.frac - 0.5).abs();
 
         for candidate in candidates {
