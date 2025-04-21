@@ -1950,7 +1950,7 @@ mod tests {
     #[test]
     fn create_sol() {
         let mut model = Model::new()
-            // .hide_output()
+            .hide_output()
             .include_default_plugins()
             .create_prob("test")
             .set_obj_sense(ObjSense::Minimize);
@@ -1962,6 +1962,10 @@ mod tests {
 
         model.add_cons_set_pack(vec![&x2], "c");
 
+        let inf_sol = model.create_orig_sol();
+        inf_sol.set_val(&x1, 2.);
+        assert!(model.add_sol(inf_sol).is_err());
+
         let sol = model.create_orig_sol();
         assert_eq!(sol.obj_val(), 0.);
 
@@ -1972,6 +1976,10 @@ mod tests {
         assert!(model.add_sol(sol).is_ok());
 
         assert_eq!(model.n_sols(), 1);
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!(solved.n_sols() >= 2);
     }
 
     #[test]

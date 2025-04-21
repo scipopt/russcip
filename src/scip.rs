@@ -1396,7 +1396,16 @@ impl ScipPtr {
         assert!(!sol.raw.is_null());
         let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw) } == 1;
         if is_orig {
-            scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            scip_call!(ffi::SCIPcheckSolOrig(
+                self.raw,
+                sol.raw,
+                &mut feasible,
+                true.into(),
+                true.into(),
+            ));
+            if feasible == 1 {
+                scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            }
             return Ok(feasible != 0);
         } else {
             scip_call!(ffi::SCIPtrySol(
