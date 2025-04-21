@@ -1,4 +1,3 @@
-
 use rand::{Rng, SeedableRng};
 use russcip::{prelude::*, ParamSetting};
 use russcip::{HeurResult, HeurTiming, Heuristic, Model, Solving, VarType};
