@@ -1332,7 +1332,7 @@ impl ScipPtr {
         let cons_is_transformed = unsafe { ffi::SCIPconsIsTransformed(cons.raw) } == 1;
         let var_is_transformed = unsafe { ffi::SCIPvarIsTransformed(var.raw) } == 1;
         let cons_ptr = if !cons_is_transformed && var_is_transformed {
-            self.get_transformed_cons(cons)?.unwrap()
+            self.get_transformed_cons(cons)?.expect("No transformed constraint was found for the passed original constraint, to prevent this you could disable presolving or mark the constraint to be not removable")
         } else {
             cons.raw
         };

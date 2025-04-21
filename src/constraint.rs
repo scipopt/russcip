@@ -74,7 +74,8 @@ impl Constraint {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use crate::{minimal_model, prelude::*};
+    use core::f64;
 
     #[test]
     fn test_constraint_mem_safety() {
@@ -90,5 +91,33 @@ mod tests {
         drop(model);
 
         assert_eq!(cons.name(), "cons");
+    }
+
+    #[test]
+    fn test_constraint_transformed_no_transformed() {
+        let mut model = minimal_model().hide_output().maximize();
+        let x1 = model.add_var(0.0, f64::INFINITY, 10.0, "x1", VarType::Continuous);
+        let cons = model.add_cons(vec![&x1], &[1.0], 0.0, 5.0, "cons");
+
+        assert!(model.solve().best_sol().is_some());
+        assert!(cons.transformed().is_none());
+    }
+
+    #[test]
+    fn test_constraint_transformed_with_transformed() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("prob")
+            .maximize();
+
+        let x1 = model.add_var(0.0, f64::INFINITY, 10.0, "x1", VarType::Continuous);
+        let cons = model.add_cons(vec![&x1], &[1.0], 0.0, 5.0, "cons");
+        model.set_cons_modifiable(&cons, true);
+
+        assert!(model.solve().best_sol().is_some());
+        assert!(cons.transformed().is_some());
+        let dual = cons.transformed().unwrap().dual_sol().unwrap();
+        assert!(dual + 10.0 < f64::EPSILON);
     }
 }
