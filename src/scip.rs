@@ -1357,6 +1357,10 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn cons_is_modifiable(&self, cons: &Constraint) -> bool {
+        unsafe { ffi::SCIPconsIsModifiable(cons.raw) == ffi::TRUE }
+    }
+
     pub(crate) fn n_nodes(&self) -> usize {
         unsafe { ffi::SCIPgetNNodes(self.raw) as usize }
     }

@@ -57,6 +57,11 @@ impl Constraint {
 
         Some(unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) })
     }
+
+    /// Returns the modifiable flag of the constraint
+    pub fn is_modifiable(&self) -> bool {
+        self.scip.cons_is_modifiable(self)
+    }
 }
 
 #[cfg(test)]

@@ -14,6 +14,8 @@ pub struct ConsBuilder<'a> {
     pub(crate) name: Option<&'a str>,
     /// Coefficients of constraint
     pub(crate) coefs: Vec<(&'a Variable, f64)>,
+    /// Modifiable attribute of constraint
+    pub(crate) modifiable: Option<bool>,
 }
 
 /// Creates a new default `ConsBuilder`.
@@ -28,6 +30,7 @@ impl Default for ConsBuilder<'_> {
             rhs: f64::INFINITY,
             name: None,
             coefs: Vec::new(),
+            modifiable: None,
         }
     }
 }
@@ -79,6 +82,12 @@ impl<'a> ConsBuilder<'a> {
         self.coefs.extend(iter);
         self
     }
+
+    /// Sets the modifiable flag of the constraint
+    pub fn modifiable(mut self, modifiable: bool) -> Self {
+        self.modifiable = Some(modifiable);
+        self
+    }
 }
 
 impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
@@ -95,13 +104,23 @@ impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
             let n_cons = model.n_conss();
             format!("cons{}", n_cons)
         });
-        model.add_cons(vars, &coefs, self.lhs, self.rhs, &name)
+        let cons = model.add_cons(vars, &coefs, self.lhs, self.rhs, &name);
+
+        if let Some(modifiable) = self.modifiable {
+            model.set_cons_modifiable(&cons, modifiable);
+        }
+
+        cons
     }
 }
 
 impl CanBeAddedToModel<Solving> for ConsBuilder<'_> {
     type Return = Constraint;
     fn add(self, model: &mut Model<Solving>) -> Self::Return {
+        if self.modifiable.is_some() {
+            panic!("cannot add a modifiable constraint during solving");
+        }
+
         let mut vars = Vec::new();
         let mut coefs = Vec::new();
         for (var, coef) in self.coefs {
@@ -178,5 +197,41 @@ mod tests {
 
         assert_eq!(solved.status(), crate::Status::Optimal);
         assert_eq!(solved.obj_val(), 1.0);
+    }
+
+    #[test]
+    fn test_cons_builder_modifiable() {
+        let mut model = minimal_model().hide_output();
+        let vars = [
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+        ];
+
+        let cb1 = cons()
+            .name("c1")
+            .le(2.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .modifiable(true);
+
+        let cb2 = cons()
+            .name("c2")
+            .ge(1.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .modifiable(false);
+
+        let cb3 = cons().name("c3").ge(1.0).coef(&vars[0], 1.0);
+
+        assert_eq!(cb1.modifiable, Some(true));
+        assert_eq!(cb2.modifiable, Some(false));
+        assert_eq!(cb3.modifiable, None);
+
+        let cons1 = model.add(cb1);
+        let cons2 = model.add(cb2);
+        let cons3 = model.add(cb3);
+
+        assert!(cons1.is_modifiable());
+        assert!(!cons2.is_modifiable());
+        assert!(!cons3.is_modifiable());
     }
 }

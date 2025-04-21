@@ -674,6 +674,9 @@ pub trait ModelWithProblem {
     /// Returns a vector of all constraints in the optimization model.
     fn conss(&self) -> Vec<Constraint>;
 
+    /// Returns the modifiable flag of the given constraint
+    fn cons_is_modifiable(&self, cons: &Constraint) -> bool;
+
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
 }
@@ -734,6 +737,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
         self.scip.n_conss()
     }
 
+    /// Returns the modifiable flag of the given constraint
     fn find_cons(&self, name: &str) -> Option<Constraint> {
         self.scip.find_cons(name).map(|cons| Constraint {
             raw: cons,
@@ -751,6 +755,11 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
                 scip: self.scip.clone(),
             })
             .collect()
+    }
+
+    /// Returns the modifiable flag of the given constraint
+    fn cons_is_modifiable(&self, cons: &Constraint) -> bool {
+        self.scip.cons_is_modifiable(cons)
     }
 
     /// Writes the optimization model to a file with the given path and extension.
