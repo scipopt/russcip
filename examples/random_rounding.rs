@@ -1,7 +1,6 @@
-use core::panic;
 
 use rand::{Rng, SeedableRng};
-use russcip::{minimal_model, prelude::*, ParamSetting};
+use russcip::{prelude::*, ParamSetting};
 use russcip::{HeurResult, HeurTiming, Heuristic, Model, Solving, VarType};
 
 /// A primal heuristic that performs random rounding at LP solutions
