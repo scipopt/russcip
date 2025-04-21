@@ -1392,9 +1392,14 @@ impl ScipPtr {
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut stored = MaybeUninit::uninit();
-        scip_call!(ffi::SCIPaddSolFree(
+        scip_call!(ffi::SCIPtrySolFree(
             self.raw,
             &mut sol.raw,
+            true.into(),
+            true.into(),
+            true.into(),
+            true.into(),
+            true.into(),
             stored.as_mut_ptr()
         ));
         let stored = unsafe { stored.assume_init() };
