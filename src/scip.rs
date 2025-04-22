@@ -1378,6 +1378,23 @@ impl ScipPtr {
         unsafe { ffi::SCIPconsIsRemovable(cons.raw) == ffi::TRUE }
     }
 
+    pub(crate) fn set_cons_separated(
+        &self,
+        cons: &Constraint,
+        separate: bool,
+    ) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetConsSeparated(
+            self.raw,
+            cons.raw,
+            separate.into()
+        ));
+        Ok(())
+    }
+
+    pub(crate) fn cons_is_separated(&self, cons: &Constraint) -> bool {
+        unsafe { ffi::SCIPconsIsSeparated(cons.raw) == ffi::TRUE }
+    }
+
     pub(crate) fn n_nodes(&self) -> usize {
         unsafe { ffi::SCIPgetNNodes(self.raw) as usize }
     }

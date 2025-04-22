@@ -148,6 +148,13 @@ impl Model<ProblemCreated> {
             .expect("Failed to set constraint removable");
     }
 
+    /// Sets whether the constraint should be separated during LP processing
+    pub fn set_cons_separated(&mut self, cons: &Constraint, separate: bool) {
+        self.scip
+            .set_cons_separated(cons, separate)
+            .expect("Failed to set constraint separated");
+    }
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     #[allow(unused_mut)]
     pub fn set_obj_integral(mut self) -> Self {
@@ -687,6 +694,9 @@ pub trait ModelWithProblem {
     /// Returns the removable flag of the given constraint
     fn cons_is_removable(&self, cons: &Constraint) -> bool;
 
+    /// Returns whether the constraint should be separated during LP processing
+    fn cons_is_separated(&self, cons: &Constraint) -> bool;
+
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
 }
@@ -775,6 +785,11 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns the removable flag of the given constraint
     fn cons_is_removable(&self, cons: &Constraint) -> bool {
         self.scip.cons_is_removable(cons)
+    }
+
+    /// Returns whether the constraint should be separated during LP processing
+    fn cons_is_separated(&self, cons: &Constraint) -> bool {
+        self.scip.cons_is_separated(cons)
     }
 
     /// Writes the optimization model to a file with the given path and extension.

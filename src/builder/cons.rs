@@ -18,6 +18,8 @@ pub struct ConsBuilder<'a> {
     pub(crate) modifiable: Option<bool>,
     /// Removable flag of constraint
     pub(crate) removable: Option<bool>,
+    /// Separated flag of constraint
+    pub(crate) separated: Option<bool>,
 }
 
 /// Creates a new default `ConsBuilder`.
@@ -34,6 +36,7 @@ impl Default for ConsBuilder<'_> {
             coefs: Vec::new(),
             modifiable: None,
             removable: None,
+            separated: None,
         }
     }
 }
@@ -97,6 +100,12 @@ impl<'a> ConsBuilder<'a> {
         self.removable = Some(removable);
         self
     }
+
+    /// Sets whether the constraint should be separated during LP processing
+    pub fn separated(mut self, separate: bool) -> Self {
+        self.separated = Some(separate);
+        self
+    }
 }
 
 impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
@@ -121,6 +130,9 @@ impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
         if let Some(removable) = self.removable {
             model.set_cons_removable(&cons, removable);
         }
+        if let Some(separate) = self.separated {
+            model.set_cons_separated(&cons, separate);
+        }
 
         cons
     }
@@ -129,8 +141,8 @@ impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
 impl CanBeAddedToModel<Solving> for ConsBuilder<'_> {
     type Return = Constraint;
     fn add(self, model: &mut Model<Solving>) -> Self::Return {
-        if self.modifiable.is_some() {
-            panic!("cannot add a modifiable constraint during solving");
+        if self.modifiable.is_some() || self.separated.is_some() || self.removable.is_some() {
+            panic!("cannot add a modifiable|separated|removable constraint during solving");
         }
 
         let mut vars = Vec::new();
@@ -281,15 +293,50 @@ mod tests {
 
         let cons1 = model.add(cb1);
         let cons2 = model.add(cb2);
-        let cons3 = model.add(cb3);
 
         assert!(cons1.is_removable());
         assert!(!cons2.is_removable());
-        assert!(!cons3.is_removable());
 
         let solved = model.solve();
         assert!(solved.cons_is_removable(&cons1));
         assert!(!solved.cons_is_removable(&cons2));
-        assert!(!solved.cons_is_removable(&cons3));
+    }
+
+    #[test]
+    fn test_cons_builder_separated() {
+        let mut model = minimal_model().hide_output();
+        let vars = [
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+        ];
+
+        let cb1 = cons()
+            .name("c1")
+            .le(2.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .separated(true);
+
+        let cb2 = cons()
+            .name("c2")
+            .ge(1.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .separated(false);
+
+        let cb3 = cons().name("c3").ge(1.0).coef(&vars[0], 1.0);
+
+        assert_eq!(cb1.separated, Some(true));
+        assert_eq!(cb2.separated, Some(false));
+        assert_eq!(cb3.separated, None);
+
+        let cons1 = model.add(cb1);
+        let cons2 = model.add(cb2);
+
+        assert!(cons1.is_separated());
+        assert!(!cons2.is_separated());
+
+        let solved = model.solve();
+        assert!(solved.cons_is_separated(&cons1));
+        assert!(!solved.cons_is_separated(&cons2));
     }
 }

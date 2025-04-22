@@ -67,6 +67,11 @@ impl Constraint {
     pub fn is_removable(&self) -> bool {
         self.scip.cons_is_removable(self)
     }
+
+    /// Returns whether the constraint should be separated during LP processing
+    pub fn is_separated(&self) -> bool {
+        self.scip.cons_is_separated(self)
+    }
 }
 
 #[cfg(test)]
