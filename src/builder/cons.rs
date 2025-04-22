@@ -14,8 +14,10 @@ pub struct ConsBuilder<'a> {
     pub(crate) name: Option<&'a str>,
     /// Coefficients of constraint
     pub(crate) coefs: Vec<(&'a Variable, f64)>,
-    /// Modifiable attribute of constraint
+    /// Modifiable flag of constraint
     pub(crate) modifiable: Option<bool>,
+    /// Removable flag of constraint
+    pub(crate) removable: Option<bool>,
 }
 
 /// Creates a new default `ConsBuilder`.
@@ -31,6 +33,7 @@ impl Default for ConsBuilder<'_> {
             name: None,
             coefs: Vec::new(),
             modifiable: None,
+            removable: None,
         }
     }
 }
@@ -88,6 +91,12 @@ impl<'a> ConsBuilder<'a> {
         self.modifiable = Some(modifiable);
         self
     }
+
+    /// Sets the removable flag of the constraint
+    pub fn removable(mut self, removable: bool) -> Self {
+        self.removable = Some(removable);
+        self
+    }
 }
 
 impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
@@ -108,6 +117,9 @@ impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
 
         if let Some(modifiable) = self.modifiable {
             model.set_cons_modifiable(&cons, modifiable);
+        }
+        if let Some(removable) = self.removable {
+            model.set_cons_removable(&cons, removable);
         }
 
         cons
@@ -233,5 +245,51 @@ mod tests {
         assert!(cons1.is_modifiable());
         assert!(!cons2.is_modifiable());
         assert!(!cons3.is_modifiable());
+
+        let solved = model.solve();
+        assert!(solved.cons_is_modifiable(&cons1));
+        assert!(!solved.cons_is_modifiable(&cons2));
+        assert!(!solved.cons_is_modifiable(&cons3));
+    }
+
+    #[test]
+    fn test_cons_builder_removable() {
+        let mut model = minimal_model().hide_output();
+        let vars = [
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+            model.add(var().bin().obj(1.)),
+        ];
+
+        let cb1 = cons()
+            .name("c1")
+            .le(2.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .removable(true);
+
+        let cb2 = cons()
+            .name("c2")
+            .ge(1.0)
+            .expr(vars.iter().map(|var| (var, 1.0)))
+            .removable(false);
+
+        let cb3 = cons().name("c3").ge(1.0).coef(&vars[0], 1.0);
+
+        assert_eq!(cb1.removable, Some(true));
+        assert_eq!(cb2.removable, Some(false));
+        assert_eq!(cb3.removable, None);
+
+        let cons1 = model.add(cb1);
+        let cons2 = model.add(cb2);
+        let cons3 = model.add(cb3);
+
+        assert!(cons1.is_removable());
+        assert!(!cons2.is_removable());
+        assert!(!cons3.is_removable());
+
+        let solved = model.solve();
+        assert!(solved.cons_is_removable(&cons1));
+        assert!(!solved.cons_is_removable(&cons2));
+        assert!(!solved.cons_is_removable(&cons3));
     }
 }

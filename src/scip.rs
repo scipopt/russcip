@@ -1361,6 +1361,23 @@ impl ScipPtr {
         unsafe { ffi::SCIPconsIsModifiable(cons.raw) == ffi::TRUE }
     }
 
+    pub(crate) fn set_cons_removable(
+        &self,
+        cons: &Constraint,
+        removable: bool,
+    ) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsetConsRemovable(
+            self.raw,
+            cons.raw,
+            removable.into()
+        ));
+        Ok(())
+    }
+
+    pub(crate) fn cons_is_removable(&self, cons: &Constraint) -> bool {
+        unsafe { ffi::SCIPconsIsRemovable(cons.raw) == ffi::TRUE }
+    }
+
     pub(crate) fn n_nodes(&self) -> usize {
         unsafe { ffi::SCIPgetNNodes(self.raw) as usize }
     }

@@ -141,6 +141,13 @@ impl Model<ProblemCreated> {
             .expect("Failed to set constraint modifiable");
     }
 
+    /// Sets the constraint as removable or not.
+    pub fn set_cons_removable(&mut self, cons: &Constraint, removable: bool) {
+        self.scip
+            .set_cons_removable(cons, removable)
+            .expect("Failed to set constraint removable");
+    }
+
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     #[allow(unused_mut)]
     pub fn set_obj_integral(mut self) -> Self {
@@ -677,6 +684,9 @@ pub trait ModelWithProblem {
     /// Returns the modifiable flag of the given constraint
     fn cons_is_modifiable(&self, cons: &Constraint) -> bool;
 
+    /// Returns the removable flag of the given constraint
+    fn cons_is_removable(&self, cons: &Constraint) -> bool;
+
     /// Writes the optimization model to a file with the given path and extension.
     fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
 }
@@ -760,6 +770,11 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// Returns the modifiable flag of the given constraint
     fn cons_is_modifiable(&self, cons: &Constraint) -> bool {
         self.scip.cons_is_modifiable(cons)
+    }
+
+    /// Returns the removable flag of the given constraint
+    fn cons_is_removable(&self, cons: &Constraint) -> bool {
+        self.scip.cons_is_removable(cons)
     }
 
     /// Writes the optimization model to a file with the given path and extension.

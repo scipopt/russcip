@@ -62,6 +62,11 @@ impl Constraint {
     pub fn is_modifiable(&self) -> bool {
         self.scip.cons_is_modifiable(self)
     }
+
+    /// Returns the removable flag of the constraint
+    pub fn is_removable(&self) -> bool {
+        self.scip.cons_is_removable(self)
+    }
 }
 
 #[cfg(test)]
