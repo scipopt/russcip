@@ -12,6 +12,7 @@ pub use crate::heuristic::*;
 pub use crate::model::Model;
 pub use crate::model::ModelWithProblem;
 pub use crate::model::ObjSense;
+pub use crate::model::ParamSetting;
 pub use crate::model::ProblemOrSolving;
 pub use crate::model::Solving;
 pub use crate::model::WithSolutions;

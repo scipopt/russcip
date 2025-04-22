@@ -107,3 +107,12 @@ fn main() {
         "Expected at least 2 solutions, the primal heuristic solution and the optimal solution."
     );
 }
+
+
+
+mod tests {
+    #[test]
+    fn test_most_infeasible_branching() {
+        main();
+    }
+}
