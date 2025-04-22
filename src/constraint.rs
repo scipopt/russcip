@@ -72,7 +72,7 @@ impl Constraint {
     pub fn is_separated(&self) -> bool {
         self.scip.cons_is_separated(self)
     }
-    
+
     /// Returns the corresponding transformed constraint.
     /// Returns `None` if the transformed constraint does not exist (yet).
     pub fn transformed(&self) -> Option<Constraint> {
