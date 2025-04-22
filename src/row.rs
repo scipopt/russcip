@@ -246,8 +246,8 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 #[cfg(test)]
 mod tests {
     use crate::prelude::{cons, eventhdlr, var};
-    use crate::Event;
     use crate::{minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, Solving};
+    use crate::{Event, ProblemOrSolving};
 
     #[test]
     fn test_row() {

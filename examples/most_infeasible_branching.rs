@@ -1,6 +1,7 @@
-use russcip::prelude::*;
-use russcip::ParamSetting;
-use russcip::Solving;
+use russcip::{
+    prelude::*, BranchRule, BranchingCandidate, BranchingResult, ParamSetting, SCIPBranchRule,
+    Solving,
+};
 
 /// A branching rule that implements the most infeasible branching strategy.
 /// It selects the variable with the highest fractionality (closest to 0.5) to branch on.

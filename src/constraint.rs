@@ -58,6 +58,21 @@ impl Constraint {
         Some(unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) })
     }
 
+    /// Returns the modifiable flag of the constraint
+    pub fn is_modifiable(&self) -> bool {
+        self.scip.cons_is_modifiable(self)
+    }
+
+    /// Returns the removable flag of the constraint
+    pub fn is_removable(&self) -> bool {
+        self.scip.cons_is_removable(self)
+    }
+
+    /// Returns whether the constraint should be separated during LP processing
+    pub fn is_separated(&self) -> bool {
+        self.scip.cons_is_separated(self)
+    }
+
     /// Returns the corresponding transformed constraint.
     /// Returns `None` if the transformed constraint does not exist (yet).
     pub fn transformed(&self) -> Option<Constraint> {
