@@ -10,3 +10,4 @@ This directory contains examples of how to use the `russcip` library.
 5. [Random rounding](random_rounding.rs): An example demonstrating how to include a primal heuristic that does random rounding to the current LP solution.
 6. [Clique separator](clique_separator.rs): An example demonstrating how to implement a clique separator for set partitioning problems.
 7. [Most infeasible branching](most_infeasible_branching.rs): An example showing how to implement a custom branching rule that selects variables based on their fractionality.
+8. [Node event handler](node_event_handler.rs): An example demonstrating how to track and report information about nodes during the branch-and-bound process.
