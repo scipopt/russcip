@@ -107,3 +107,13 @@ fn main() {
         "Expected at least 2 solutions, the primal heuristic solution and the optimal solution."
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_random_rounding() {
+        main();
+    }
+}
