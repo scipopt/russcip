@@ -757,7 +757,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
         self.scip.n_conss()
     }
 
-    /// Returns the modifiable flag of the given constraint
+    /// Finds a constraint using its name
     fn find_cons(&self, name: &str) -> Option<Constraint> {
         self.scip.find_cons(name).map(|cons| Constraint {
             raw: cons,
