@@ -108,8 +108,6 @@ fn main() {
     );
 }
 
-
-
 mod tests {
     #[test]
     fn test_most_infeasible_branching() {
