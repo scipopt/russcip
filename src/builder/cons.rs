@@ -1,6 +1,7 @@
 use crate::builder::CanBeAddedToModel;
 use crate::{
-    Constraint, Model, ModelWithProblem, ProblemCreated, ProblemOrSolving, Solving, Variable,
+    Constraint, Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem,
+    ProblemOrSolving, Variable,
 };
 
 /// A builder for creating constraints.
@@ -108,9 +109,12 @@ impl<'a> ConsBuilder<'a> {
     }
 }
 
-impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
+impl<S> CanBeAddedToModel<S> for ConsBuilder<'_>
+where
+    S: ModelStageProblemOrSolving + ModelStageWithProblem,
+{
     type Return = Constraint;
-    fn add(self, model: &mut Model<ProblemCreated>) -> Self::Return {
+    fn add(self, model: &mut Model<S>) -> Self::Return {
         let mut vars = Vec::new();
         let mut coefs = Vec::new();
         for (var, coef) in self.coefs {
@@ -135,28 +139,6 @@ impl CanBeAddedToModel<ProblemCreated> for ConsBuilder<'_> {
         }
 
         cons
-    }
-}
-
-impl CanBeAddedToModel<Solving> for ConsBuilder<'_> {
-    type Return = Constraint;
-    fn add(self, model: &mut Model<Solving>) -> Self::Return {
-        if self.modifiable.is_some() || self.separated.is_some() || self.removable.is_some() {
-            panic!("cannot add a modifiable|separated|removable constraint during solving");
-        }
-
-        let mut vars = Vec::new();
-        let mut coefs = Vec::new();
-        for (var, coef) in self.coefs {
-            vars.push(var);
-            coefs.push(coef);
-        }
-
-        let name = self.name.map(|s| s.to_string()).unwrap_or_else(|| {
-            let n_cons = model.n_conss();
-            format!("cons{}", n_cons)
-        });
-        model.add_cons(vars, &coefs, self.lhs, self.rhs, &name)
     }
 }
 

@@ -134,27 +134,6 @@ impl Model<ProblemCreated> {
         self.set_obj_sense(ObjSense::Minimize)
     }
 
-    /// Sets the constraint as modifiable or not.
-    pub fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool) {
-        self.scip
-            .set_cons_modifiable(cons, modifiable)
-            .expect("Failed to set constraint modifiable");
-    }
-
-    /// Sets the constraint as removable or not.
-    pub fn set_cons_removable(&mut self, cons: &Constraint, removable: bool) {
-        self.scip
-            .set_cons_removable(cons, removable)
-            .expect("Failed to set constraint removable");
-    }
-
-    /// Sets whether the constraint should be separated during LP processing
-    pub fn set_cons_separated(&mut self, cons: &Constraint, separate: bool) {
-        self.scip
-            .set_cons_separated(cons, separate)
-            .expect("Failed to set constraint separated");
-    }
-
     /// Informs the SCIP instance that the objective value is always integral and returns the same `Model` instance.
     #[allow(unused_mut)]
     pub fn set_obj_integral(mut self) -> Self {
@@ -988,6 +967,15 @@ pub trait ProblemOrSolving {
         rhs: f64,
         name: &str,
     ) -> Constraint;
+
+    /// Sets the constraint as modifiable or not.
+    fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool);
+
+    /// Sets the constraint as removable or not.
+    fn set_cons_removable(&mut self, cons: &Constraint, removable: bool);
+
+    /// Sets whether the constraint should be separated during LP processing
+    fn set_cons_separated(&mut self, cons: &Constraint, separate: bool);
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1295,6 +1283,27 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             raw: cons,
             scip: self.scip.clone(),
         }
+    }
+
+    /// Sets the constraint as modifiable or not.
+    fn set_cons_modifiable(&mut self, cons: &Constraint, modifiable: bool) {
+        self.scip
+            .set_cons_modifiable(cons, modifiable)
+            .expect("Failed to set constraint modifiable");
+    }
+
+    /// Sets the constraint as removable or not.
+    fn set_cons_removable(&mut self, cons: &Constraint, removable: bool) {
+        self.scip
+            .set_cons_removable(cons, removable)
+            .expect("Failed to set constraint removable");
+    }
+
+    /// Sets whether the constraint should be separated during LP processing
+    fn set_cons_separated(&mut self, cons: &Constraint, separate: bool) {
+        self.scip
+            .set_cons_separated(cons, separate)
+            .expect("Failed to set constraint separated");
     }
 }
 
