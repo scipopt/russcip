@@ -108,9 +108,12 @@ fn main() {
     );
 }
 
+#[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_most_infeasible_branching() {
+    fn test_random_rounding() {
         main();
     }
 }

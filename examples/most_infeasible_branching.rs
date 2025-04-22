@@ -59,7 +59,10 @@ fn main() {
     assert_eq!(solved.n_nodes(), 2);
 }
 
+#[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_most_infeasible_branching() {
         main();
