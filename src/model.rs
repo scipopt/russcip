@@ -1630,6 +1630,11 @@ impl<T> Model<T> {
     pub fn eps(&self) -> f64 {
         unsafe { ffi::SCIPepsilon(self.scip.raw) }
     }
+
+    /// Returns the fractional part of a number.
+    pub fn frac(&self, x: f64) -> f64 {
+        unsafe { ffi::SCIPfrac(self.scip.raw, x) }
+    }
 }
 
 /// The default implementation for a `Model` instance in the `ProblemCreated` state.
