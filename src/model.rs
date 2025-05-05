@@ -4,6 +4,7 @@ use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
 use crate::param::ScipParameter;
+use crate::probing::Prober;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
@@ -14,7 +15,6 @@ use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
 use std::rc::Rc;
-use crate::probing::Prober;
 
 /// Represents an optimization model.
 #[non_exhaustive]
