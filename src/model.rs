@@ -14,6 +14,7 @@ use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use scip_sys::SCIP;
 use std::rc::Rc;
+use crate::probing::Prober;
 
 /// Represents an optimization model.
 #[non_exhaustive]
@@ -608,6 +609,18 @@ impl Model<Solving> {
     /// Value of the variable.
     pub fn current_val(&self, var: &Variable) -> f64 {
         unsafe { ffi::SCIPgetSolVal(self.scip_ptr(), std::ptr::null_mut(), var.inner()) }
+    }
+
+    /// Starts probing at the current node.
+    ///
+    /// # Returns
+    /// A `Prober` instance that can be used to access methods allowed only in probing mode.
+    pub fn start_probing(&mut self) -> Prober {
+        let scip = self.scip.clone();
+
+        unsafe { ffi::SCIPstartProbing(scip.raw) };
+
+        Prober { scip }
     }
 }
 

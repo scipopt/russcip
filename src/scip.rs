@@ -340,6 +340,16 @@ impl ScipPtr {
         Ok(trans_var_ptr)
     }
 
+    pub(crate) fn is_lp_constructed(&self) -> bool {
+        unsafe { ffi::SCIPisLPConstructed(self.raw) != 0 }
+    }
+
+    pub(crate) fn construct_lp(&self) -> Result<Option<bool>, Retcode> {
+        let mut cutoff = 0;
+        scip_call! { ffi::SCIPconstructLP(self.raw, &mut cutoff) }
+        Ok(Some(cutoff != 0))
+    }
+
     pub(crate) fn create_priced_var(
         &self,
         lb: f64,
