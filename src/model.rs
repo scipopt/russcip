@@ -622,6 +622,11 @@ impl Model<Solving> {
 
         Prober { scip }
     }
+
+    /// Returns the objective value of the current LP relaxation.
+    pub fn lp_obj_val(&self) -> f64 {
+        unsafe { ffi::SCIPgetLPObjval(self.scip.raw) }
+    }
 }
 
 impl Model<Solved> {

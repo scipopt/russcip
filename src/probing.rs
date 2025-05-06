@@ -180,3 +180,60 @@ impl Drop for Prober {
         unsafe { ffi::SCIPendProbing(self.scip.raw) };
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::model::Model;
+    use crate::prelude::eventhdlr;
+    use crate::{ffi, Eventhdlr, ModelWithProblem, ParamSetting};
+    use crate::{Event, EventMask, SCIPEventhdlr, Solving};
+
+    #[test]
+    fn test_prober() {
+        struct ProbingTester;
+
+        impl Eventhdlr for ProbingTester {
+            fn get_type(&self) -> EventMask {
+                EventMask::NODE_SOLVED
+            }
+
+            fn execute(
+                &mut self,
+                mut model: Model<Solving>,
+                _eventhdlr: SCIPEventhdlr,
+                _event: Event,
+            ) {
+                let mut prober = model.start_probing();
+                assert!(!prober.is_obj_changed());
+
+                let vars = model.vars();
+                for var in vars {
+                    prober.chg_var_obj(&var, 0.0);
+                }
+                assert!(prober.is_obj_changed());
+
+                prober.solve_lp(None).unwrap();
+
+                assert!(model.lp_obj_val().abs() < 1e-6);
+
+                drop(prober);
+
+                // have to use unsafe here as the method is not available in the public API
+                assert!(unsafe { ffi::SCIPinProbing(model.scip_ptr().into()) == 0 });
+            }
+        }
+
+        let mut model = Model::new()
+            .include_default_plugins()
+            .read_prob("data/test/simple.mps")
+            .unwrap()
+            .hide_output()
+            .set_presolving(ParamSetting::Off)
+            .set_separating(ParamSetting::Off)
+            .set_heuristics(ParamSetting::Off)
+            .set_param("branching/pscost/priority", 100000);
+
+        model.add(eventhdlr(ProbingTester));
+        model.solve();
+    }
+}
