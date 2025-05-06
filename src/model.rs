@@ -4,6 +4,7 @@ use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
 use crate::param::ScipParameter;
+use crate::probing::Prober;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
@@ -608,6 +609,23 @@ impl Model<Solving> {
     /// Value of the variable.
     pub fn current_val(&self, var: &Variable) -> f64 {
         unsafe { ffi::SCIPgetSolVal(self.scip_ptr(), std::ptr::null_mut(), var.inner()) }
+    }
+
+    /// Starts probing at the current node.
+    ///
+    /// # Returns
+    /// A `Prober` instance that can be used to access methods allowed only in probing mode.
+    pub fn start_probing(&mut self) -> Prober {
+        let scip = self.scip.clone();
+
+        unsafe { ffi::SCIPstartProbing(scip.raw) };
+
+        Prober { scip }
+    }
+
+    /// Returns the objective value of the current LP relaxation.
+    pub fn lp_obj_val(&self) -> f64 {
+        unsafe { ffi::SCIPgetLPObjval(self.scip.raw) }
     }
 }
 
