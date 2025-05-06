@@ -151,11 +151,19 @@ impl Prober {
         }
         let mut cutoff = 0;
         let mut lperror = 0;
+
+        // set a default for now to communicate the current state, any further needed communication
+        // can be done by sharing data between plugins
+        const PRETENDATROOT: u32 = 0;
+
+        // enable always for now, to avoid unnecessary complexity
+        const DISPLAYINFO: u32 = 1;
+
         unsafe {
             ffi::SCIPsolveProbingLPWithPricing(
                 self.scip.raw,
-                0,
-                1,
+                PRETENDATROOT,
+                DISPLAYINFO,
                 rounds,
                 &mut cutoff,
                 &mut lperror,
