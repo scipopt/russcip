@@ -1458,7 +1458,7 @@ impl ScipPtr {
                 self.raw,
                 sol.raw,
                 &mut feasible,
-                true.into(),
+                false.into(),
                 true.into(),
             ));
             if feasible == 1 {
@@ -1469,7 +1469,7 @@ impl ScipPtr {
             scip_call!(ffi::SCIPtrySol(
                 self.raw,
                 sol.raw,
-                true.into(),
+                false.into(),
                 true.into(),
                 true.into(),
                 true.into(),
