@@ -227,7 +227,7 @@ mod tests {
                 drop(prober);
 
                 // have to use unsafe here as the method is not available in the public API
-                assert!(unsafe { ffi::SCIPinProbing(model.scip_ptr().into()) == 0 });
+                assert_eq!(unsafe { ffi::SCIPinProbing(model.scip_ptr()) }, 0);
             }
         }
 
