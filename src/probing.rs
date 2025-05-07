@@ -269,8 +269,7 @@ mod tests {
                 let mut prober = model.start_probing();
                 let obj = model.lp_obj_val();
                 assert!(obj < -25.0);
-                let vars = model.vars();
-                let row = model.add(row().eq(-1.0));
+                let row = model.add(row().eq(-1.0)); // unsatisfiable row
                 prober.add_row(&row);
                 let _ = prober.solve_lp(None);
                 let obj = model.lp_obj_val();
