@@ -1493,7 +1493,6 @@ impl ScipPtr {
         let modifiable = row.modifiable.unwrap_or(false);
         let removable = row.removable.unwrap_or(true);
         let local = row.local.unwrap_or(true);
-        println!("{:?}", row);
 
         if row.source.is_none() {
             scip_call!(ffi::SCIPcreateEmptyRowUnspec(
