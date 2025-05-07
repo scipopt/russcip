@@ -1483,10 +1483,7 @@ impl ScipPtr {
         Ok(feasible != 0)
     }
 
-    pub(crate) fn create_empty_row(
-        &self,
-        row: &RowBuilder,
-    ) -> Result<*mut ffi::SCIP_ROW, Retcode> {
+    pub(crate) fn create_empty_row(&self, row: &RowBuilder) -> Result<*mut ffi::SCIP_ROW, Retcode> {
         let mut row_ptr = MaybeUninit::uninit();
 
         let row_name = CString::new(row.name.unwrap_or("r")).unwrap();

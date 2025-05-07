@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, scip_call, scip_call_panic, Retcode, Row, RowOrigin, Variable};
+use crate::{ffi, scip_call, scip_call_panic, Retcode, Row, Variable};
 use std::rc::Rc;
 
 /// Struct giving access to methods allowed in probing mode

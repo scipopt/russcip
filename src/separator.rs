@@ -152,7 +152,10 @@ mod tests {
     use super::*;
     use crate::builder::row::RowSource;
     use crate::prelude::{cons, row, sepa, var};
-    use crate::{minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving, VarType, Variable};
+    use crate::{
+        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving,
+        VarType, Variable,
+    };
 
     struct NotRunningSeparator;
 
@@ -294,13 +297,14 @@ mod tests {
             mut model: Model<Solving>,
             sepa: SCIPSeparator,
         ) -> SeparationResult {
-            let mut row = model.add(row()
-                .name("test")
-                .eq(5.0)
-                .local(true)
-                .modifiable(false)
-                .removable(false)
-                .source(RowSource::Separator(&sepa))
+            let mut row = model.add(
+                row()
+                    .name("test")
+                    .eq(5.0)
+                    .local(true)
+                    .modifiable(false)
+                    .removable(false)
+                    .source(RowSource::Separator(&sepa)),
             );
             assert_eq!(row.name(), "test");
             assert_eq!(row.lhs(), 5.0);
@@ -310,7 +314,7 @@ mod tests {
             assert!(!row.is_modifiable());
             assert!(!row.is_removable());
             assert_eq!(row.origin_type(), RowOrigin::Separator);
-            
+
             let vars = model.vars();
             for var in vars.clone() {
                 row.set_coeff(&var, 1.0);
