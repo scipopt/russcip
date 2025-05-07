@@ -17,6 +17,8 @@ use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
+use crate::builder::row::{RowBuilder, RowSource};
+
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct ScipPtr {
@@ -1479,6 +1481,72 @@ impl ScipPtr {
         }
 
         Ok(feasible != 0)
+    }
+
+    pub(crate) fn create_empty_row(&self, row: &RowBuilder) -> Result<*mut ffi::SCIP_ROW, Retcode> {
+        let mut row_ptr = MaybeUninit::uninit();
+
+        let row_name = CString::new(row.name.unwrap_or("r")).unwrap();
+        let modifiable = row.modifiable.unwrap_or(false);
+        let removable = row.removable.unwrap_or(true);
+        let local = row.local.unwrap_or(true);
+
+        if row.source.is_none() {
+            scip_call!(ffi::SCIPcreateEmptyRowUnspec(
+                self.raw,
+                row_ptr.as_mut_ptr(),
+                row_name.as_ptr(),
+                row.lhs,
+                row.rhs,
+                local.into(),
+                modifiable.into(),
+                removable.into(),
+            ));
+        } else {
+            match row.source.as_ref().unwrap() {
+                RowSource::Constraint(c) => {
+                    scip_call!(ffi::SCIPcreateEmptyRowCons(
+                        self.raw,
+                        row_ptr.as_mut_ptr(),
+                        c.raw,
+                        row_name.as_ptr(),
+                        row.lhs,
+                        row.rhs,
+                        local.into(),
+                        modifiable.into(),
+                        removable.into(),
+                    ));
+                }
+                RowSource::Separator(s) => {
+                    scip_call!(ffi::SCIPcreateEmptyRowSepa(
+                        self.raw,
+                        row_ptr.as_mut_ptr(),
+                        s.raw,
+                        row_name.as_ptr(),
+                        row.lhs,
+                        row.rhs,
+                        local.into(),
+                        modifiable.into(),
+                        removable.into(),
+                    ));
+                }
+                RowSource::ConstraintHandler(ch) => {
+                    scip_call!(ffi::SCIPcreateEmptyRowConshdlr(
+                        self.raw,
+                        row_ptr.as_mut_ptr(),
+                        ch.raw,
+                        row_name.as_ptr(),
+                        row.lhs,
+                        row.rhs,
+                        local.into(),
+                        modifiable.into(),
+                        removable.into(),
+                    ));
+                }
+            }
+        }
+
+        Ok(unsafe { row_ptr.assume_init() })
     }
 
     pub(crate) fn free_transform(&self) -> Result<(), Retcode> {

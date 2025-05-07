@@ -1,5 +1,6 @@
 use crate::{ffi, scip_call, Model, Retcode, Row, Solving};
 use scip_sys::{SCIP_Result, SCIP_ROW};
+use std::fmt::Debug;
 
 /// A trait for defining custom separation routines.
 pub trait Separator {
@@ -66,6 +67,7 @@ impl From<SeparationResult> for SCIP_Result {
 }
 
 /// A wrapper struct for the internal ffi::SCIP_SEPA
+#[derive(Debug)]
 pub struct SCIPSeparator {
     pub(crate) raw: *mut ffi::SCIP_SEPA,
 }
@@ -148,10 +150,11 @@ impl SCIPSeparator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::prelude::{cons, sepa, var};
+    use crate::builder::row::RowSource;
+    use crate::prelude::{cons, row, sepa, var};
     use crate::{
-        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
-        Variable,
+        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving,
+        VarType, Variable,
     };
 
     struct NotRunningSeparator;
@@ -226,23 +229,35 @@ mod tests {
     struct InternalSeparatorDataTester;
 
     impl Separator for InternalSeparatorDataTester {
-        fn execute_lp(&mut self, model: Model<Solving>, sep: SCIPSeparator) -> SeparationResult {
+        fn execute_lp(
+            &mut self,
+            mut model: Model<Solving>,
+            sep: SCIPSeparator,
+        ) -> SeparationResult {
             assert_eq!(sep.name(), "InternalSeparatorDataTester");
             assert_eq!(sep.desc(), "Internal separator data tester");
             assert_eq!(sep.priority(), 1000000);
             assert_eq!(sep.freq(), 1);
             assert_eq!(sep.maxbounddist(), 1.0);
             assert!(!sep.is_delayed());
-            let row = sep
-                .create_empty_row(&model, "test", 0.0, 1.0, true, false, false)
-                .unwrap();
+
+            let row = model.add(
+                row()
+                    .bounds(0.0, 1.0)
+                    .removable(false)
+                    .local(false)
+                    .modifiable(true)
+                    .name("test")
+                    .source(RowSource::Separator(&sep)),
+            );
             assert_eq!(row.name(), "test");
             assert_eq!(row.lhs(), 0.0);
             assert_eq!(row.rhs(), 1.0);
             assert_eq!(row.n_non_zeroes(), 0);
-            assert!(!row.is_modifiable());
+            assert!(row.is_modifiable());
+            assert!(!row.is_local());
             assert!(!row.is_removable());
-            assert!(row.is_local());
+            assert_eq!(row.origin_type(), RowOrigin::Separator);
 
             SeparationResult::DidNotRun
         }
@@ -282,10 +297,24 @@ mod tests {
             mut model: Model<Solving>,
             sepa: SCIPSeparator,
         ) -> SeparationResult {
-            // adds a row representing the sum of all variables == 5, causing infeasibility
-            let mut row = sepa
-                .create_empty_row(&model, "test", 5.0, 5.0, true, false, false)
-                .unwrap();
+            let mut row = model.add(
+                row()
+                    .name("test")
+                    .eq(5.0)
+                    .local(true)
+                    .modifiable(false)
+                    .removable(false)
+                    .source(RowSource::Separator(&sepa)),
+            );
+            assert_eq!(row.name(), "test");
+            assert_eq!(row.lhs(), 5.0);
+            assert_eq!(row.rhs(), 5.0);
+            assert_eq!(row.n_non_zeroes(), 0);
+            assert!(row.is_local());
+            assert!(!row.is_modifiable());
+            assert!(!row.is_removable());
+            assert_eq!(row.origin_type(), RowOrigin::Separator);
+
             let vars = model.vars();
             for var in vars.clone() {
                 row.set_coeff(&var, 1.0);

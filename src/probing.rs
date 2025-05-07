@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Retcode, Variable};
+use crate::{ffi, scip_call, scip_call_panic, Retcode, Row, Variable};
 use std::rc::Rc;
 
 /// Struct giving access to methods allowed in probing mode
@@ -11,7 +11,7 @@ impl Prober {
     /// Creates a new probing (sub-)node, whose changes can be undone by backtracking to a higher node
     /// in the probing path with a call to the `backtrack()` method.
     pub fn new_node(&mut self) {
-        unsafe { ffi::SCIPnewProbingNode(self.scip.raw) };
+        scip_call_panic! { ffi::SCIPnewProbingNode(self.scip.raw) }
     }
 
     /// Returns the current probing depth
@@ -29,17 +29,17 @@ impl Prober {
             depth < self.depth(),
             "Probing depth must be less than the current probing depth."
         );
-        unsafe { ffi::SCIPbacktrackProbing(self.scip.raw, depth.try_into().unwrap()) };
+        scip_call_panic! { ffi::SCIPbacktrackProbing(self.scip.raw, depth.try_into().unwrap()) }
     }
 
     /// Changes the lower bound of a variable in the current probing node
     pub fn chg_var_lb(&mut self, var: &Variable, new_bound: f64) {
-        unsafe { ffi::SCIPchgVarLbProbing(self.scip.raw, var.inner(), new_bound) };
+        scip_call_panic! { ffi::SCIPchgVarLbProbing(self.scip.raw, var.inner(), new_bound) }
     }
 
     /// Changes the upper bound of a variable in the current probing node
     pub fn chg_var_ub(&mut self, var: &Variable, new_bound: f64) {
-        unsafe { ffi::SCIPchgVarUbProbing(self.scip.raw, var.inner(), new_bound) };
+        scip_call_panic! { ffi::SCIPchgVarUbProbing(self.scip.raw, var.inner(), new_bound) }
     }
 
     /// Retrieves the objective value of a variable in the current probing node
@@ -49,12 +49,12 @@ impl Prober {
 
     /// Fixes a variable to a value in the current probing node
     pub fn fix_var(&mut self, var: &Variable, value: f64) {
-        unsafe { ffi::SCIPfixVarProbing(self.scip.raw, var.inner(), value) };
+        scip_call_panic! { ffi::SCIPfixVarProbing(self.scip.raw, var.inner(), value) }
     }
 
     /// Changes the objective value of a variable in the current probing node
     pub fn chg_var_obj(&mut self, var: &Variable, new_obj: f64) {
-        unsafe { ffi::SCIPchgVarObjProbing(self.scip.raw, var.inner(), new_obj) };
+        scip_call_panic! { ffi::SCIPchgVarObjProbing(self.scip.raw, var.inner(), new_obj) }
     }
 
     /// Returns whether the probing subproblem objective function has been changed
@@ -79,8 +79,9 @@ impl Prober {
         if let Some(rounds) = max_rounds {
             r = rounds.try_into().unwrap();
         }
-        unsafe {
-            ffi::SCIPpropagateProbing(self.scip.raw, r, &mut cutoff, &mut nreductions_found);
+
+        scip_call_panic! {
+            ffi::SCIPpropagateProbing(self.scip.raw, r, &mut cutoff, &mut nreductions_found)
         }
 
         (cutoff != 0, nreductions_found.try_into().unwrap())
@@ -95,8 +96,8 @@ impl Prober {
     /// - `cutoff`: whether a cutoff was detected
     pub fn propagate_implications(&mut self) -> bool {
         let mut cutoff = 0;
-        unsafe {
-            ffi::SCIPpropagateProbingImplications(self.scip.raw, &mut cutoff);
+        scip_call_panic! {
+            ffi::SCIPpropagateProbingImplications(self.scip.raw, &mut cutoff)
         }
 
         cutoff != 0
@@ -120,7 +121,7 @@ impl Prober {
         }
         let mut cutoff = 0;
         let mut lperror = 0;
-        unsafe { ffi::SCIPsolveProbingLP(self.scip.raw, limit, &mut cutoff, &mut lperror) };
+        scip_call! { ffi::SCIPsolveProbingLP(self.scip.raw, limit, &mut cutoff, &mut lperror) }
 
         if lperror != 0 {
             return Err(Retcode::LpError);
@@ -159,7 +160,7 @@ impl Prober {
         // enable always for now, to avoid unnecessary complexity
         const DISPLAYINFO: u32 = 1;
 
-        unsafe {
+        scip_call! {
             ffi::SCIPsolveProbingLPWithPricing(
                 self.scip.raw,
                 PRETENDATROOT,
@@ -168,13 +169,18 @@ impl Prober {
                 &mut cutoff,
                 &mut lperror,
             )
-        };
+        }
 
         if lperror != 0 {
             return Err(Retcode::LpError);
         }
 
         Ok(cutoff != 0)
+    }
+
+    /// Adds a row to the probing subproblem
+    pub fn add_row(&mut self, row: &Row) {
+        scip_call_panic! { ffi::SCIPaddRowProbing(self.scip.raw, row.inner(),) }
     }
 }
 
@@ -192,7 +198,7 @@ impl Drop for Prober {
 #[cfg(test)]
 mod tests {
     use crate::model::Model;
-    use crate::prelude::eventhdlr;
+    use crate::prelude::{eventhdlr, row};
     use crate::{ffi, Eventhdlr, ModelWithProblem, ParamSetting};
     use crate::{Event, EventMask, SCIPEventhdlr, Solving};
 
@@ -242,6 +248,48 @@ mod tests {
             .set_param("branching/pscost/priority", 100000);
 
         model.add(eventhdlr(ProbingTester));
+        model.solve();
+    }
+
+    #[test]
+    fn test_probing_add_row() {
+        struct ProbingAddRowTester;
+
+        impl Eventhdlr for ProbingAddRowTester {
+            fn get_type(&self) -> EventMask {
+                EventMask::NODE_SOLVED
+            }
+
+            fn execute(
+                &mut self,
+                mut model: Model<Solving>,
+                _eventhdlr: SCIPEventhdlr,
+                _event: Event,
+            ) {
+                let mut prober = model.start_probing();
+                let obj = model.lp_obj_val();
+                assert!(obj < -25.0);
+                let row = model.add(row().eq(-1.0)); // unsatisfiable row
+                prober.add_row(&row);
+                let _ = prober.solve_lp(None);
+                let obj = model.lp_obj_val();
+                assert!(obj.abs() > 1e15); // infeasible
+            }
+        }
+
+        let mut model = Model::new()
+            .include_default_plugins()
+            .read_prob("data/test/simple.mps")
+            .unwrap()
+            .hide_output()
+            .set_presolving(ParamSetting::Off)
+            .set_separating(ParamSetting::Off)
+            .set_heuristics(ParamSetting::Off)
+            .set_param("branching/pscost/priority", 100000)
+            .set_param("display/lpinfo", true);
+
+        model.add(eventhdlr(ProbingAddRowTester));
+
         model.solve();
     }
 }

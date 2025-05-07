@@ -1,5 +1,6 @@
 use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving};
 use scip_sys::SCIP_ROW;
+use std::fmt::Debug;
 
 /// A trait for implementing custom constraint handlers.
 ///
@@ -60,6 +61,7 @@ impl From<ConshdlrResult> for ffi::SCIP_Result {
 }
 
 /// Wrapper for the internal SCIP constraint handler.
+#[derive(Debug)]
 pub struct SCIPConshdlr {
     pub(crate) raw: *mut ffi::SCIP_CONSHDLR,
 }

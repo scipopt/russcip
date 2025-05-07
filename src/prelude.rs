@@ -4,6 +4,7 @@ pub use crate::builder::cons::cons;
 pub use crate::builder::eventhdlr::eventhdlr;
 pub use crate::builder::heur::heur;
 pub use crate::builder::pricer::pricer;
+pub use crate::builder::row::row;
 pub use crate::builder::sepa::sepa;
 pub use crate::builder::var::var;
 pub use crate::conshdlr::*;

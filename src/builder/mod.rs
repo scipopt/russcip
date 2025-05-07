@@ -8,6 +8,7 @@ pub mod eventhdlr;
 pub mod heur;
 /// This module contains `PricerBuilder` for easily creating pricers.
 pub mod pricer;
+pub(crate) mod row;
 /// This module contains `SepaBuilder` for easily creating separators.
 pub mod sepa;
 /// This module contains `VarBuilder` for easily creating variables.
