@@ -152,10 +152,7 @@ mod tests {
     use super::*;
     use crate::builder::row::RowSource;
     use crate::prelude::{cons, row, sepa, var};
-    use crate::{
-        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, Solving, VarType,
-        Variable,
-    };
+    use crate::{minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving, VarType, Variable};
 
     struct NotRunningSeparator;
 
@@ -257,6 +254,7 @@ mod tests {
             assert!(row.is_modifiable());
             assert!(!row.is_local());
             assert!(!row.is_removable());
+            assert_eq!(row.origin_type(), RowOrigin::Separator);
 
             SeparationResult::DidNotRun
         }
@@ -296,10 +294,23 @@ mod tests {
             mut model: Model<Solving>,
             sepa: SCIPSeparator,
         ) -> SeparationResult {
-            // adds a row representing the sum of all variables == 5, causing infeasibility
-            let mut row = sepa
-                .create_empty_row(&model, "test", 5.0, 5.0, true, false, false)
-                .unwrap();
+            let mut row = model.add(row()
+                .name("test")
+                .eq(5.0)
+                .local(true)
+                .modifiable(false)
+                .removable(false)
+                .source(RowSource::Separator(&sepa))
+            );
+            assert_eq!(row.name(), "test");
+            assert_eq!(row.lhs(), 5.0);
+            assert_eq!(row.rhs(), 5.0);
+            assert_eq!(row.n_non_zeroes(), 0);
+            assert!(row.is_local());
+            assert!(!row.is_modifiable());
+            assert!(!row.is_removable());
+            assert_eq!(row.origin_type(), RowOrigin::Separator);
+            
             let vars = model.vars();
             for var in vars.clone() {
                 row.set_coeff(&var, 1.0);
