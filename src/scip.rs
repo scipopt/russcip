@@ -1,10 +1,18 @@
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
-use crate::{ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable};
+use crate::{
+    ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
+    LPStatus, Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr,
+    SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType,
+    Variable,
+};
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
-use scip_sys::{SCIP_Cons, SCIP_Var, Scip, SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_LOCKTYPE, SCIP_NODE, SCIP_RESULT, SCIP_RETCODE, SCIP_SOL};
+use scip_sys::{
+    SCIP_Cons, SCIP_Var, Scip, SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_LOCKTYPE, SCIP_NODE,
+    SCIP_RESULT, SCIP_RETCODE, SCIP_SOL,
+};
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
 use std::mem::MaybeUninit;
