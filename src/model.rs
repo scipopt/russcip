@@ -627,6 +627,11 @@ impl Model<Solving> {
     pub fn lp_obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetLPObjval(self.scip.raw) }
     }
+
+    /// Returns the status of the current lp solve.
+    pub fn lp_status(&self) -> LPStatus {
+        self.scip.lp_status()
+    }
 }
 
 impl Model<Solved> {
@@ -1700,6 +1705,43 @@ impl From<ObjSense> for ffi::SCIP_OBJSENSE {
         match val {
             ObjSense::Maximize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MAXIMIZE,
             ObjSense::Minimize => ffi::SCIP_Objsense_SCIP_OBJSENSE_MINIMIZE,
+        }
+    }
+}
+
+/// Status of the LP solver
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LPStatus {
+    /// The LP is solved to optimality
+    Optimal,
+    /// The LP is infeasible
+    Infeasible,
+    /// The LP is unbounded
+    Unbounded,
+    /// The LP is not solved yet
+    NotSolved,
+    /// Error in solving the LP
+    Error,
+    /// The LP is solved to optimality, but the solution is not valid
+    IterLimit,
+    /// The LP is solved to optimality, but the objective limit is reached
+    ObjLimit,
+    /// The LP is solved to optimality, but the time limit is reached
+    TimeLimit,
+}
+
+impl From<ffi::SCIP_LPSolStat> for LPStatus {
+    fn from(value: ffi::SCIP_LPSolStat) -> Self {
+        match value {
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_OPTIMAL => LPStatus::Optimal,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_INFEASIBLE => LPStatus::Infeasible,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_UNBOUNDEDRAY => LPStatus::Unbounded,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_NOTSOLVED => LPStatus::NotSolved,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_ERROR => LPStatus::Error,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_ITERLIMIT => LPStatus::IterLimit,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_OBJLIMIT => LPStatus::ObjLimit,
+            ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_TIMELIMIT => LPStatus::TimeLimit,
+            _ => LPStatus::Error,
         }
     }
 }

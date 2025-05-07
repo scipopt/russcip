@@ -285,8 +285,7 @@ mod tests {
             .set_presolving(ParamSetting::Off)
             .set_separating(ParamSetting::Off)
             .set_heuristics(ParamSetting::Off)
-            .set_param("branching/pscost/priority", 100000)
-            .set_param("display/lpinfo", true);
+            .set_param("branching/pscost/priority", 100000);
 
         model.add(eventhdlr(ProbingAddRowTester));
 

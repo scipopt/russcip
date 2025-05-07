@@ -3,8 +3,9 @@ use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
-    Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr,
-    SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable,
+    LPStatus, Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr,
+    SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType,
+    Variable,
 };
 use crate::{scip_call, HeurTiming, Heuristic};
 use core::panic;
@@ -1552,6 +1553,11 @@ impl ScipPtr {
     pub(crate) fn free_transform(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPfreeTransform(self.raw));
         Ok(())
+    }
+
+    pub(crate) fn lp_status(&self) -> LPStatus {
+        let status = unsafe { ffi::SCIPgetLPSolstat(self.raw) };
+        status.into()
     }
 
     pub(crate) fn add_row(&self, row: Row, force_cut: bool) -> Result<bool, Retcode> {
