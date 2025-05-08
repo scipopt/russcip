@@ -56,10 +56,36 @@ To add a custom plugin to a SCIP `Model` instance, you should implement its trai
 corresponding files.
 
 ## Attaching custom data to SCIP instance
-This is enabled with the help of the `anymap` crate. You can attach any data to the `Model` instance using the
+This is enabled with the help of the [`anymap`](https://github.com/chris-morgan/anymap) crate. You can attach any data to the `Model` instance using the
 `set_data` method, and retrieve it using the `get_data` and `get_data_mut` methods.
 This is useful for communicating data between plugins, or storing other representations of the
 variables/constraints in the model.
+
+```rust
+let mut model = Model::new();
+
+// Some user-defined data
+struct MyData {
+    title: String,
+}
+
+let data = MyData {
+    title: "My Data".to_string(),
+};
+
+// Attach the data to the model
+model.set_data(data);
+
+// Retrieve the data
+let data_ref = model.get_data::<MyData>().unwrap();
+assert_eq!(data_ref.title, "My Data");
+
+// Mutate the data
+let data_mut = model.get_data_mut::<MyData>().unwrap();
+data_mut.title = "New Title".to_string();
+assert_eq!(data_mut.title, "New Title");
+```
+
 
 ## Contributing
 

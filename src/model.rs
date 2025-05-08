@@ -2316,4 +2316,31 @@ mod tests {
         assert!(model.le(1.0 - eps, 1.0));
         assert!(model.ge(1.0, 1.0 - eps));
     }
+    
+    #[test]
+    #[cfg(feature = "datastore")]
+    fn test_datastore() {
+        let mut model = Model::new();
+
+        // Some user-defined data
+        struct MyData {
+            title: String,
+        }
+
+        let data = MyData {
+            title: "My Data".to_string(),
+        };
+
+        // Attach the data to the model
+        model.set_data(data);
+
+        // Retrieve the data
+        let data_ref = model.get_data::<MyData>().unwrap();
+        assert_eq!(data_ref.title, "My Data");
+
+        // Mutate the data
+        let data_mut = model.get_data_mut::<MyData>().unwrap();
+        data_mut.title = "New Title".to_string();
+        assert_eq!(data_mut.title, "New Title");
+    }
 }
