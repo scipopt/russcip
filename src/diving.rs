@@ -82,6 +82,11 @@ impl Diver {
     pub fn last_dive_node(&self) -> usize {
         unsafe { ffi::SCIPgetLastDivenode(self.scip.raw) as usize }
     }
+
+    /// Changes the cutoff bound in the diving LP
+    pub fn chg_cutoff_bound(&mut self, cutoff: f64) {
+        scip_call_panic! { ffi::SCIPchgCutoffboundDive(self.scip.raw, cutoff) }
+    }
 }
 
 impl Drop for Diver {
