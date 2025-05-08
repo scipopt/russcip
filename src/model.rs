@@ -2316,7 +2316,7 @@ mod tests {
         assert!(model.le(1.0 - eps, 1.0));
         assert!(model.ge(1.0, 1.0 - eps));
     }
-    
+
     #[test]
     #[cfg(feature = "datastore")]
     fn test_datastore() {
