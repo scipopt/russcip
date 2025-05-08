@@ -8,17 +8,17 @@ pub struct Diver {
 }
 
 impl Diver {
-    /// Changes the lower bound of a variable in the current diving node
+    /// Changes the lower bound of a variable in the current dive
     pub fn chg_var_lb(&mut self, var: &Variable, new_bound: f64) {
         scip_call_panic! { ffi::SCIPchgVarLbDive(self.scip.raw, var.inner(), new_bound) }
     }
 
-    /// Changes the upper bound of a variable in the current diving node
+    /// Changes the upper bound of a variable in the current dive
     pub fn chg_var_ub(&mut self, var: &Variable, new_bound: f64) {
         scip_call_panic! { ffi::SCIPchgVarUbDive(self.scip.raw, var.inner(), new_bound) }
     }
 
-    /// Changes the objective value of a variable in the current diving node
+    /// Changes the objective value of a variable in the current dive
     pub fn chg_var_obj(&mut self, var: &Variable, new_obj: f64) {
         scip_call_panic! { ffi::SCIPchgVarObjDive(self.scip.raw, var.inner(), new_obj) }
     }
