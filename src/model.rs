@@ -1665,6 +1665,24 @@ impl<T> Model<T> {
     pub fn eps(&self) -> f64 {
         unsafe { ffi::SCIPepsilon(self.scip.raw) }
     }
+
+    #[cfg(feature = "datastore")]
+    /// Set generic data attached to the model
+    pub fn set_data<D: 'static>(&mut self, data: D) {
+        self.scip.set_store(data).expect("Failed to set data");
+    }
+
+    #[cfg(feature = "datastore")]
+    /// Retrieves a reference to a generic data type attached to the model
+    pub fn get_data<D: 'static>(&self) -> Option<&D> {
+        self.scip.get_store::<D>().expect("Failed to get data")
+    }
+
+    #[cfg(feature = "datastore")]
+    /// Returns a mutable reference to generic data attached to the model
+    pub fn get_data_mut<D: 'static>(&mut self) -> Option<&mut D> {
+        self.scip.get_mut_store::<D>().expect("Failed to get data")
+    }
 }
 
 /// The default implementation for a `Model` instance in the `ProblemCreated` state.
