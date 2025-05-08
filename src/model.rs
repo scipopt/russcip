@@ -10,9 +10,9 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
-use crate::Conshdlr;
 use crate::{ffi, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
+use crate::{Conshdlr, Diver};
 use scip_sys::SCIP;
 use std::rc::Rc;
 
@@ -621,6 +621,18 @@ impl Model<Solving> {
         unsafe { ffi::SCIPstartProbing(scip.raw) };
 
         Prober { scip }
+    }
+
+    /// Starts diving at the current node.
+    ///
+    /// # Returns
+    /// A `Diver` instance that can be used to access methods allowed only in diving mode.
+    pub fn start_diving(&mut self) -> Diver {
+        let scip = self.scip.clone();
+
+        unsafe { ffi::SCIPstartDive(scip.raw) };
+
+        Diver { scip }
     }
 
     /// Returns the objective value of the current LP relaxation.
