@@ -61,9 +61,6 @@ This is enabled with the help of the `anymap` crate. You can attach any data to 
 This is useful for communicating data between plugins, or storing other representations of the
 variables/constraints in the model.
 
-```rust
-
-
 ## Contributing
 
 Thinking about contributing to _russcip_? First of all thank you! You can check our
