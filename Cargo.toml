@@ -9,6 +9,7 @@ edition = "2021"
 exclude = ["data/test/*"]
 
 [features]
+default = ["datastore"]
 bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 datastore = ["anymap"]
