@@ -1668,7 +1668,7 @@ impl<T> Model<T> {
 
     #[cfg(feature = "datastore")]
     /// Set generic data attached to the model
-    pub fn data_set<D: 'static>(&mut self, data: D) {
+    pub fn set_data<D: 'static>(&mut self, data: D) {
         self.scip.set_store(data).expect("Failed to set data");
     }
 
