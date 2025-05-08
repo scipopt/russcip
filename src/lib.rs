@@ -90,9 +90,11 @@ pub mod builder;
 
 /// Contains the `Conshdlr` trait used to define custom constraint handlers.
 pub mod conshdlr;
+mod diving;
 mod probing;
 
 pub use conshdlr::*;
+pub use diving::*;
 
 pub use row::*;
 
