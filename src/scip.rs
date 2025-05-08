@@ -1574,6 +1574,7 @@ impl ScipPtr {
         Ok(infeasible != 0)
     }
 
+    #[cfg(feature = "datastore")]
     // Initializes an anymap as a generic datastore, and keeps a reference to it on an
     // unused plugin (eventhdlr)
     fn init_datastore(&self) -> Result<(), Retcode> {
@@ -1630,6 +1631,7 @@ impl ScipPtr {
         Ok(())
     }
 
+    #[cfg(feature = "datastore")]
     pub(crate) fn get_store<T: 'static>(&self) -> Result<Option<&T>, Retcode> {
         let name = CString::new("russcip_datastore").unwrap();
         let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
@@ -1646,6 +1648,7 @@ impl ScipPtr {
         Ok(thing)
     }
 
+    #[cfg(feature = "datastore")]
     pub(crate) fn get_mut_store<T: 'static>(&self) -> Result<Option<&mut T>, Retcode> {
         let name = CString::new("russcip_datastore").unwrap();
         let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
@@ -1662,6 +1665,7 @@ impl ScipPtr {
         Ok(thing)
     }
 
+    #[cfg(feature = "datastore")]
     pub(crate) fn set_store<T: 'static>(&self, thing: T) -> Result<(), Retcode> {
         let name = CString::new("russcip_datastore").unwrap();
         let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
@@ -1730,11 +1734,11 @@ impl Drop for ScipPtr {
 
 #[cfg(test)]
 mod tests {
-    use crate::scip::ScipPtr;
-
     #[cfg(feature = "datastore")]
     #[test]
     fn test_datastore() {
+        use crate::scip::ScipPtr;
+
         let scip = ScipPtr::new();
         assert!(!scip.raw.is_null());
 
@@ -1747,7 +1751,6 @@ mod tests {
         *data.unwrap() = 10;
         let data = scip.get_store::<i32>().unwrap();
         assert_eq!(data, Some(&10));
-
 
         // Test with a custom struct
         #[derive(Debug, PartialEq)]
@@ -1763,11 +1766,32 @@ mod tests {
 
         scip.set_store(my_data).unwrap();
         let data = scip.get_store::<MyData>().unwrap();
-        assert_eq!(data, Some(&MyData { a: 42, b: "Hello".to_string() }));
+        assert_eq!(
+            data,
+            Some(&MyData {
+                a: 42,
+                b: "Hello".to_string()
+            })
+        );
         let data = scip.get_mut_store::<MyData>().unwrap();
-        assert_eq!(data, Some(&mut MyData { a: 42, b: "Hello".to_string() }));
-        *data.unwrap() = MyData { a: 100, b: "World".to_string() };
+        assert_eq!(
+            data,
+            Some(&mut MyData {
+                a: 42,
+                b: "Hello".to_string()
+            })
+        );
+        *data.unwrap() = MyData {
+            a: 100,
+            b: "World".to_string(),
+        };
         let data = scip.get_store::<MyData>().unwrap();
-        assert_eq!(data, Some(&MyData { a: 100, b: "World".to_string() }));
+        assert_eq!(
+            data,
+            Some(&MyData {
+                a: 100,
+                b: "World".to_string()
+            })
+        );
     }
 }
