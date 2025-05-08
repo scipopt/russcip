@@ -1,3 +1,6 @@
+#[cfg(feature = "datastore")]
+use anymap::AnyMap;
+
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
@@ -760,7 +763,7 @@ impl ScipPtr {
         let c_desc = CString::new(desc).unwrap();
         let eventhdlr_ptr = Box::into_raw(Box::new(eventhdlr));
 
-        unsafe {
+        scip_call! {
             ffi::SCIPincludeEventhdlr(
                 self.raw,
                 c_name.as_ptr(),
@@ -774,7 +777,7 @@ impl ScipPtr {
                 None,
                 Some(eventhdlrexec),
                 eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
-            );
+            )
         }
 
         Ok(())
@@ -1570,6 +1573,110 @@ impl ScipPtr {
         ));
         Ok(infeasible != 0)
     }
+
+    // Initializes an anymap as a generic datastore, and keeps a reference to it on an
+    // unused plugin (eventhdlr)
+    fn init_datastore(&self) -> Result<(), Retcode> {
+        unsafe extern "C" fn eventhdlrfree(
+            _scip: *mut ffi::SCIP,
+            eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+            assert!(!data_ptr.is_null());
+            let eventhdlr_ptr = data_ptr as *mut AnyMap;
+            drop(unsafe { Box::from_raw(eventhdlr_ptr) });
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn eventhdlrexec(
+            _scip: *mut ffi::SCIP,
+            _eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+            _event: *mut ffi::SCIP_EVENT,
+            _event_data: *mut ffi::SCIP_EVENTDATA,
+        ) -> ffi::SCIP_Retcode {
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn eventhdlrinit(
+            _scip: *mut ffi::SCIP,
+            _eventhdlr: *mut ffi::SCIP_EVENTHDLR,
+        ) -> ffi::SCIP_Retcode {
+            Retcode::Okay.into()
+        }
+
+        let c_name = CString::new("russcip_datastore").unwrap();
+        let c_desc = CString::new("").unwrap();
+        let map = AnyMap::new();
+        let data = Box::new(map);
+        let eventhdlr_ptr = Box::into_raw(data);
+
+        scip_call! {
+            ffi::SCIPincludeEventhdlr(
+                self.raw,
+                c_name.as_ptr(),
+                c_desc.as_ptr(),
+                None,
+                Some(eventhdlrfree),
+                Some(eventhdlrinit),
+                None,
+                None,
+                None,
+                None,
+                Some(eventhdlrexec),
+                eventhdlr_ptr as *mut ffi::SCIP_EVENTHDLRDATA,
+            )
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn get_store<T: 'static>(&self) -> Result<Option<&T>, Retcode> {
+        let name = CString::new("russcip_datastore").unwrap();
+        let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        if eventhdlr.is_null() {
+            self.init_datastore()?;
+            eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        }
+
+        let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+        assert!(!data_ptr.is_null());
+        let eventhdlr_ptr = data_ptr as *mut AnyMap;
+        let map = unsafe { &*eventhdlr_ptr };
+        let thing = map.get::<T>();
+        Ok(thing)
+    }
+
+    pub(crate) fn get_mut_store<T: 'static>(&self) -> Result<Option<&mut T>, Retcode> {
+        let name = CString::new("russcip_datastore").unwrap();
+        let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        if eventhdlr.is_null() {
+            self.init_datastore()?;
+            eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        }
+
+        let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+        assert!(!data_ptr.is_null());
+        let eventhdlr_ptr = data_ptr as *mut AnyMap;
+        let map = unsafe { &mut *eventhdlr_ptr };
+        let thing = map.get_mut::<T>();
+        Ok(thing)
+    }
+
+    pub(crate) fn set_store<T: 'static>(&self, thing: T) -> Result<(), Retcode> {
+        let name = CString::new("russcip_datastore").unwrap();
+        let mut eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        if eventhdlr.is_null() {
+            self.init_datastore()?;
+            eventhdlr = unsafe { ffi::SCIPfindEventhdlr(self.raw, name.as_ptr()) };
+        }
+
+        let data_ptr = unsafe { ffi::SCIPeventhdlrGetData(eventhdlr) };
+        assert!(!data_ptr.is_null());
+        let eventhdlr_ptr = data_ptr as *mut AnyMap;
+        let map = unsafe { &mut *eventhdlr_ptr };
+        map.insert(thing);
+        Ok(())
+    }
 }
 
 impl Drop for ScipPtr {
@@ -1618,5 +1725,49 @@ impl Drop for ScipPtr {
 
         // free SCIP instance
         unsafe { ffi::SCIPfree(&mut self.raw) };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::scip::ScipPtr;
+
+    #[cfg(feature = "datastore")]
+    #[test]
+    fn test_datastore() {
+        let scip = ScipPtr::new();
+        assert!(!scip.raw.is_null());
+
+        // Test with a simple integer
+        scip.set_store(5).unwrap();
+        let data = scip.get_store::<i32>().unwrap();
+        assert_eq!(data, Some(&5));
+        let data = scip.get_mut_store::<i32>().unwrap();
+        assert_eq!(data, Some(&mut 5));
+        *data.unwrap() = 10;
+        let data = scip.get_store::<i32>().unwrap();
+        assert_eq!(data, Some(&10));
+
+
+        // Test with a custom struct
+        #[derive(Debug, PartialEq)]
+        struct MyData {
+            a: i32,
+            b: String,
+        }
+
+        let my_data = MyData {
+            a: 42,
+            b: "Hello".to_string(),
+        };
+
+        scip.set_store(my_data).unwrap();
+        let data = scip.get_store::<MyData>().unwrap();
+        assert_eq!(data, Some(&MyData { a: 42, b: "Hello".to_string() }));
+        let data = scip.get_mut_store::<MyData>().unwrap();
+        assert_eq!(data, Some(&mut MyData { a: 42, b: "Hello".to_string() }));
+        *data.unwrap() = MyData { a: 100, b: "World".to_string() };
+        let data = scip.get_store::<MyData>().unwrap();
+        assert_eq!(data, Some(&MyData { a: 100, b: "World".to_string() }));
     }
 }
