@@ -55,6 +55,15 @@ To add a custom plugin to a SCIP `Model` instance, you should implement its trai
 `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the
 corresponding files.
 
+## Attaching custom data to SCIP instance
+This is enabled with the help of the `anymap` crate. You can attach any data to the `Model` instance using the
+`set_data` method, and retrieve it using the `get_data` and `get_data_mut` methods.
+This is useful for communicating data between plugins, or storing other representations of the
+variables/constraints in the model.
+
+```rust
+
+
 ## Contributing
 
 Thinking about contributing to _russcip_? First of all thank you! You can check our
