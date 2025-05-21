@@ -193,7 +193,7 @@ fn solve_knapsack(
     for pair in branching_decision.together.iter() {
         let var1 = &vars[pair.0];
         let var2 = &vars[pair.1];
-        model.add(cons().eq(1.0).coef(var1, 1.0).coef(var2, -1.0));
+        model.add(cons().eq(0.0).coef(var1, 1.0).coef(var2, -1.0));
     }
 
     // apart constraints
