@@ -73,7 +73,7 @@ fn main() {
             println!("{:?} = {value}", pattern);
         }
     }
-    
+
     assert!(solved_model.eq(solution.obj_val(), 4.0));
 }
 
