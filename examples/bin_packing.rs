@@ -79,7 +79,7 @@ fn main() {
 
 struct KnapsackPricer;
 
-fn get_duals(item_constraints: &Vec<Constraint>, farkas: bool) -> Vec<f64> {
+fn get_duals(item_constraints: &[Constraint], farkas: bool) -> Vec<f64> {
     let mut duals = vec![0.0; item_constraints.len()];
     for (item, cons) in item_constraints.iter().enumerate() {
         let c = cons
@@ -170,7 +170,7 @@ impl Pricer for KnapsackPricer {
 
 /// Solve the knapsack problem and return the selected items and the total profit.
 fn solve_knapsack(
-    sizes: &Vec<f64>,
+    sizes: &[f64],
     profits: &Vec<f64>,
     capacity: f64,
     branching_decision: &BranchingDecisions,
