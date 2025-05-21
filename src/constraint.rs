@@ -58,6 +58,25 @@ impl Constraint {
         Some(unsafe { ffi::SCIPgetDualsolLinear(self.scip.raw, self.raw) })
     }
 
+    /// Returns the Farkas dual solution of the linear constraint in the current (infeasible) LP.
+    /// Returns `None` if the constraint is not a linear constraint.
+    pub fn farkas_dual_sol(&self) -> Option<f64> {
+        let cons_handler = unsafe { ffi::SCIPconsGetHdlr(self.raw) };
+        if cons_handler.is_null() {
+            return None;
+        }
+        let cons_handler_name = unsafe { ffi::SCIPconshdlrGetName(cons_handler) };
+        if cons_handler_name.is_null() {
+            return None;
+        }
+        let cons_handler_name = unsafe { std::ffi::CStr::from_ptr(cons_handler_name) };
+        if cons_handler_name.to_str().unwrap() != "linear" {
+            return None;
+        }
+
+        Some(unsafe { ffi::SCIPgetDualfarkasLinear(self.scip.raw, self.raw) })
+    }
+
     /// Returns the modifiable flag of the constraint
     pub fn is_modifiable(&self) -> bool {
         self.scip.cons_is_modifiable(self)

@@ -138,6 +138,20 @@ impl Variable {
     pub fn is_active(&self) -> bool {
         unsafe { ffi::SCIPvarIsActive(self.raw) != 0 }
     }
+
+    /// Returns the trasnformed variable if it exists.
+    pub fn transformed(&self) -> Option<Variable> {
+        let var_ptr = unsafe { ffi::SCIPvarGetTransVar(self.raw) };
+        if var_ptr.is_null() {
+            return None;
+        }
+
+        let var = Variable {
+            raw: var_ptr,
+            scip: Rc::clone(&self.scip),
+        };
+        Some(var)
+    }
 }
 
 /// The type of variable in an optimization problem.

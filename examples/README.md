@@ -11,3 +11,4 @@ This directory contains examples of how to use the `russcip` library.
 6. [Clique separator](clique_separator.rs): An example demonstrating how to implement a clique separator for set partitioning problems.
 7. [Most infeasible branching](most_infeasible_branching.rs): An example showing how to implement a custom branching rule that selects variables based on their fractionality.
 8. [Node event handler](node_event_handler.rs): An example demonstrating how to track and report information about nodes during the branch-and-bound process.
+9. [Bin packing](bin_packing.rs): An example branch-and-price implementation for the bin packing problem, following the guide in https://github.com/mmghannam/co-work2024/blob/main/Day3/README.md
