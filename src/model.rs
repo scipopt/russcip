@@ -10,7 +10,7 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
-use crate::{ffi, Row, Separator};
+use crate::{ffi, scip_call_panic, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use crate::{Conshdlr, Diver};
 use scip_sys::SCIP;
@@ -643,6 +643,26 @@ impl Model<Solving> {
     /// Returns the status of the current lp solve.
     pub fn lp_status(&self) -> LPStatus {
         self.scip.lp_status()
+    }
+
+    /// Changes the upper bound of the variable in a given node.
+    pub fn set_ub_node(&mut self, node: &Node, var: &Variable, ub: f64) {
+        scip_call_panic!(ffi::SCIPchgVarUbNode(
+            self.scip.raw,
+            node.inner(),
+            var.inner(),
+            ub
+        ));
+    }
+
+    /// Changes the lower bound of the variable in a given node.
+    pub fn set_lb_node(&mut self, node: &Node, var: &Variable, lb: f64) {
+        scip_call_panic!(ffi::SCIPchgVarLbNode(
+            self.scip.raw,
+            node.inner(),
+            var.inner(),
+            lb
+        ));
     }
 }
 
