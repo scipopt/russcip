@@ -325,7 +325,7 @@ impl RyanFoster {
         // find the pair with the largest fractional value
         let pair = pair_vals
             .iter()
-            .filter(|(_, &val)| val.fract() > model.eps() && val < 1.0 - model.eps())
+            .filter(|&(_, &val)| val.fract() > model.eps() && val < 1.0 - model.eps())
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap()
             .0;
