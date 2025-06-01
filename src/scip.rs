@@ -232,7 +232,13 @@ impl ScipPtr {
 
     pub(crate) fn vars(&self, original: bool, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
         // NOTE: this method should only be called once per SCIP instance
-        let n_vars = self.n_vars();
+        let n_vars = {
+            if original {
+                unsafe { ffi::SCIPgetNOrigVars(self.raw) as usize }
+            } else {
+                self.n_vars()
+            }
+        };
         let mut vars = BTreeMap::new();
         let scip_vars = if original {
             unsafe { ffi::SCIPgetOrigVars(self.raw) }
