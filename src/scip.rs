@@ -18,7 +18,7 @@ use scip_sys::{
 };
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
-use std::mem::MaybeUninit;
+use std::mem::{ManuallyDrop, MaybeUninit};
 use std::rc::Rc;
 
 use crate::builder::row::{RowBuilder, RowSource};
@@ -290,6 +290,26 @@ impl ScipPtr {
             return None;
         }
         Some(unsafe { ffi::SCIPgetBestSol(self.raw) })
+    }
+
+    /// Returns a vector containing SCIP_SOL pointers.
+    /// The vector needs to be dropped manually
+    pub(crate) fn get_sols(&self) -> Option<ManuallyDrop<Vec<*mut SCIP_SOL>>> {
+        // check number of sols
+        let n_sols = self.n_sols();
+        if n_sols == 0 {
+            return None;
+        }
+        let sols = unsafe {
+            //? ManuallyDrop is needed to prevent Vec::drop from running.
+            //? This prevents Rust from calling free on the elements in the vector.
+            ManuallyDrop::new(Vec::from_raw_parts(
+                ffi::SCIPgetSols(self.raw),
+                n_sols,
+                n_sols,
+            ))
+        };
+        Some(sols)
     }
 
     pub(crate) fn obj_val(&self) -> f64 {
