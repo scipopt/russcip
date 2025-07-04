@@ -690,7 +690,7 @@ impl Model<Solved> {
     pub fn free_transform(self) -> Model<ProblemCreated> {
         self.scip
             .free_transform()
-            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {:?}", retcode));
+            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {retcode:?}"));
         Model {
             scip: self.scip,
             state: ProblemCreated {},

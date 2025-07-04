@@ -1041,8 +1041,7 @@ impl ScipPtr {
                     let heur_name =
                         unsafe { CStr::from_ptr(ffi::SCIPheurGetName(heur)).to_str().unwrap() };
                     eprintln!(
-                        "Heuristic {} returned result {:?}, but no solutions were added",
-                        heur_name, heur_res
+                        "Heuristic {heur_name} returned result {heur_res:?}, but no solutions were added"
                     );
                     return Retcode::Error.into();
                 }
