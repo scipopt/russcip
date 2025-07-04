@@ -18,7 +18,7 @@ use scip_sys::{
 };
 use std::collections::BTreeMap;
 use std::ffi::{c_int, CStr, CString};
-use std::mem::{ManuallyDrop, MaybeUninit};
+use std::mem::MaybeUninit;
 use std::rc::Rc;
 
 use crate::builder::row::{RowBuilder, RowSource};
@@ -302,8 +302,8 @@ impl ScipPtr {
         }
         let mut sols = Vec::with_capacity(n_sols);
         let scip_sols = unsafe { ffi::SCIPgetSols(self.raw) };
-        for i in 0..n_sols{
-            let scip_sol = unsafe {*scip_sols.add(i)};
+        for i in 0..n_sols {
+            let scip_sol = unsafe { *scip_sols.add(i) };
             sols.push(scip_sol);
         }
         Some(sols)
