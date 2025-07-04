@@ -578,12 +578,10 @@ impl Model<Solving> {
     /// # Returns
     /// The `Variable` if it exists, otherwise `None`.
     pub fn var_in_prob(&self, var_prob_id: usize) -> Option<Variable> {
-        unsafe {
-            ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
-                raw: v,
-                scip: self.scip.clone(),
-            })
-        }
+        ScipPtr::var_from_id(self.scip.raw, var_prob_id).map(|v| Variable {
+            raw: v,
+            scip: self.scip.clone(),
+        })
     }
 
     /// Adds a new cut (row) to the model.

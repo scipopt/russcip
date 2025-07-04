@@ -592,9 +592,9 @@ impl ScipPtr {
         unsafe { ffi::SCIPnodeGetNAddedConss(node.raw) as usize }
     }
 
-    pub(crate) unsafe fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
-        let n_vars = ffi::SCIPgetNVars(scip) as usize;
-        let var = *ffi::SCIPgetVars(scip).add(var_prob_id);
+    pub(crate) fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
+        let n_vars = unsafe { ffi::SCIPgetNVars(scip) as usize };
+        let var = unsafe { *ffi::SCIPgetVars(scip).add(var_prob_id) };
         if var_prob_id >= n_vars {
             None
         } else {

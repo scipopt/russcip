@@ -34,7 +34,7 @@ impl Heuristic for RandomRoundingHeur {
                 if frac_part > 1e-6 && frac_part < 1.0 - 1e-6 {
                     has_fractional = true;
                     // Randomly round up with probability equal to fractional part
-                    let rounded = if rng.gen::<f64>() < frac_part {
+                    let rounded = if rng.r#gen::<f64>() < frac_part {
                         lp_val.ceil()
                     } else {
                         lp_val.floor()
