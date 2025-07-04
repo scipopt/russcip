@@ -294,21 +294,18 @@ impl ScipPtr {
 
     /// Returns a vector containing SCIP_SOL pointers.
     /// The vector needs to be dropped manually
-    pub(crate) fn get_sols(&self) -> Option<ManuallyDrop<Vec<*mut SCIP_SOL>>> {
+    pub(crate) fn get_sols(&self) -> Option<Vec<*mut SCIP_SOL>> {
         // check number of sols
         let n_sols = self.n_sols();
         if n_sols == 0 {
             return None;
         }
-        let sols = unsafe {
-            //? ManuallyDrop is needed to prevent Vec::drop from running.
-            //? This prevents Rust from calling free on the elements in the vector.
-            ManuallyDrop::new(Vec::from_raw_parts(
-                ffi::SCIPgetSols(self.raw),
-                n_sols,
-                n_sols,
-            ))
-        };
+        let mut sols = Vec::with_capacity(n_sols);
+        let scip_sols = unsafe { ffi::SCIPgetSols(self.raw) };
+        for i in 0..n_sols{
+            let scip_sol = unsafe {*scip_sols.add(i)};
+            sols.push(scip_sol);
+        }
         Some(sols)
     }
 

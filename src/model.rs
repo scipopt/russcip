@@ -1368,9 +1368,7 @@ pub trait WithSolutions {
     fn best_sol(&self) -> Option<Solution>;
 
     /// Return vector containing all solutions
-    fn get_sols(&self) -> Option<Vec<Solution>> {
-        unimplemented!();
-    }
+    fn get_sols(&self) -> Option<Vec<Solution>>;
 
     /// Returns the number of solutions found by the optimization model.
     fn n_sols(&self) -> usize;
@@ -1407,10 +1405,10 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
                 .scip
                 .get_sols()
                 .unwrap()
-                .iter()
+                .into_iter()
                 .map(|x| Solution {
+                    raw: x,
                     scip_ptr: self.scip.clone(),
-                    raw: x.to_owned(),
                 })
                 .collect();
             Some(scip_sols)
