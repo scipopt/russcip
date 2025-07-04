@@ -2,7 +2,7 @@ name: russcip_pipelines
 
 env:
   version: 9.2.1
-  RUST_VERSION: 1.83.0
+  RUST_VERSION: 1.88.0
 
 on:
   push:
