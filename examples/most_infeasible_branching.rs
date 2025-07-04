@@ -1,6 +1,6 @@
 use russcip::{
-    prelude::*, BranchRule, BranchingCandidate, BranchingResult, ParamSetting, SCIPBranchRule,
-    Solving,
+    BranchRule, BranchingCandidate, BranchingResult, ParamSetting, SCIPBranchRule, Solving,
+    prelude::*,
 };
 
 /// A branching rule that implements the most infeasible branching strategy.

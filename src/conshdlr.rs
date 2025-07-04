@@ -1,4 +1,4 @@
-use crate::{ffi, scip_call, Model, Retcode, Row, Solution, Solving};
+use crate::{Model, Retcode, Row, Solution, Solving, ffi, scip_call};
 use scip_sys::SCIP_ROW;
 use std::fmt::Debug;
 
@@ -15,7 +15,7 @@ pub trait Conshdlr {
     /// * `conshdlr` - The internal SCIP constraint handler.
     /// * `solution` - The solution to be checked.
     fn check(&mut self, model: Model<Solving>, conshdlr: SCIPConshdlr, solution: &Solution)
-        -> bool;
+    -> bool;
 
     /// Enforce the constraint for the current sub-problem's (LP) solution.
     ///

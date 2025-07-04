@@ -5,19 +5,18 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
-    LPStatus, Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr,
-    SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType,
-    Variable,
+    BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
+    ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
+    SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable, ffi, scip_call_panic,
 };
-use crate::{scip_call, HeurTiming, Heuristic};
+use crate::{HeurTiming, Heuristic, scip_call};
 use core::panic;
 use scip_sys::{
-    SCIP_Cons, SCIP_Var, Scip, SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_LOCKTYPE, SCIP_NODE,
-    SCIP_RESULT, SCIP_RETCODE, SCIP_SOL,
+    SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_Cons, SCIP_LOCKTYPE, SCIP_NODE, SCIP_RESULT, SCIP_RETCODE,
+    SCIP_SOL, SCIP_Var, Scip,
 };
 use std::collections::BTreeMap;
-use std::ffi::{c_int, CStr, CString};
+use std::ffi::{CStr, CString, c_int};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -1441,11 +1440,7 @@ impl ScipPtr {
 
     pub(crate) fn focus_node(&self) -> Option<*mut SCIP_NODE> {
         let ptr = unsafe { ffi::SCIPgetFocusNode(self.raw) };
-        if ptr.is_null() {
-            None
-        } else {
-            Some(ptr)
-        }
+        if ptr.is_null() { None } else { Some(ptr) }
     }
 
     pub(crate) fn create_child(&self) -> Result<*mut SCIP_NODE, Retcode> {

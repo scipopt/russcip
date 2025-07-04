@@ -48,9 +48,9 @@ impl Node {
 mod tests {
     use crate::prelude::branchrule;
     use crate::{
+        SCIPBranchRule, Solving,
         branchrule::{BranchRule, BranchingResult},
         model::Model,
-        SCIPBranchRule, Solving,
     };
 
     struct NodeDataBranchRule;

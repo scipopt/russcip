@@ -1,6 +1,6 @@
 use rand::{Rng, SeedableRng};
-use russcip::{prelude::*, ParamSetting};
 use russcip::{HeurResult, HeurTiming, Heuristic, Model, Solving, VarType};
+use russcip::{ParamSetting, prelude::*};
 
 /// A primal heuristic that performs random rounding at LP solutions
 struct RandomRoundingHeur;

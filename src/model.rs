@@ -1,5 +1,5 @@
-use crate::builder::cons::ConsBuilder;
 use crate::builder::CanBeAddedToModel;
+use crate::builder::cons::ConsBuilder;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
@@ -10,9 +10,9 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
-use crate::{ffi, scip_call_panic, Row, Separator};
 use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use crate::{Conshdlr, Diver};
+use crate::{Row, Separator, ffi, scip_call_panic};
 use scip_sys::SCIP;
 use std::rc::Rc;
 

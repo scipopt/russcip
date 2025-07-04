@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, scip_call, scip_call_panic, Retcode, Row, Variable};
+use crate::{Retcode, Row, Variable, ffi, scip_call, scip_call_panic};
 use std::rc::Rc;
 
 /// Struct giving access to methods allowed in probing mode
@@ -199,8 +199,8 @@ impl Drop for Prober {
 mod tests {
     use crate::model::Model;
     use crate::prelude::{eventhdlr, row};
-    use crate::{ffi, Eventhdlr, ModelWithProblem, ParamSetting};
     use crate::{Event, EventMask, SCIPEventhdlr, Solving};
+    use crate::{Eventhdlr, ModelWithProblem, ParamSetting, ffi};
 
     #[test]
     fn test_prober() {
