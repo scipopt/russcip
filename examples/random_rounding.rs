@@ -65,9 +65,7 @@ impl Heuristic for RandomRoundingHeur {
         // Try to add the rounded solution
         match model.add_sol(sol) {
             Ok(_) => {
-                println!(
-                    "-- RandomRoundingHeur: Added solution to the model with val {sol_val}."
-                );
+                println!("-- RandomRoundingHeur: Added solution to the model with val {sol_val}.");
                 HeurResult::FoundSol
             }
             Err(_) => {
