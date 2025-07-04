@@ -1648,6 +1648,7 @@ impl ScipPtr {
         Ok(thing)
     }
 
+    #[allow(clippy::mut_from_ref)]
     #[cfg(feature = "datastore")]
     pub(crate) fn get_mut_store<T: 'static>(&self) -> Result<Option<&mut T>, Retcode> {
         let name = CString::new("russcip_datastore").unwrap();
