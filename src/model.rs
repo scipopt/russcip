@@ -1368,7 +1368,9 @@ pub trait WithSolutions {
     fn best_sol(&self) -> Option<Solution>;
 
     /// Return vector containing all solutions
-    fn get_sols(&self) -> Option<Vec<Solution>>;
+    fn get_sols(&self) -> Option<Vec<Solution>> {
+        unimplemented!();
+    }
 
     /// Returns the number of solutions found by the optimization model.
     fn n_sols(&self) -> usize;
