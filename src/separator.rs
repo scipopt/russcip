@@ -1,5 +1,5 @@
-use crate::{ffi, scip_call, Model, Retcode, Row, Solving};
-use scip_sys::{SCIP_Result, SCIP_ROW};
+use crate::{Model, Retcode, Row, Solving, ffi, scip_call};
+use scip_sys::{SCIP_ROW, SCIP_Result};
 use std::fmt::Debug;
 
 /// A trait for defining custom separation routines.
@@ -153,8 +153,8 @@ mod tests {
     use crate::builder::row::RowSource;
     use crate::prelude::{cons, row, sepa, var};
     use crate::{
-        minimal_model, Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving,
-        VarType, Variable,
+        Model, ModelWithProblem, ObjSense, ProblemOrSolving, RowOrigin, Solving, VarType, Variable,
+        minimal_model,
     };
 
     struct NotRunningSeparator;

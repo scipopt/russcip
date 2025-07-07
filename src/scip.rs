@@ -5,19 +5,18 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    ffi, scip_call_panic, BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult,
-    LPStatus, Model, ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr,
-    SCIPEventhdlr, SCIPPricer, SCIPSeparator, Separator, Solution, Solving, Status, VarType,
-    Variable,
+    BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
+    ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
+    SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable, ffi, scip_call_panic,
 };
-use crate::{scip_call, HeurTiming, Heuristic};
+use crate::{HeurTiming, Heuristic, scip_call};
 use core::panic;
 use scip_sys::{
-    SCIP_Cons, SCIP_Var, Scip, SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_LOCKTYPE, SCIP_NODE,
-    SCIP_RESULT, SCIP_RETCODE, SCIP_SOL,
+    SCIP, SCIP_CONS, SCIP_CONSHDLR, SCIP_Cons, SCIP_LOCKTYPE, SCIP_NODE, SCIP_RESULT, SCIP_RETCODE,
+    SCIP_SOL, SCIP_Var, Scip,
 };
 use std::collections::BTreeMap;
-use std::ffi::{c_int, CStr, CString};
+use std::ffi::{CStr, CString, c_int};
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -592,9 +591,9 @@ impl ScipPtr {
         unsafe { ffi::SCIPnodeGetNAddedConss(node.raw) as usize }
     }
 
-    pub(crate) unsafe fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
-        let n_vars = ffi::SCIPgetNVars(scip) as usize;
-        let var = *ffi::SCIPgetVars(scip).add(var_prob_id);
+    pub(crate) fn var_from_id(scip: *mut Scip, var_prob_id: usize) -> Option<*mut SCIP_Var> {
+        let n_vars = unsafe { ffi::SCIPgetNVars(scip) as usize };
+        let var = unsafe { *ffi::SCIPgetVars(scip).add(var_prob_id) };
         if var_prob_id >= n_vars {
             None
         } else {
@@ -1042,8 +1041,7 @@ impl ScipPtr {
                     let heur_name =
                         unsafe { CStr::from_ptr(ffi::SCIPheurGetName(heur)).to_str().unwrap() };
                     eprintln!(
-                        "Heuristic {} returned result {:?}, but no solutions were added",
-                        heur_name, heur_res
+                        "Heuristic {heur_name} returned result {heur_res:?}, but no solutions were added"
                     );
                     return Retcode::Error.into();
                 }
@@ -1441,11 +1439,7 @@ impl ScipPtr {
 
     pub(crate) fn focus_node(&self) -> Option<*mut SCIP_NODE> {
         let ptr = unsafe { ffi::SCIPgetFocusNode(self.raw) };
-        if ptr.is_null() {
-            None
-        } else {
-            Some(ptr)
-        }
+        if ptr.is_null() { None } else { Some(ptr) }
     }
 
     pub(crate) fn create_child(&self) -> Result<*mut SCIP_NODE, Retcode> {
@@ -1654,6 +1648,7 @@ impl ScipPtr {
         Ok(thing)
     }
 
+    #[allow(clippy::mut_from_ref)]
     #[cfg(feature = "datastore")]
     pub(crate) fn get_mut_store<T: 'static>(&self) -> Result<Option<&mut T>, Retcode> {
         let name = CString::new("russcip_datastore").unwrap();

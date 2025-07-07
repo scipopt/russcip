@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Model, Solving, Variable};
+use crate::{Model, Solving, Variable, ffi};
 use scip_sys::SCIPeventGetVar;
 use std::ops::{BitOr, BitOrAssign};
 use std::rc::Rc;

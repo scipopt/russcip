@@ -70,7 +70,7 @@ fn main() {
         let value = solution.val(var);
         if value > 1e-6 {
             let pattern = pattern_for_var.get(&var.index()).unwrap();
-            println!("{:?} = {value}", pattern);
+            println!("{pattern:?} = {value}");
         }
     }
 
