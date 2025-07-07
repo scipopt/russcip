@@ -124,7 +124,7 @@ mod tests {
         let sol = model.best_sol().unwrap();
         assert!(!sol.inner().is_null());
 
-        let debug_str = format!("{:?}", sol);
+        let debug_str = format!("{sol:?}");
         assert!(debug_str.contains("Solution with obj val: 200"));
         assert!(debug_str.contains("Var x1=40"));
         assert!(debug_str.contains("Var x2=20"));

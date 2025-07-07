@@ -15,10 +15,10 @@ fn main() {
     let solved_model = model.solve();
 
     let status = solved_model.status();
-    println!("Solved with status {:?}", status);
+    println!("Solved with status {status:?}");
 
     let obj_val = solved_model.obj_val();
-    println!("Objective value: {}", obj_val);
+    println!("Objective value: {obj_val}");
 
     let sol = solved_model.best_sol().unwrap();
     let vars = solved_model.vars();

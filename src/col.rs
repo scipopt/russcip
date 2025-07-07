@@ -1,7 +1,7 @@
 use crate::row::BasisStatus;
 use crate::row::Row;
 use crate::scip::ScipPtr;
-use crate::{ffi, Variable};
+use crate::{Variable, ffi};
 use std::rc::Rc;
 
 /// A column in the LP relaxation.u
@@ -97,11 +97,7 @@ impl Col {
     /// Returns the position of the column in the current LP.
     pub fn lp_pos(&self) -> Option<usize> {
         let pos = unsafe { ffi::SCIPcolGetLPPos(self.raw) };
-        if pos < 0 {
-            None
-        } else {
-            Some(pos as usize)
-        }
+        if pos < 0 { None } else { Some(pos as usize) }
     }
 
     /// Returns the depth in the tree where the column entered the LP.
@@ -157,11 +153,7 @@ impl Col {
     /// Returns the node number of the last node in current branch and bound run, where strong branching was used on the given column.
     pub fn strong_branching_node(&self) -> Option<i64> {
         let node = unsafe { ffi::SCIPcolGetStrongbranchNode(self.raw) };
-        if node < 0 {
-            None
-        } else {
-            Some(node)
-        }
+        if node < 0 { None } else { Some(node) }
     }
 
     /// Returns the number of times, strong branching was applied in current run on the given column.
@@ -189,8 +181,8 @@ impl PartialEq for Col {
 mod tests {
     use crate::prelude::eventhdlr;
     use crate::{
-        minimal_model, BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem,
-        ProblemOrSolving, SCIPEventhdlr, Solving, VarType,
+        BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving,
+        SCIPEventhdlr, Solving, VarType, minimal_model,
     };
 
     struct ColTesterEventHandler;

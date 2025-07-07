@@ -113,7 +113,7 @@ fn solve_tsp(graph: TspGraph) -> Result<TspResult, Status> {
     for edge in graph.edge_indices() {
         let (source_id, target_id) = graph.edge_endpoints(edge).unwrap();
         let (source, target) = (source_id.index(), target_id.index());
-        let name = format!("x_{}_{}", source, target);
+        let name = format!("x_{source}_{target}");
         let distance = *graph.edge_weight(edge).unwrap();
         let var = model.add(var().bin().obj(distance).name(&name));
         vars.insert(edge, var);
@@ -184,7 +184,7 @@ fn main() {
             assert!((result.cost - 2586.769).abs() < 0.1);
         }
         Err(status) => {
-            println!("failed to solve: {:?}", status);
+            println!("failed to solve: {status:?}");
         }
     }
 }

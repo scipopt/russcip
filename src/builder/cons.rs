@@ -124,7 +124,7 @@ where
 
         let name = self.name.map(|s| s.to_string()).unwrap_or_else(|| {
             let n_cons = model.n_conss();
-            format!("cons{}", n_cons)
+            format!("cons{n_cons}")
         });
         let cons = model.add_cons(vars, &coefs, self.lhs, self.rhs, &name);
 

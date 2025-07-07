@@ -1,4 +1,4 @@
-use crate::{ffi, Model, Solving};
+use crate::{Model, Solving, ffi};
 use scip_sys::SCIP_Result;
 
 /// A trait for SCIP pricers.
@@ -102,8 +102,8 @@ mod tests {
     use super::*;
     use crate::prelude::pricer;
     use crate::{
-        model::ModelWithProblem, status::Status, variable::VarType, Model, ProblemOrSolving,
-        Solving,
+        Model, ProblemOrSolving, Solving, model::ModelWithProblem, status::Status,
+        variable::VarType,
     };
 
     struct LyingPricer;

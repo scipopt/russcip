@@ -68,7 +68,7 @@ fn main() {
     let knapsack = Knapsack::new(vec![2, 3, 4, 5], vec![3, 4, 5, 6], 6);
     let solution = knapsack.solve();
 
-    println!("Input: {:?}", knapsack);
+    println!("Input: {knapsack:?}");
     println!("Solution items: {:?}", solution.items);
     println!(
         "Value: {} = {:?}",
