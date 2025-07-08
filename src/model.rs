@@ -1398,7 +1398,7 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
         self.scip.n_sols()
     }
 
-    /// Returns a vector containing all solutions.
+    /// Returns a vector containing all solutions stored in the solution storage.
     fn get_sols(&self) -> Option<Vec<Solution>> {
         if self.n_sols() > 0 {
             let scip_sols = self
@@ -2384,5 +2384,16 @@ mod tests {
         let data_mut = model.get_data_mut::<MyData>().unwrap();
         data_mut.title = "New Title".to_string();
         assert_eq!(data_mut.title, "New Title");
+    }
+
+    #[test]
+    fn test_get_sols() {
+        use crate::prelude::var;
+        let mut model = minimal_model().set_display_verbosity(0).maximize();
+        model.add(var().bin());
+        let solved_model = model.solve();
+        let sols = solved_model.get_sols().unwrap();
+        assert_eq!(solved_model.n_sols(), sols.len());
+        assert!(1 >= sols.len());
     }
 }
