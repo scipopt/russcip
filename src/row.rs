@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Col, Constraint, Variable};
+use crate::{Col, Constraint, Variable, ffi};
 use std::ffi::c_int;
 use std::rc::Rc;
 
@@ -246,8 +246,8 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 #[cfg(test)]
 mod tests {
     use crate::prelude::{cons, eventhdlr, var};
-    use crate::{minimal_model, EventMask, Eventhdlr, Model, ModelWithProblem, Solving};
     use crate::{Event, ProblemOrSolving};
+    use crate::{EventMask, Eventhdlr, Model, ModelWithProblem, Solving, minimal_model};
 
     #[test]
     fn test_row() {

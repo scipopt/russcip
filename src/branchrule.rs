@@ -1,4 +1,4 @@
-use crate::{ffi, Model, Solving};
+use crate::{Model, Solving, ffi};
 use scip_sys::SCIP_Result;
 
 /// A trait for defining custom branching rules.
@@ -115,7 +115,7 @@ mod tests {
     use super::*;
     use crate::model::ModelWithProblem;
     use crate::prelude::{branchrule, cons};
-    use crate::{model::Model, status::Status, Solving};
+    use crate::{Solving, model::Model, status::Status};
 
     struct FirstChoosingBranchingRule {
         pub chosen: Option<BranchingCandidate>,

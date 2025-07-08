@@ -1,7 +1,7 @@
 use scip_sys::SCIP_Result;
 use std::ops::{BitOr, BitOrAssign};
 
-use crate::{ffi, Model, Solving};
+use crate::{Model, Solving, ffi};
 
 /// A trait for defining custom primal heuristics.
 pub trait Heuristic {
