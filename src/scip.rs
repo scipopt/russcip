@@ -291,6 +291,23 @@ impl ScipPtr {
         Some(unsafe { ffi::SCIPgetBestSol(self.raw) })
     }
 
+    /// Returns a vector containing SCIP_SOL pointers.
+    /// The vector needs to be dropped manually
+    pub(crate) fn get_sols(&self) -> Option<Vec<*mut SCIP_SOL>> {
+        // check number of sols
+        let n_sols = self.n_sols();
+        if n_sols == 0 {
+            return None;
+        }
+        let mut sols = Vec::with_capacity(n_sols);
+        let scip_sols = unsafe { ffi::SCIPgetSols(self.raw) };
+        for i in 0..n_sols {
+            let scip_sol = unsafe { *scip_sols.add(i) };
+            sols.push(scip_sol);
+        }
+        Some(sols)
+    }
+
     pub(crate) fn obj_val(&self) -> f64 {
         unsafe { ffi::SCIPgetPrimalbound(self.raw) }
     }

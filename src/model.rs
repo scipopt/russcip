@@ -1365,6 +1365,9 @@ pub trait WithSolutions {
     /// Returns the best solution for the optimization model, if one exists.
     fn best_sol(&self) -> Option<Solution>;
 
+    /// Return vector containing all solutions
+    fn get_sols(&self) -> Option<Vec<Solution>>;
+
     /// Returns the number of solutions found by the optimization model.
     fn n_sols(&self) -> usize;
 }
@@ -1391,6 +1394,25 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
     /// Returns the number of solutions found by the optimization model.
     fn n_sols(&self) -> usize {
         self.scip.n_sols()
+    }
+
+    /// Returns a vector containing all solutions stored in the solution storage.
+    fn get_sols(&self) -> Option<Vec<Solution>> {
+        if self.n_sols() > 0 {
+            let scip_sols = self
+                .scip
+                .get_sols()
+                .unwrap()
+                .into_iter()
+                .map(|x| Solution {
+                    raw: x,
+                    scip_ptr: self.scip.clone(),
+                })
+                .collect();
+            Some(scip_sols)
+        } else {
+            None
+        }
     }
 }
 
@@ -2360,5 +2382,16 @@ mod tests {
         let data_mut = model.get_data_mut::<MyData>().unwrap();
         data_mut.title = "New Title".to_string();
         assert_eq!(data_mut.title, "New Title");
+    }
+
+    #[test]
+    fn test_get_sols() {
+        use crate::prelude::var;
+        let mut model = minimal_model().set_display_verbosity(0).maximize();
+        model.add(var().bin());
+        let solved_model = model.solve();
+        let sols = solved_model.get_sols().unwrap();
+        assert_eq!(solved_model.n_sols(), sols.len());
+        assert!(1 >= sols.len());
     }
 }
