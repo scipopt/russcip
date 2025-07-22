@@ -18,9 +18,23 @@ use scip_sys::{
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_int};
 use std::mem::MaybeUninit;
+use std::ptr;
 use std::rc::Rc;
 
 use crate::builder::row::{RowBuilder, RowSource};
+
+/// Represents a parsed expression
+#[derive(Debug)]
+pub struct Expr {
+    pub(crate) raw: *mut ffi::SCIP_EXPR,
+}
+
+impl Expr {
+    /// Creates a new expression from a raw pointer
+    pub fn from_raw(raw: *mut ffi::SCIP_EXPR) -> Self {
+        Self { raw }
+    }
+}
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -1698,6 +1712,49 @@ impl ScipPtr {
         let map = unsafe { &mut *eventhdlr_ptr };
         map.insert(thing);
         Ok(())
+    }
+
+    /// Parses an expression from a string
+    pub(crate) fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        let c_expr = CString::new(expr_str).expect("Failed to convert string to CString");
+        let mut scip_expr = MaybeUninit::uninit();
+        let mut final_pos = ptr::null();
+
+        scip_call! { ffi::SCIPparseExpr(
+            self.raw,
+            scip_expr.as_mut_ptr(),
+            c_expr.as_ptr(),
+            &mut final_pos,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let scip_expr = unsafe { scip_expr.assume_init() };
+        Ok(Expr { raw: scip_expr })
+    }
+
+    /// Creates a basic nonlinear constraint from an expression
+    pub(crate) fn create_cons_basic_nonlinear(
+        &self,
+        expr: *mut ffi::SCIP_EXPR,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        scip_call! { ffi::SCIPcreateConsBasicNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            expr,
+            lhs,
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        Ok(scip_cons)
     }
 }
 

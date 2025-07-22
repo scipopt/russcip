@@ -6,7 +6,7 @@ use crate::node::Node;
 use crate::param::ScipParameter;
 use crate::probing::Prober;
 use crate::retcode::Retcode;
-use crate::scip::ScipPtr;
+use crate::scip::{Expr, ScipPtr};
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
@@ -380,6 +380,40 @@ impl Model<ProblemCreated> {
             state: Solved {},
         }
     }
+
+    /// Parses an expression from a string and returns an Expr object
+    pub fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        self.scip.parse_expr(expr_str)
+    }
+
+    /// Creates a constraint from a parsed expression
+    pub fn add_cons_expr(
+        &mut self,
+        expr: Expr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let cons = self
+            .scip
+            .create_cons_basic_nonlinear(expr.raw, lhs, rhs, name)?;
+        Ok(Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        })
+    }
+
+    /// Helper method to parse and add a constraint from an expression string
+    pub fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.parse_expr(expr_str)?;
+        self.add_cons_expr(expr, lhs, rhs, name)
+    }
 }
 
 impl Model<Solving> {
@@ -661,6 +695,40 @@ impl Model<Solving> {
             var.inner(),
             lb
         ));
+    }
+
+    /// Parses an expression from a string and returns an Expr object
+    pub fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        self.scip.parse_expr(expr_str)
+    }
+
+    /// Creates a constraint from a parsed expression
+    pub fn add_cons_expr(
+        &mut self,
+        expr: Expr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let cons = self
+            .scip
+            .create_cons_basic_nonlinear(expr.raw, lhs, rhs, name)?;
+        Ok(Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        })
+    }
+
+    /// Helper method to parse and add a constraint from an expression string
+    pub fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.parse_expr(expr_str)?;
+        self.add_cons_expr(expr, lhs, rhs, name)
     }
 }
 
