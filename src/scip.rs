@@ -1484,7 +1484,11 @@ impl ScipPtr {
                 true.into(),
             ));
             if feasible == 1 {
-                scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw.as_ptr(), &mut feasible));
+                scip_call!(ffi::SCIPaddSolFree(
+                    self.raw,
+                    &mut sol.raw.as_ptr(),
+                    &mut feasible
+                ));
             }
             return Ok(feasible != 0);
         } else {

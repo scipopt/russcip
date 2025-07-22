@@ -1386,7 +1386,8 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
         if self.n_sols() > 0 {
             let sol = Solution {
                 scip_ptr: self.scip.clone(),
-                raw: std::ptr::NonNull::new(self.scip.best_sol().unwrap()).expect("SCIP returned null pointer for best solution"),
+                raw: std::ptr::NonNull::new(self.scip.best_sol().unwrap())
+                    .expect("SCIP returned null pointer for best solution"),
             };
             Some(sol)
         } else {
@@ -1408,7 +1409,8 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
                 .unwrap()
                 .into_iter()
                 .map(|x| Solution {
-                    raw: std::ptr::NonNull::new(x).expect("SCIP returned null pointer for solution"),
+                    raw: std::ptr::NonNull::new(x)
+                        .expect("SCIP returned null pointer for solution"),
                     scip_ptr: self.scip.clone(),
                 })
                 .collect::<Vec<_>>()
