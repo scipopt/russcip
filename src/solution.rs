@@ -1,4 +1,5 @@
 use std::fmt;
+use std::ptr::NonNull;
 use std::rc::Rc;
 
 use crate::scip::ScipPtr;
@@ -8,31 +9,31 @@ use crate::{ffi, scip_call_panic};
 /// A wrapper for a SCIP solution.
 #[derive(Clone)]
 pub struct Solution {
-    pub(crate) raw: *mut ffi::SCIP_SOL,
     pub(crate) scip_ptr: Rc<ScipPtr>,
+    pub(crate) raw: NonNull<ffi::SCIP_SOL>,
 }
 
 impl Solution {
     /// Returns a raw pointer to the underlying `ffi::SCIP_SOL` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_SOL {
-        self.raw
+        self.raw.as_ptr()
     }
 
     /// Returns the objective value of the solution.
     pub fn obj_val(&self) -> f64 {
-        unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr.raw, self.raw) }
+        unsafe { ffi::SCIPgetSolOrigObj(self.scip_ptr.raw, self.raw.as_ptr()) }
     }
 
     /// Returns the value of a variable in the solution.
     pub fn val(&self, var: &Variable) -> f64 {
-        unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var.raw) }
+        unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw.as_ptr(), var.raw) }
     }
 
     /// Sets the value of a variable in the solution.
     pub fn set_val(&self, var: &Variable, val: f64) {
         scip_call_panic!(ffi::SCIPsetSolVal(
             self.scip_ptr.raw,
-            self.raw,
+            self.raw.as_ptr(),
             var.raw,
             val
         ));
@@ -45,7 +46,7 @@ impl Solution {
         let mut map = std::collections::HashMap::new();
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
-            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw.as_ptr(), var) };
             let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
             if val > eps || val < -eps {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };
@@ -64,7 +65,7 @@ impl Solution {
         let mut map = std::collections::HashMap::new();
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
-            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw.as_ptr(), var) };
             let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
             if val > eps || val < -eps {
                 let id = unsafe { ffi::SCIPvarGetProbindex(var) };
@@ -84,7 +85,7 @@ impl fmt::Debug for Solution {
         let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.scip_ptr.raw) };
         for i in 0..n_vars {
             let var = unsafe { *vars.offset(i as isize) };
-            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw, var) };
+            let val = unsafe { ffi::SCIPgetSolVal(self.scip_ptr.raw, self.raw.as_ptr(), var) };
             let eps = unsafe { ffi::SCIPepsilon(self.scip_ptr.raw) };
             if val > eps || val < -eps {
                 let name_ptr = unsafe { ffi::SCIPvarGetName(var) };

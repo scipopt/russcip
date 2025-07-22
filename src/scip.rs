@@ -1256,7 +1256,7 @@ impl ScipPtr {
             assert!(!sol.is_null());
 
             let solution = Solution {
-                raw: sol,
+                raw: std::ptr::NonNull::new(sol).expect("sol is null"),
                 scip_ptr: scip_ptr.clone(),
             };
 
@@ -1472,26 +1472,25 @@ impl ScipPtr {
         Ok(node_ptr)
     }
 
-    pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
+    pub(crate) fn add_sol(&self, sol: Solution) -> Result<bool, Retcode> {
         let mut feasible = 0;
-        assert!(!sol.raw.is_null());
-        let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw) } == 1;
+        let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw.as_ptr()) } == 1;
         if is_orig {
             scip_call!(ffi::SCIPcheckSolOrig(
                 self.raw,
-                sol.raw,
+                sol.raw.as_ptr(),
                 &mut feasible,
                 false.into(),
                 true.into(),
             ));
             if feasible == 1 {
-                scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+                scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw.as_ptr(), &mut feasible));
             }
             return Ok(feasible != 0);
         } else {
             scip_call!(ffi::SCIPtrySol(
                 self.raw,
-                sol.raw,
+                sol.raw.as_ptr(),
                 false.into(),
                 true.into(),
                 true.into(),
