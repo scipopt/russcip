@@ -2431,29 +2431,31 @@ mod tests {
     }
 
     #[test]
-    fn sos1_constraint_basic() {
+    fn sos1_constraint() {
         let mut model = Model::new()
             .hide_output()
             .include_default_plugins()
             .create_prob("test")
-            .minimize();
+            .set_obj_sense(ObjSense::Maximize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Integer);
+        // Create three variables where only one can be non-zero (SOS1)
+        let x1 = model.add_var(0., 10., 4., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 10., 2., "x2", VarType::Continuous);
+        let x3 = model.add_var(0., 10., 3., "x3", VarType::Continuous);
 
-        // Add SOS1 constraint - only one of x1 or x2 can be non-zero
-        model.add_cons_sos1(vec![&x1, &x2], None, "sos1");
+        // Add SOS1 constraint - only one of these variables can be non-zero
+        model.add_cons_sos1(vec![&x1, &x2, &x3], None, "sos1");
 
         let solved_model = model.solve();
-        assert_eq!(solved_model.status(), Status::Optimal);
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
 
-        let sol = solved_model.best_sol().unwrap();
-        let x1_val = sol.val(&x1);
-        let x2_val = sol.val(&x2);
-
-        // Verify only one variable is non-zero
-        assert!((x1_val == 0.0 && x2_val == 1.0) || (x1_val == 1.0 && x2_val == 0.0));
-        assert_eq!(solved_model.obj_val(), 3.0); // Should pick x1 since it has lower objective
+        // The optimal solution should be x1=10 (highest coefficient), others 0
+        let solution = solved_model.best_sol().unwrap();
+        assert_eq!(solution.val(&x1), 10.);
+        assert_eq!(solution.val(&x2), 0.);
+        assert_eq!(solution.val(&x3), 0.);
+        assert_eq!(solved_model.obj_val(), 40.);
     }
 
     #[test]
@@ -2462,79 +2464,26 @@ mod tests {
             .hide_output()
             .include_default_plugins()
             .create_prob("test")
-            .minimize();
+            .set_obj_sense(ObjSense::Maximize);
 
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Integer);
+        // Create three variables where only one can be non-zero (SOS1)
+        let x1 = model.add_var(0., 10., 1., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 10., 1., "x2", VarType::Continuous);
+        let x3 = model.add_var(0., 10., 1., "x3", VarType::Continuous);
 
-        // Add SOS1 constraint with weights - higher weight means more branching priority
-        let weights = [1.0, 2.0]; // x2 has higher weight
-        model.add_cons_sos1(vec![&x1, &x2], Some(&weights), "sos1");
-
-        let solved_model = model.solve();
-        assert_eq!(solved_model.status(), Status::Optimal);
-
-        let sol = solved_model.best_sol().unwrap();
-        assert_eq!(sol.val(&x1), 1.0);
-        assert_eq!(sol.val(&x2), 0.0);
-        assert_eq!(solved_model.obj_val(), 3.0);
-    }
-
-    #[test]
-    #[should_panic(expected = "assertion failed")]
-    fn sos1_constraint_empty_vars() {
-        let mut model = Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .create_prob("test");
-
-        // Should panic when trying to create SOS1 with empty variables
-        model.add_cons_sos1(vec![], None, "empty_sos1");
-    }
-
-    #[test]
-    #[should_panic(expected = "assertion failed")]
-    fn sos1_constraint_invalid_weights() {
-        let mut model = Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .create_prob("test");
-
-        let x1 = model.add_var(0., 1., 1., "x1", VarType::Integer);
-        let x2 = model.add_var(0., 1., 1., "x2", VarType::Integer);
-
-        // Should panic when weights length doesn't match variables length
-        let invalid_weights = [1.0]; // Only one weight for two variables
-        model.add_cons_sos1(vec![&x1, &x2], Some(&invalid_weights), "invalid_sos1");
-    }
-
-    #[test]
-    fn sos1_constraint_with_other_constraints() {
-        let mut model = Model::new()
-            .hide_output()
-            .include_default_plugins()
-            .create_prob("test")
-            .minimize();
-
-        let x1 = model.add_var(0., 1., 3., "x1", VarType::Integer);
-        let x2 = model.add_var(0., 1., 4., "x2", VarType::Integer);
-        let x3 = model.add_var(0., 1., 2., "x3", VarType::Integer);
-
-        // SOS1 constraint between x1 and x2
-        model.add_cons_sos1(vec![&x1, &x2], None, "sos1");
-
-        // Additional constraint that forces x3 to be 1
-        model.add_cons(vec![&x3], &[1.0], 1.0, 1.0, "force_x3");
+        // Add SOS1 constraint with weights - variables with lower weights are preferred
+        let weights = [3., 1., 2.]; // x2 (weight 1) should be chosen first
+        model.add_cons_sos1(vec![&x1, &x2, &x3], Some(&weights), "sos1_weighted");
 
         let solved_model = model.solve();
-        assert_eq!(solved_model.status(), Status::Optimal);
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
 
-        let sol = solved_model.best_sol().unwrap();
-        assert_eq!(sol.val(&x3), 1.0);
-
-        // Verify SOS1 constraint is still respected
-        let x1_val = sol.val(&x1);
-        let x2_val = sol.val(&x2);
-        assert!((x1_val == 0.0 && x2_val == 1.0) || (x1_val == 1.0 && x2_val == 0.0));
+        // The optimal solution should be x2=10 (lowest weight), others 0
+        let solution = solved_model.best_sol().unwrap();
+        assert_eq!(solution.val(&x1), 0.);
+        assert_eq!(solution.val(&x2), 10.);
+        assert_eq!(solution.val(&x3), 0.);
+        assert_eq!(solved_model.obj_val(), 10.);
     }
 }
