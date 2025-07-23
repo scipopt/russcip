@@ -1403,8 +1403,7 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
     /// Returns a vector containing all solutions stored in the solution storage.
     fn get_sols(&self) -> Option<Vec<Solution>> {
         if self.n_sols() > 0 {
-            let scip_sols = self
-                .scip
+            self.scip
                 .get_sols()
                 .unwrap()
                 .into_iter()
@@ -1414,8 +1413,7 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
                     scip_ptr: self.scip.clone(),
                 })
                 .collect::<Vec<_>>()
-                .into();
-            scip_sols
+                .into()
         } else {
             None
         }
