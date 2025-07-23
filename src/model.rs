@@ -1029,6 +1029,24 @@ pub trait ProblemOrSolving {
 
     /// Sets whether the constraint should be separated during LP processing
     fn set_cons_separated(&mut self, cons: &Constraint, separate: bool);
+
+    /// Adds a new SOS1 constraint to the model with the given variables, optional weights, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The variables in the SOS1 constraint.
+    /// * `weights` - Optional weights for the variables (used for branching priorities).
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// The created `Constraint`
+    fn add_cons_sos1(
+        &mut self,
+        vars: Vec<&Variable>,
+        weights: Option<&[f64]>,
+        name: &str,
+    ) -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1357,6 +1375,23 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         self.scip
             .set_cons_separated(cons, separate)
             .expect("Failed to set constraint separated");
+    }
+
+    fn add_cons_sos1(
+        &mut self,
+        vars: Vec<&Variable>,
+        weights: Option<&[f64]>,
+        name: &str,
+    ) -> Constraint {
+        let cons = self
+            .scip
+            .create_cons_sos1(vars, weights, name)
+            .expect("Failed to create SOS1 constraint");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
     }
 }
 
