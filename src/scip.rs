@@ -1720,7 +1720,12 @@ impl ScipPtr {
         let mut scip_cons = MaybeUninit::uninit();
 
         let mut var_ptrs = vars.iter().map(|v| v.raw).collect::<Vec<_>>();
-        let weights_ptr = weights.map_or(std::ptr::null(), |ws| ws.as_ptr());
+
+        let mut weights_vec = if let Some(weights) = weights {
+            weights.to_vec()
+        } else {
+            vec![0.0; vars.len()] // Default weights if none provided
+        };
 
         scip_call! { ffi::SCIPcreateConsBasicSOS1(
             self.raw,
@@ -1728,14 +1733,11 @@ impl ScipPtr {
             c_name.as_ptr(),
             var_ptrs.len() as c_int,
             var_ptrs.as_mut_ptr(),
-            weights_ptr as *mut f64,
+            weights_vec.as_mut_ptr(),
         ) };
 
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
-
-        // Ensure the constraint is active
-        scip_call! { ffi::SCIPactiveCons(self.raw, scip_cons) };
 
         Ok(scip_cons)
     }

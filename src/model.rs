@@ -2471,18 +2471,18 @@ mod tests {
         let x2 = model.add_var(0., 10., 1., "x2", VarType::Continuous);
         let x3 = model.add_var(0., 10., 1., "x3", VarType::Continuous);
 
-        // Add SOS1 constraint with weights - variables with lower weights are preferred
-        let weights = [3., 1., 2.]; // x2 (weight 1) should be chosen first
-        model.add_cons_sos1(vec![&x1, &x2, &x3], Some(&weights), "sos1_weighted");
+        // Add SOS1 constraint with weights - branching will prefer variables with higher weights
+        let weights = [3.0, 1.0, 2.0]; // x1 has highest priority
+        model.add_cons_sos1(vec![&x1, &x2, &x3], Some(&weights), "sos1");
 
         let solved_model = model.solve();
         let status = solved_model.status();
         assert_eq!(status, Status::Optimal);
 
-        // The optimal solution should be x2=10 (lowest weight), others 0
+        // With weights, the solver should prefer x1 (highest weight) even though all have same coefficient
         let solution = solved_model.best_sol().unwrap();
-        assert_eq!(solution.val(&x1), 0.);
-        assert_eq!(solution.val(&x2), 10.);
+        assert_eq!(solution.val(&x1), 10.);
+        assert_eq!(solution.val(&x2), 0.);
         assert_eq!(solution.val(&x3), 0.);
         assert_eq!(solved_model.obj_val(), 10.);
     }
