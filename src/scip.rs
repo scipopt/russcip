@@ -1699,6 +1699,48 @@ impl ScipPtr {
         map.insert(thing);
         Ok(())
     }
+
+    pub(crate) fn create_cons_sos1(
+        &self,
+        vars: Vec<&Variable>,
+        weights: Option<&[f64]>,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        if vars.is_empty() {
+            return Err(Retcode::ParameterWrongVal);
+        }
+
+        if let Some(ws) = weights {
+            if vars.len() != ws.len() {
+                return Err(Retcode::ParameterWrongVal);
+            }
+        }
+
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        let mut var_ptrs = vars.iter().map(|v| v.raw).collect::<Vec<_>>();
+
+        let mut weights_vec = if let Some(weights) = weights {
+            weights.to_vec()
+        } else {
+            vec![0.0; vars.len()] // Default weights if none provided
+        };
+
+        scip_call! { ffi::SCIPcreateConsBasicSOS1(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            var_ptrs.len() as c_int,
+            var_ptrs.as_mut_ptr(),
+            weights_vec.as_mut_ptr(),
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+
+        Ok(scip_cons)
+    }
 }
 
 impl Drop for ScipPtr {
