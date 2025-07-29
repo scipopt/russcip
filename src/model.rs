@@ -1132,6 +1132,24 @@ pub trait ProblemOrSolving {
 
     /// Sets whether the constraint should be separated during LP processing
     fn set_cons_separated(&mut self, cons: &Constraint, separate: bool);
+
+    /// Adds a new SOS1 constraint to the model with the given variables, optional weights, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The variables in the SOS1 constraint.
+    /// * `weights` - Optional weights for the variables (used for branching priorities).
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// The created `Constraint`
+    fn add_cons_sos1(
+        &mut self,
+        vars: Vec<&Variable>,
+        weights: Option<&[f64]>,
+        name: &str,
+    ) -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1434,6 +1452,34 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_cons_indicator(bin_var, vars, coefs, rhs, name)
             .expect("Failed to create constraint in state ProblemCreated");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
+    /// Adds a new SOS1 constraint to the model with the given variables, optional weights, and name.
+    ///
+    /// # Arguments
+    ///
+    /// * `vars` - The variables in the SOS1 constraint.
+    /// * `weights` - Optional weights for the variables (used for branching priorities).
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// The created `Constraint`
+    fn add_cons_sos1(
+        &mut self,
+        vars: Vec<&Variable>,
+        weights: Option<&[f64]>,
+        name: &str,
+    ) -> Constraint {
+        let cons = self
+            .scip
+            .create_cons_sos1(vars, weights, name)
+            .expect("Failed to create SOS1 constraint");
 
         Constraint {
             raw: cons,
@@ -2583,5 +2629,60 @@ mod tests {
         // Should maximize x with x^2 + y^2 <= 25
         assert!((sol.val(&x) - 5.0).abs() < 1e-6);
         assert!(sol.val(&y).abs() < 1e-6);
+  }
+    fn sos1_constraint() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // Create three variables where only one can be non-zero (SOS1)
+        let x1 = model.add_var(0., 10., 4., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 10., 2., "x2", VarType::Continuous);
+        let x3 = model.add_var(0., 10., 3., "x3", VarType::Continuous);
+
+        // Add SOS1 constraint - only one of these variables can be non-zero
+        model.add_cons_sos1(vec![&x1, &x2, &x3], None, "sos1");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+
+        // The optimal solution should be x1=10 (highest coefficient), others 0
+        let solution = solved_model.best_sol().unwrap();
+        assert_eq!(solution.val(&x1), 10.);
+        assert_eq!(solution.val(&x2), 0.);
+        assert_eq!(solution.val(&x3), 0.);
+        assert_eq!(solved_model.obj_val(), 40.);
+    }
+
+    #[test]
+    fn sos1_constraint_with_weights() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // Create three variables where only one can be non-zero (SOS1)
+        let x1 = model.add_var(0., 10., 1., "x1", VarType::Continuous);
+        let x2 = model.add_var(0., 10., 1., "x2", VarType::Continuous);
+        let x3 = model.add_var(0., 10., 1., "x3", VarType::Continuous);
+
+        // Add SOS1 constraint with weights - branching will prefer variables with higher weights
+        let weights = [3.0, 1.0, 2.0]; // x1 has highest priority
+        model.add_cons_sos1(vec![&x1, &x2, &x3], Some(&weights), "sos1");
+
+        let solved_model = model.solve();
+        let status = solved_model.status();
+        assert_eq!(status, Status::Optimal);
+
+        // With weights, the solver should prefer x1 (highest weight) even though all have same coefficient
+        let solution = solved_model.best_sol().unwrap();
+        assert_eq!(solution.val(&x1), 10.);
+        assert_eq!(solution.val(&x2), 0.);
+        assert_eq!(solution.val(&x3), 0.);
+        assert_eq!(solved_model.obj_val(), 10.);
     }
 }
