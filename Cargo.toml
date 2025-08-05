@@ -12,11 +12,11 @@ exclude = ["data/test/*"]
 default = ["datastore"]
 bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
-datastore = ["anymap"]
+datastore = ["anymap3"]
 
 [dependencies]
 scip-sys = "0.1.21"
-anymap = { version = "0.12.0", optional = true }
+anymap3 = { version = "1.0.1", optional = true }
 
 [dev-dependencies]
 rayon = "1.5.1"

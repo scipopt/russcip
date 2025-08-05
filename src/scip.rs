@@ -1,5 +1,5 @@
 #[cfg(feature = "datastore")]
-use anymap::AnyMap;
+use anymap3::AnyMap;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
