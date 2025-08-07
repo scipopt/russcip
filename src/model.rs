@@ -6,7 +6,7 @@ use crate::node::Node;
 use crate::param::ScipParameter;
 use crate::probing::Prober;
 use crate::retcode::Retcode;
-use crate::scip::ScipPtr;
+use crate::scip::{Expr, ScipPtr};
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
@@ -380,6 +380,64 @@ impl Model<ProblemCreated> {
             state: Solved {},
         }
     }
+
+    /// Parses an expression from a string and returns an Expr object
+    pub fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        self.scip.parse_expr(expr_str)
+    }
+
+    /// Creates a constraint from a parsed expression
+    pub fn add_cons_expr(
+        &mut self,
+        expr: Expr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let cons = self
+            .scip
+            .create_cons_basic_nonlinear(expr.raw, lhs, rhs, name)?;
+        Ok(Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        })
+    }
+
+    /// Helper method to parse and add a constraint from an expression string
+    pub fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.parse_expr(expr_str)?;
+        self.add_cons_expr(expr, lhs, rhs, name)
+    }
+
+    /// Creates a variable expression
+    pub fn create_var_expr(&self, var: &Variable) -> Result<Expr, Retcode> {
+        self.scip.create_expr_var(var.raw)
+    }
+
+    /// Creates a power expression from a variable (var^exponent)
+    pub fn create_pow_expr(&self, var: &Variable, exponent: f64) -> Result<Expr, Retcode> {
+        let var_expr = self.create_var_expr(var)?;
+        var_expr.pow(exponent, &self.scip)
+    }
+
+    /// Adds a power expression constraint (var^exponent)
+    pub fn add_pow_cons(
+        &mut self,
+        var: &Variable,
+        exponent: f64,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.create_pow_expr(var, exponent)?;
+        self.add_cons_expr(expr, lhs, rhs, name)
+    }
 }
 
 impl Model<Solving> {
@@ -661,6 +719,51 @@ impl Model<Solving> {
             var.inner(),
             lb
         ));
+    }
+
+    /// Parses an expression from a string and returns an Expr object
+    pub fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        self.scip.parse_expr(expr_str)
+    }
+
+    /// Creates a constraint from a parsed expression
+    pub fn add_cons_expr(
+        &mut self,
+        expr: Expr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let cons = self
+            .scip
+            .create_cons_basic_nonlinear(expr.raw, lhs, rhs, name)?;
+        Ok(Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        })
+    }
+
+    /// Helper method to parse and add a constraint from an expression string
+    pub fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.parse_expr(expr_str)?;
+        self.add_cons_expr(expr, lhs, rhs, name)
+    }
+
+    /// Creates a variable expression
+    pub fn create_var_expr(&self, var: &Variable) -> Result<Expr, Retcode> {
+        self.scip.create_expr_var(var.raw)
+    }
+
+    /// Creates a power expression from a variable (var^exponent)
+    pub fn create_pow_expr(&self, var: &Variable, exponent: f64) -> Result<Expr, Retcode> {
+        let var_expr = self.create_var_expr(var)?;
+        var_expr.pow(exponent, &self.scip)
     }
 }
 
@@ -2442,6 +2545,91 @@ mod tests {
     }
 
     #[test]
+    fn test_pow_expr() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test_pow")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // Add variables
+        let x = model.add_var(0.0, 10.0, 1.0, "x", VarType::Continuous);
+
+        // Create x^2 expression and constraint x^2 <= 25
+        let _cons = model
+            .add_pow_cons(&x, 2.0, -f64::INFINITY, 25.0, "x_squared")
+            .expect("Failed to create power constraint");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+
+        let sol = solved.best_sol().unwrap();
+        assert!((sol.val(&x) - 5.0).abs() < 1e-6); // x should be 5 (maximizing x with x^2 <= 25)
+    }
+
+    #[test]
+    fn test_parsed_expr() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test_parsed_expr")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // Add variables
+        let x = model.add_var(0.0, 10.0, 1.0, "x", VarType::Continuous);
+        let y = model.add_var(0.0, 10.0, 0.0, "y", VarType::Continuous);
+
+        // Parse and add constraint "x^2 + y^2 <= 25"
+        let expr = model.parse_expr("x^2 + y^2").unwrap();
+        model
+            .add_cons_expr(expr, -f64::INFINITY, 25.0, "circle")
+            .expect("Failed to add parsed expression constraint");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+
+        let sol = solved.best_sol().unwrap();
+        // Should maximize x with x^2 + y^2 <= 25
+        assert!((sol.val(&x) - 5.0).abs() < 1e-6);
+        assert!(sol.val(&y).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_complex_expr() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test_complex_expr")
+            .set_obj_sense(ObjSense::Maximize);
+
+        // Add variables
+        let x = model.add_var(0.0, 10.0, 1.0, "x", VarType::Continuous);
+        let y = model.add_var(0.0, 10.0, 0.0, "y", VarType::Continuous);
+
+        // Create expressions
+        let x_expr = model.create_var_expr(&x).unwrap();
+        let y_expr = model.create_var_expr(&y).unwrap();
+
+        // Create x^2 and y^2
+        let x_sq = x_expr.pow(2.0, &model.scip).unwrap();
+        let y_sq = y_expr.pow(2.0, &model.scip).unwrap();
+
+        // Create sum x^2 + y^2
+        let sum = Expr::sum(&[x_sq, y_sq], &mut [1.0, 1.0], &model.scip).unwrap();
+
+        // Add constraint x^2 + y^2 <= 25
+        model
+            .add_cons_expr(sum, -f64::INFINITY, 25.0, "circle")
+            .expect("Failed to add complex expression constraint");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+
+        let sol = solved.best_sol().unwrap();
+        // Should maximize x with x^2 + y^2 <= 25
+        assert!((sol.val(&x) - 5.0).abs() < 1e-6);
+        assert!(sol.val(&y).abs() < 1e-6);
+  }
     fn sos1_constraint() {
         let mut model = Model::new()
             .hide_output()

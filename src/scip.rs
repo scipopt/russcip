@@ -18,9 +18,50 @@ use scip_sys::{
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_int};
 use std::mem::MaybeUninit;
+use std::ptr;
 use std::rc::Rc;
 
 use crate::builder::row::{RowBuilder, RowSource};
+
+/// Represents a parsed expression
+#[derive(Debug)]
+pub struct Expr {
+    pub(crate) raw: *mut ffi::SCIP_EXPR,
+}
+
+impl Expr {
+    /// Creates a new expression from a raw pointer
+    pub fn from_raw(raw: *mut ffi::SCIP_EXPR) -> Self {
+        Self { raw }
+    }
+
+    /// Creates a power expression (base^exponent)
+    pub fn pow(self, exponent: f64, scip: &ScipPtr) -> Result<Expr, Retcode> {
+        scip.create_expr_pow(self.raw, exponent)
+    }
+
+    /// Creates a sum expression
+    pub fn sum(exprs: &[Expr], coefficients: &mut [f64], scip: &ScipPtr) -> Result<Expr, Retcode> {
+        let raw_exprs: Vec<_> = exprs.iter().map(|e| e.raw).collect();
+        scip.create_expr_sum(&raw_exprs, coefficients)
+    }
+
+    /// Creates a product expression
+    pub fn product(exprs: &[Expr], scip: &ScipPtr) -> Result<Expr, Retcode> {
+        let raw_exprs: Vec<_> = exprs.iter().map(|e| e.raw).collect();
+        scip.create_expr_product(&raw_exprs)
+    }
+}
+
+impl Drop for Expr {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.raw.is_null() {
+                ffi::SCIPreleaseExpr(std::ptr::null_mut(), &mut self.raw);
+            }
+        }
+    }
+}
 
 #[non_exhaustive]
 #[derive(Debug)]
@@ -1040,7 +1081,9 @@ impl ScipPtr {
             result: *mut ffi::SCIP_RESULT,
         ) -> ffi::SCIP_RETCODE {
             let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
-            assert!(!data_ptr.is_null());
+            if data_ptr.is_null() {
+                return Retcode::Error.into();
+            }
             let rule_ptr = data_ptr as *mut Box<dyn Heuristic>;
 
             let current_n_sols = unsafe { ffi::SCIPgetNSols(scip) };
@@ -1073,8 +1116,9 @@ impl ScipPtr {
             heur: *mut ffi::SCIP_HEUR,
         ) -> ffi::SCIP_Retcode {
             let data_ptr = unsafe { ffi::SCIPheurGetData(heur) };
-            assert!(!data_ptr.is_null());
-            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heuristic>) });
+            if !data_ptr.is_null() {
+                drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn Heuristic>) });
+            }
             Retcode::Okay.into()
         }
 
@@ -1700,6 +1744,133 @@ impl ScipPtr {
         Ok(())
     }
 
+    /// Parses an expression from a string
+    pub(crate) fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        let c_expr = CString::new(expr_str).expect("Failed to convert string to CString");
+        let mut scip_expr = MaybeUninit::uninit();
+        let mut final_pos = ptr::null();
+
+        scip_call! { ffi::SCIPparseExpr(
+            self.raw,
+            scip_expr.as_mut_ptr(),
+            c_expr.as_ptr(),
+            &mut final_pos,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let scip_expr = unsafe { scip_expr.assume_init() };
+        Ok(Expr { raw: scip_expr })
+    }
+
+    /// Creates a basic nonlinear constraint from an expression
+    pub(crate) fn create_cons_basic_nonlinear(
+        &self,
+        expr: *mut ffi::SCIP_EXPR,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+
+        scip_call! { ffi::SCIPcreateConsBasicNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            expr,
+            lhs,
+            rhs,
+        ) };
+
+        let scip_cons = unsafe { scip_cons.assume_init() };
+        Ok(scip_cons)
+    }
+
+    /// Creates a power expression (base^exponent)
+    pub(crate) fn create_expr_pow(
+        &self,
+        base: *mut ffi::SCIP_EXPR,
+        exponent: f64,
+    ) -> Result<Expr, Retcode> {
+        let mut expr_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprPow(
+            self.raw,
+            expr_ptr.as_mut_ptr(),
+            base,
+            exponent,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let expr_ptr = unsafe { expr_ptr.assume_init() };
+        Ok(Expr { raw: expr_ptr })
+    }
+
+    /// Creates a variable expression
+    pub(crate) fn create_expr_var(&self, var: *mut ffi::SCIP_VAR) -> Result<Expr, Retcode> {
+        let mut expr_ptr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprVar(
+            self.raw,
+            expr_ptr.as_mut_ptr(),
+            var,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let expr_ptr = unsafe { expr_ptr.assume_init() };
+        Ok(Expr { raw: expr_ptr })
+    }
+
+    /// Creates a sum expression
+    pub(crate) fn create_expr_sum(
+        &self,
+        exprs: &[*mut ffi::SCIP_EXPR],
+        coefficients: &mut [f64],
+    ) -> Result<Expr, Retcode> {
+        assert_eq!(exprs.len(), coefficients.len());
+        let mut expr_ptr = MaybeUninit::uninit();
+
+        // Convert exprs to a mutable pointer array
+        let mut expr_ptrs: Vec<_> = exprs.iter().map(|&e| e).collect();
+
+        scip_call! { ffi::SCIPcreateExprSum(
+            self.raw,
+            expr_ptr.as_mut_ptr(),
+            exprs.len() as i32,
+            expr_ptrs.as_mut_ptr(),
+            coefficients.as_mut_ptr(),
+            0.0,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let expr_ptr = unsafe { expr_ptr.assume_init() };
+        Ok(Expr { raw: expr_ptr })
+    }
+
+    pub(crate) fn create_expr_product(
+        &self,
+        exprs: &[*mut ffi::SCIP_EXPR],
+    ) -> Result<Expr, Retcode> {
+        let mut expr_ptr = MaybeUninit::uninit();
+
+        // Convert exprs to a mutable pointer array
+        let mut expr_ptrs: Vec<_> = exprs.iter().map(|&e| e).collect();
+
+        scip_call! { ffi::SCIPcreateExprProduct(
+            self.raw,
+            expr_ptr.as_mut_ptr(),
+            exprs.len() as i32,
+            expr_ptrs.as_mut_ptr(),
+            1.0,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let expr_ptr = unsafe { expr_ptr.assume_init() };
+        Ok(Expr { raw: expr_ptr })
+  }
     pub(crate) fn create_cons_sos1(
         &self,
         vars: Vec<&Variable>,
