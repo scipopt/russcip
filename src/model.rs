@@ -14,6 +14,7 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use crate::{Conshdlr, Diver};
 use crate::{Row, Separator, ffi, scip_call_panic};
 use scip_sys::SCIP;
+use std::ptr::NonNull;
 use std::rc::Rc;
 
 /// Represents an optimization model.
@@ -423,8 +424,9 @@ impl Model<Solving> {
     pub fn create_sol(&self) -> Solution {
         let sol_ptr = self
             .scip
-            .create_sol(false)
+            .create_sol(true)
             .expect("Failed to create solution in state ProblemCreated");
+        let sol_ptr = NonNull::new(sol_ptr).expect("SCIP returned null solution pointer");
         Solution {
             scip_ptr: self.scip.clone(),
             raw: sol_ptr,
@@ -1061,6 +1063,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             .scip
             .create_sol(true)
             .expect("Failed to create solution in state ProblemCreated");
+        let sol_ptr = NonNull::new(sol_ptr).expect("SCIP returned null solution pointer");
         Solution {
             scip_ptr: self.scip.clone(),
             raw: sol_ptr,
@@ -1429,7 +1432,8 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
         if self.n_sols() > 0 {
             let sol = Solution {
                 scip_ptr: self.scip.clone(),
-                raw: self.scip.best_sol().unwrap(),
+                raw: std::ptr::NonNull::new(self.scip.best_sol().unwrap())
+                    .expect("SCIP returned null pointer for best solution"),
             };
             Some(sol)
         } else {
@@ -1445,17 +1449,17 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
     /// Returns a vector containing all solutions stored in the solution storage.
     fn get_sols(&self) -> Option<Vec<Solution>> {
         if self.n_sols() > 0 {
-            let scip_sols = self
-                .scip
+            self.scip
                 .get_sols()
                 .unwrap()
                 .into_iter()
                 .map(|x| Solution {
-                    raw: x,
+                    raw: std::ptr::NonNull::new(x)
+                        .expect("SCIP returned null pointer for solution"),
                     scip_ptr: self.scip.clone(),
                 })
-                .collect();
-            Some(scip_sols)
+                .collect::<Vec<_>>()
+                .into()
         } else {
             None
         }
