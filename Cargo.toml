@@ -4,7 +4,7 @@ authors = ["Mohammed Ghannam <ghannam@zib.de>"]
 description = "Rust interface for SCIP"
 license = "Apache-2.0"
 repository = "https://github.com/scipopt/russcip"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2024"
 exclude = ["data/test/*"]
 
@@ -15,7 +15,7 @@ from-source = ["scip-sys/from-source"]
 datastore = ["anymap3"]
 
 [dependencies]
-scip-sys = "0.1.21"
+scip-sys = "0.1.22"
 anymap3 = { version = "1.0.1", optional = true }
 
 [dev-dependencies]
