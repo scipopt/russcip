@@ -15,7 +15,7 @@ from-source = ["scip-sys/from-source"]
 datastore = ["anymap3"]
 
 [dependencies]
-scip-sys = "0.1.21"
+scip-sys = "0.1.22"
 anymap3 = { version = "1.0.1", optional = true }
 
 [dev-dependencies]
