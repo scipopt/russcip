@@ -730,7 +730,7 @@ pub trait ModelWithProblem {
     fn cons_is_separated(&self, cons: &Constraint) -> bool;
 
     /// Writes the optimization model to a file with the given path and extension.
-    fn write(&self, path: &str, ext: &str) -> Result<(), Retcode>;
+    fn write(&self, path: &str, ext: &str, symb: &bool) -> Result<(), Retcode>;
 }
 
 /// A trait for model stages that have a problem.
@@ -825,8 +825,8 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     }
 
     /// Writes the optimization model to a file with the given path and extension.
-    fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
-        self.scip.write(path, ext)?;
+    fn write(&self, path: &str, ext: &str, symb: &bool) -> Result<(), Retcode> {
+        self.scip.write(path, ext, Some(symb))?;
         Ok(())
     }
 }
@@ -2267,7 +2267,7 @@ mod tests {
     fn write_and_read_lp() {
         let model = create_model();
 
-        model.write("test.lp", "lp").unwrap();
+        model.write("test.lp", "lp", &false).unwrap();
 
         let read_model = Model::new()
             .include_default_plugins()
