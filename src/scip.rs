@@ -212,14 +212,16 @@ impl ScipPtr {
         unsafe { ffi::SCIPprintVersion(self.raw, std::ptr::null_mut()) };
     }
 
-    pub(crate) fn write(&self, path: &str, ext: &str) -> Result<(), Retcode> {
+    pub(crate) fn write(&self, path: &str, ext: &str, symb: Option<&bool>) -> Result<(), Retcode> {
+        let symb_bool = symb.unwrap_or(&true); // Default to true if None
+        let symb_value = if symb_bool == &true { 0 as u32 } else { 1 as u32 };
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
         scip_call! { ffi::SCIPwriteOrigProblem(
             self.raw,
             c_path.as_ptr(),
             c_ext.as_ptr(),
-            true.into(),
+            symb_value, // 1 shows the number of the variable, 0 shows the assigned name while building
         ) };
         Ok(())
     }
