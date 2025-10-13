@@ -213,19 +213,19 @@ impl ScipPtr {
     }
 
     /// Write the problem to a file using SCIP's writer
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `path` - The path to the file (without extension).
     /// * `ext` - The file extension (e.g., "lp", "mps").
     /// * `symb` - If true, use symbolic names given by user for variables and constraints; if false, use indices given by SCIP. Defaults to true.
-    /// 
+    ///
     /// # Returns
-    /// 
+    ///
     /// * `Result<(), Retcode>` - Ok(()) if successful, Err(Retcode) otherwise.
-    /// 
+    ///
     /// # Notes
-    /// 
+    ///
     /// * Linked to test in model.rs: write_and_read_lp
     pub(crate) fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode> {
         let symb_value = if symb == true {
