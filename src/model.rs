@@ -2267,7 +2267,7 @@ mod tests {
     fn write_and_read_lp() {
         let model = create_model();
 
-        model.write("test.lp", "lp", &false).unwrap();
+        model.write("test.lp", "lp", false).unwrap();
 
         let read_model = Model::new()
             .include_default_plugins()
