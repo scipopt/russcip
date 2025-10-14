@@ -228,11 +228,7 @@ impl ScipPtr {
     ///
     /// * Linked to test in model.rs: write_and_read_lp
     pub(crate) fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode> {
-        let symb_value = if symb == true {
-            0 as u32 
-        } else {
-            1 as u32 
-        };
+        let symb_value = if symb { 0u32 } else { 1u32 };
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
         scip_call! { ffi::SCIPwriteOrigProblem(
