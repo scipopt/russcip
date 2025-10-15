@@ -238,7 +238,7 @@ impl ScipPtr {
             self.raw,
             c_path.as_ptr(),
             c_ext.as_ptr(),
-            symb_value, 
+            symb_value,
         ) };
         Ok(())
     }
