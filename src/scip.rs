@@ -218,7 +218,7 @@ impl ScipPtr {
     ///
     /// * `path` - The path to the file (without extension).
     /// * `ext` - The file extension (e.g., "lp", "mps").
-    /// * `symb` - If true, use symbolic names given by user for variables and constraints; if false, use indices given by SCIP. Defaults to true.
+    /// * `symb` - If true, use symbolic names given by user for variables and constraints; if false, use indices given by SCIP.
     ///
     /// # Returns
     ///
@@ -226,16 +226,19 @@ impl ScipPtr {
     ///
     /// # Notes
     ///
-    /// * Linked to test in model.rs: write_and_read_lp
+    /// * Linked to test in `model.rs`: `write_and_read_lp`
     pub(crate) fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode> {
+        // Transform the true/false value of `symb` to 0/1 for SCIP
         let symb_value = if symb { 0u32 } else { 1u32 };
+        // Convert Rust strings to C strings
         let c_path = CString::new(path).unwrap();
         let c_ext = CString::new(ext).unwrap();
+        // Call the scip writer function
         scip_call! { ffi::SCIPwriteOrigProblem(
             self.raw,
             c_path.as_ptr(),
             c_ext.as_ptr(),
-            symb_value, // 0 for symbolic names, 1 for indices.
+            symb_value, 
         ) };
         Ok(())
     }

@@ -729,7 +729,21 @@ pub trait ModelWithProblem {
     /// Returns whether the constraint should be separated during LP processing
     fn cons_is_separated(&self, cons: &Constraint) -> bool;
 
-    /// Writes the optimization model to a file with the given path and extension.
+    /// Write the problem to a file using SCIP's writer
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file (without extension).
+    /// * `ext` - The file extension (e.g., "lp", "mps").
+    /// * `symb` - If true, use symbolic names given by user for variables and constraints; if false, use indices given by SCIP.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), Retcode>` - Ok(()) if successful, Err(Retcode) otherwise.
+    ///
+    /// # Notes
+    ///
+    /// * Linked to test in `write_and_read_lp`
     fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode>;
 }
 
@@ -824,7 +838,21 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
         self.scip.cons_is_separated(cons)
     }
 
-    /// Writes the optimization model to a file with the given path and extension.
+    /// Write the problem to a file using SCIP's writer
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file (without extension).
+    /// * `ext` - The file extension (e.g., "lp", "mps").
+    /// * `symb` - If true, use symbolic names given by user for variables and constraints; if false, use indices given by SCIP.
+    ///
+    /// # Returns
+    ///
+    /// * `Result<(), Retcode>` - Ok(()) if successful, Err(Retcode) otherwise.
+    ///
+    /// # Notes
+    ///
+    /// * Linked to test in `write_and_read_lp`
     fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode> {
         self.scip.write(path, ext, symb)?;
         Ok(())
