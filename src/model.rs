@@ -741,9 +741,6 @@ pub trait ModelWithProblem {
     ///
     /// * `Result<(), Retcode>` - Ok(()) if successful, Err(Retcode) otherwise.
     ///
-    /// # Notes
-    ///
-    /// * Linked to test in `write_and_read_lp`
     fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode>;
 }
 
