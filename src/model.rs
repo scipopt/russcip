@@ -846,10 +846,6 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
     /// # Returns
     ///
     /// * `Result<(), Retcode>` - Ok(()) if successful, Err(Retcode) otherwise.
-    ///
-    /// # Notes
-    ///
-    /// * Linked to test in `write_and_read_lp`
     fn write(&self, path: &str, ext: &str, symb: bool) -> Result<(), Retcode> {
         self.scip.write(path, ext, symb)?;
         Ok(())
