@@ -4,7 +4,7 @@ authors = ["Mohammed Ghannam <ghannam@zib.de>"]
 description = "Rust interface for SCIP"
 license = "Apache-2.0"
 repository = "https://github.com/scipopt/russcip"
-version = "0.9.1"
+version = "0.10.0"
 edition = "2024"
 exclude = ["data/test/*"]
 
