@@ -20,6 +20,10 @@ pub enum Status {
     MemoryLimit,
     /// The solving process was interrupted because the gap limit was reached.
     GapLimit,
+    /// The solving process was interrupted because the primal limit was reached.
+    PrimalLimit,
+    /// The solving process was interrupted because the dual limit was reached.
+    DualLimit,
     /// The solving process was interrupted because the solution limit was reached.
     SolutionLimit,
     /// The solving process was interrupted because the solution improvement limit was reached.
@@ -50,6 +54,8 @@ impl From<SCIP_Status> for Status {
             ffi::SCIP_Status_SCIP_STATUS_TIMELIMIT => Status::TimeLimit,
             ffi::SCIP_Status_SCIP_STATUS_MEMLIMIT => Status::MemoryLimit,
             ffi::SCIP_Status_SCIP_STATUS_GAPLIMIT => Status::GapLimit,
+            ffi::SCIP_Status_SCIP_STATUS_PRIMALLIMIT => Status::PrimalLimit,
+            ffi::SCIP_Status_SCIP_STATUS_DUALLIMIT => Status::DualLimit,
             ffi::SCIP_Status_SCIP_STATUS_SOLLIMIT => Status::SolutionLimit,
             ffi::SCIP_Status_SCIP_STATUS_BESTSOLLIMIT => Status::BestSolutionLimit,
             ffi::SCIP_Status_SCIP_STATUS_RESTARTLIMIT => Status::RestartLimit,
@@ -164,6 +170,34 @@ mod tests {
             .solve();
 
         assert_eq!(model.status(), Status::BestSolutionLimit);
+    }
+
+    #[test]
+    fn primal_limit() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+        model = model.set_int_param("presolving/maxrounds", 0).unwrap();
+        model = model.set_real_param("limits/primal", 100000.).unwrap();
+        let model = model.solve();
+
+        assert_eq!(model.status(), Status::PrimalLimit);
+    }
+
+    #[test]
+    fn dual_limit() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+        model = model.set_int_param("presolving/maxrounds", 0).unwrap();
+        model = model.set_real_param("limits/dual", -100000.).unwrap();
+        let model = model.solve();
+
+        assert_eq!(model.status(), Status::DualLimit);
     }
 
     #[test]
