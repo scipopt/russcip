@@ -1,5 +1,6 @@
 use crate::ffi;
 use crate::scip::ScipPtr;
+use std::num;
 use std::rc::Rc;
 
 /// A node in the branch-and-bound tree.
@@ -41,6 +42,29 @@ impl Node {
                 scip: self.scip.clone(),
             })
         }
+    }
+
+    /// Returns the children of the node.
+    pub fn children(&self) -> Option<Vec<Node>> {
+        let num_children = unsafe { ffi::SCIPgetNChildren(self.scip.raw) };
+        if num_children == 0 {
+            return None;
+        }
+        let mut child_nodes_ptr = std::ptr::null_mut();
+
+        unsafe {
+            ffi::SCIPgetChildren(self.scip.raw, &mut child_nodes_ptr, std::ptr::null_mut());
+        }
+        let child_nodes_slice = unsafe{std::slice::from_raw_parts(child_nodes_ptr, num_children as usize)};
+        // put into a Vec and transform to Node
+        let mut children_vec = Vec::with_capacity(num_children as usize);
+        for child in child_nodes_slice {
+            children_vec.push(Node{
+                raw: *child,
+                scip: self.scip.clone(),
+            });
+        }
+        Some(children_vec)
     }
 }
 
