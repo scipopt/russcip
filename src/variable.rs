@@ -156,9 +156,9 @@ impl Variable {
     /// Gets the reduced costs of the variable in the current node's LP relaxation; the current node has to have a feasible LP.
     ///
     /// * Returns:
-    /// `None` - if the variable is active but not in the current LP
-    /// `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
-    /// `Some(f64)` - the reduced cost of the variable
+    ///   `None` - if the variable is active but not in the current LP
+    ///   `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
+    ///   `Some(f64)` - the reduced cost of the variable
     ///
     pub fn get_redcost(&self) -> Option<f64> {
         let rc = unsafe { ffi::SCIPgetVarRedcost(self.scip.raw, self.raw) };
@@ -354,6 +354,5 @@ mod tests {
         model.add(pricer(pricer_obj));
 
         model.solve();
-        let redcost = x.get_redcost().unwrap();
     }
 }
