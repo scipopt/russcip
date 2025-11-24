@@ -1,6 +1,5 @@
 use crate::ffi;
 use crate::scip::ScipPtr;
-use std::num;
 use std::rc::Rc;
 
 /// A node in the branch-and-bound tree.
@@ -52,19 +51,22 @@ impl Node {
     /// Returns the children of the node.
     pub fn children(&self) -> Option<Vec<Node>> {
         let num_children = self.n_children();
+        // no children -> return None
         if num_children == 0 {
             return None;
         }
-        let mut child_nodes_ptr = std::ptr::null_mut();
 
+        // get raw pointers to child nodes
+        let mut child_nodes_ptr = std::ptr::null_mut();
         unsafe {
             ffi::SCIPgetChildren(self.scip.raw, &mut child_nodes_ptr, std::ptr::null_mut());
         }
-        let child_nodes_slice = unsafe{std::slice::from_raw_parts(child_nodes_ptr, num_children)};
+        let child_nodes_slice =
+            unsafe { std::slice::from_raw_parts(child_nodes_ptr, num_children) };
         // put into a Vec and transform to Node
         let mut children_vec = Vec::with_capacity(num_children);
         for child in child_nodes_slice {
-            children_vec.push(Node{
+            children_vec.push(Node {
                 raw: *child,
                 scip: self.scip.clone(),
             });
@@ -75,9 +77,9 @@ impl Node {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::branchrule;
+    use crate::prelude::{branchrule, eventhdlr};
     use crate::{
-        SCIPBranchRule, Solving,
+        EventMask, Eventhdlr, SCIPBranchRule, Solving,
         branchrule::{BranchRule, BranchingResult},
         model::Model,
     };
@@ -101,6 +103,8 @@ mod tests {
                 assert!(node.lower_bound() <= 6777.0);
                 assert!(node.parent().is_some());
             }
+            // before branching, there should be no children
+            assert!(node.children().is_none());
             BranchingResult::BranchOn(candidates[0].clone())
         }
     }
@@ -117,6 +121,38 @@ mod tests {
 
         let br = NodeDataBranchRule;
         model.add(branchrule(br));
+        model.solve();
+    }
+
+    struct FocusNodeHandler;
+    impl Eventhdlr for FocusNodeHandler {
+        fn get_type(&self) -> EventMask {
+            EventMask::NODE_BRANCHED
+        }
+
+        fn execute(
+            &mut self,
+            model: Model<Solving>,
+            _eventhdlr: crate::SCIPEventhdlr,
+            _event: crate::Event,
+        ) {
+            // after branching! There should be children now
+            let current_node = model.focus_node();
+            assert!(current_node.children().is_some());
+        }
+    }
+
+    #[test]
+    fn node_after_branching() {
+        let mut model = Model::new()
+            .hide_output()
+            .set_longint_param("limits/nodes", 3) // only call eventhandler once
+            .unwrap() 
+            .include_default_plugins()
+            .read_prob("data/test/gen-ip054.mps")
+            .unwrap();
+        let fnh = FocusNodeHandler;
+        model.add(eventhdlr(fnh));
         model.solve();
     }
 }
