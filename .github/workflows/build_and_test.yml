@@ -59,7 +59,7 @@ jobs:
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          conda install -y --prefix $CONDA/envs/test --channel conda-forge::scip==9.2.4
+          conda install -y --prefix $CONDA/envs/test --channel conda-forge scip=9.2.4
           echo "LD_LIBRARY_PATH=$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
 
