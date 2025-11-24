@@ -147,7 +147,7 @@ mod tests {
         let mut model = Model::new()
             .hide_output()
             .set_longint_param("limits/nodes", 3) // only call eventhandler once
-            .unwrap() 
+            .unwrap()
             .include_default_plugins()
             .read_prob("data/test/gen-ip054.mps")
             .unwrap();
