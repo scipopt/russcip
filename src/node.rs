@@ -44,9 +44,14 @@ impl Node {
         }
     }
 
+    /// Returns the number of children of the node.
+    pub fn n_children(&self) -> usize {
+        unsafe { ffi::SCIPgetNChildren(self.scip.raw) as usize }
+    }
+
     /// Returns the children of the node.
     pub fn children(&self) -> Option<Vec<Node>> {
-        let num_children = unsafe { ffi::SCIPgetNChildren(self.scip.raw) };
+        let num_children = self.n_children();
         if num_children == 0 {
             return None;
         }
@@ -55,9 +60,9 @@ impl Node {
         unsafe {
             ffi::SCIPgetChildren(self.scip.raw, &mut child_nodes_ptr, std::ptr::null_mut());
         }
-        let child_nodes_slice = unsafe{std::slice::from_raw_parts(child_nodes_ptr, num_children as usize)};
+        let child_nodes_slice = unsafe{std::slice::from_raw_parts(child_nodes_ptr, num_children)};
         // put into a Vec and transform to Node
-        let mut children_vec = Vec::with_capacity(num_children as usize);
+        let mut children_vec = Vec::with_capacity(num_children);
         for child in child_nodes_slice {
             children_vec.push(Node{
                 raw: *child,
