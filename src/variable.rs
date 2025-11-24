@@ -355,6 +355,5 @@ mod tests {
 
         model.solve();
         let redcost = x.get_redcost().unwrap();
-        println!("Reduced cost of x: {}", redcost);
     }
 }
