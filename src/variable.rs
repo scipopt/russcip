@@ -161,12 +161,22 @@ impl Variable {
     ///   `Some(f64)` - the reduced cost of the variable
     ///
     pub fn redcost(&self) -> Option<f64> {
-        let rc = unsafe { ffi::SCIPgetVarRedcost(self.scip.raw, self.raw) };
-        // ? scip invalid
-        if rc == 1e100 {
-            return None;
+        match self.status() {
+            VarStatus::Original => match self.transformed() {
+                None => None,
+                Some(transvar) => Some(unsafe {
+                    ffi::SCIPgetColRedcost(self.scip.raw, ffi::SCIPvarGetCol(transvar.raw))
+                }),
+            },
+            VarStatus::Column => {
+                Some(unsafe { ffi::SCIPgetColRedcost(self.scip.raw, ffi::SCIPvarGetCol(self.raw)) })
+            }
+            VarStatus::Loose => None,
+            VarStatus::Fixed
+            | VarStatus::Aggregated
+            | VarStatus::MultiAggregated
+            | VarStatus::NegatedVar => Some(0.0),
         }
-        Some(rc)
     }
 }
 
@@ -352,6 +362,8 @@ mod tests {
         let pricer_obj = PricerRedcost;
 
         model.add(pricer(pricer_obj));
+        // Check if variable is none
+        assert_eq!(x.redcost(), None);
 
         model.solve();
     }
