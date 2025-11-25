@@ -326,8 +326,8 @@ mod tests {
             let var_obj = model.add_priced_var(0.0, 1.0, c, "testvar", VarType::Continuous);
             model.add_cons_coef(cons1, &var_obj, 1.0);
             model.add_cons_coef(cons2, &var_obj, 1.0);
-            // check if calculated rc matches get_redcost
-            assert_eq!(rc, var_obj.get_redcost().unwrap());
+            // check if calculated rc matches Variable::redcost
+            assert_eq!(rc, var_obj.redcost().unwrap());
 
             crate::PricerResult {
                 state: crate::PricerResultState::FoundColumns,
