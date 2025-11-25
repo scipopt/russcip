@@ -160,7 +160,7 @@ impl Variable {
     ///   `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
     ///   `Some(f64)` - the reduced cost of the variable
     ///
-    pub fn get_redcost(&self) -> Option<f64> {
+    pub fn redcost(&self) -> Option<f64> {
         let rc = unsafe { ffi::SCIPgetVarRedcost(self.scip.raw, self.raw) };
         // ? scip invalid
         if rc == 1e100 {
