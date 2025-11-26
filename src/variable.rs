@@ -164,9 +164,7 @@ impl Variable {
         match self.status() {
             VarStatus::Original => match self.transformed() {
                 None => None,
-                Some(transvar) => Some(unsafe {
-                    ffi::SCIPgetColRedcost(self.scip.raw, ffi::SCIPvarGetCol(transvar.raw))
-                }),
+                Some(transvar) => transvar.redcost(),
             },
             VarStatus::Column => {
                 Some(unsafe { ffi::SCIPgetColRedcost(self.scip.raw, ffi::SCIPvarGetCol(self.raw)) })
