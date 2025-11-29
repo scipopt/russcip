@@ -79,9 +79,9 @@ impl Node {
 mod tests {
     use crate::prelude::{branchrule, eventhdlr};
     use crate::{
+        EventMask, Eventhdlr, SCIPBranchRule, Solving,
         branchrule::{BranchRule, BranchingResult},
         model::Model,
-        EventMask, Eventhdlr, SCIPBranchRule, Solving,
     };
 
     struct NodeDataBranchRule;

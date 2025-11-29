@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{ffi, Col};
+use crate::{Col, ffi};
 use core::panic;
 use scip_sys::SCIP_Status;
 use std::rc::Rc;
@@ -255,9 +255,8 @@ impl From<SCIP_Status> for VarStatus {
 mod tests {
     use super::*;
     use crate::{
-        minimal_model,
+        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, minimal_model,
         prelude::{cons, pricer},
-        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving,
     };
 
     #[test]
