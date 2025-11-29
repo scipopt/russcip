@@ -359,13 +359,13 @@ mod tests {
         let cons2 = model.add(cons().modifiable(true).ge(10.0));
         model.add_cons_coef(&cons1, &y, 10.0);
         model.add_cons_coef(&cons2, &x, 10.0);
-
         let pricer_obj = PricerRedcost;
-
         model.add(pricer(pricer_obj));
         // Check if variable is none
         assert_eq!(x.redcost(), None);
 
         model.solve();
+        assert!(x.redcost().is_some());
+        assert!(x.transformed().is_some());
     }
 }
