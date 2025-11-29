@@ -169,6 +169,11 @@ impl Col {
         assert!(age >= 0);
         age as usize
     }
+
+    /// Returns the reduced cost of the column.
+    pub fn redcost(&self) -> f64 {
+        unsafe { ffi::SCIPgetColRedcost(self.scip.raw, self.raw) }
+    }
 }
 
 impl PartialEq for Col {

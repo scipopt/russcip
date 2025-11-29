@@ -159,16 +159,19 @@ impl Variable {
     ///   `None` - if the variable is active but not in the current LP
     ///   `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
     ///   `Some(f64)` - the reduced cost of the variable
-    ///
     pub fn redcost(&self) -> Option<f64> {
         match self.status() {
-            VarStatus::Original => match self.transformed() {
-                None => None,
-                Some(transvar) => transvar.redcost(),
-            },
-            VarStatus::Column => {
-                Some(unsafe { ffi::SCIPgetColRedcost(self.scip.raw, ffi::SCIPvarGetCol(self.raw)) })
+            // if original, get the transformed variable's column reduced cost
+            VarStatus::Original => {
+                if let Some(transvar) = self.transformed() {
+                    transvar.col().map(|x| x.redcost())
+                } else {
+                    None
+                }
             }
+            // if column, get the column reduced cost
+            VarStatus::Column => self.col().map(|x| x.redcost()),
+            // if loose, fixed, aggregated, multi-aggregated or negated, return None or 0.0
             VarStatus::Loose => None,
             VarStatus::Fixed
             | VarStatus::Aggregated
