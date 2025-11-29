@@ -1,5 +1,5 @@
 use crate::scip::ScipPtr;
-use crate::{Col, ffi};
+use crate::{ffi, Col};
 use core::panic;
 use scip_sys::SCIP_Status;
 use std::rc::Rc;
@@ -82,7 +82,7 @@ impl Variable {
 
     /// Returns the column associated with the variable.
     pub fn col(&self) -> Option<Col> {
-        if self.is_in_lp() {
+        if self.status() == VarStatus::Column {
             let col_ptr = unsafe { ffi::SCIPvarGetCol(self.raw) };
             let col = Col {
                 raw: col_ptr,
@@ -155,7 +155,7 @@ impl Variable {
 
     /// Gets the reduced costs of the variable in the current node's LP relaxation; the current node has to have a feasible LP.
     ///
-    /// * Returns:
+    /// # Returns:
     ///   `None` - if the variable is active but not in the current LP
     ///   `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
     ///   `Some(f64)` - the reduced cost of the variable
@@ -255,8 +255,9 @@ impl From<SCIP_Status> for VarStatus {
 mod tests {
     use super::*;
     use crate::{
-        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, minimal_model,
+        minimal_model,
         prelude::{cons, pricer},
+        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving,
     };
 
     #[test]
