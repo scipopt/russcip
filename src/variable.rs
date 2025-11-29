@@ -82,7 +82,7 @@ impl Variable {
 
     /// Returns the column associated with the variable.
     pub fn col(&self) -> Option<Col> {
-        if self.is_in_lp() {
+        if self.status() == VarStatus::Column {
             let col_ptr = unsafe { ffi::SCIPvarGetCol(self.raw) };
             let col = Col {
                 raw: col_ptr,
@@ -151,6 +151,33 @@ impl Variable {
             scip: Rc::clone(&self.scip),
         };
         Some(var)
+    }
+
+    /// Gets the reduced costs of the variable in the current node's LP relaxation; the current node has to have a feasible LP.
+    ///
+    /// # Returns:
+    ///   `None` - if the variable is active but not in the current LP
+    ///   `Some(0.0)` - if the variable has been aggregated out or fixed in presolving.
+    ///   `Some(f64)` - the reduced cost of the variable
+    pub fn redcost(&self) -> Option<f64> {
+        match self.status() {
+            // if original, get the transformed variable's column reduced cost
+            VarStatus::Original => {
+                if let Some(transvar) = self.transformed() {
+                    transvar.col().map(|x| x.redcost())
+                } else {
+                    None
+                }
+            }
+            // if column, get the column reduced cost
+            VarStatus::Column => self.col().map(|x| x.redcost()),
+            // if loose, fixed, aggregated, multi-aggregated or negated, return None or 0.0
+            VarStatus::Loose => None,
+            VarStatus::Fixed
+            | VarStatus::Aggregated
+            | VarStatus::MultiAggregated
+            | VarStatus::NegatedVar => Some(0.0),
+        }
     }
 }
 
@@ -227,7 +254,10 @@ impl From<SCIP_Status> for VarStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Model, ObjSense, ProblemOrSolving, minimal_model};
+    use crate::{
+        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, minimal_model,
+        prelude::{cons, pricer},
+    };
 
     #[test]
     fn var_data() {
@@ -277,5 +307,65 @@ mod tests {
         model.solve();
 
         assert_eq!(x.sol_val(), 1.0);
+    }
+
+    struct PricerRedcost;
+    impl Pricer for PricerRedcost {
+        fn generate_columns(
+            &mut self,
+            mut model: Model<crate::Solving>,
+            _pricer: crate::SCIPPricer,
+            _farkas: bool,
+        ) -> crate::PricerResult {
+            if model.vars().len() > 3 {
+                // initial call, no vars yet
+                return crate::PricerResult {
+                    state: crate::PricerResultState::NoColumns,
+                    lower_bound: None,
+                };
+            }
+            let conss = model.conss();
+            let cons1 = &conss[0];
+            let cons2 = &conss[1];
+            let dual1 = cons1.dual_sol().unwrap();
+            let dual2 = cons2.dual_sol().unwrap();
+            // coeff
+            let c = 1.0;
+            // rc
+            let rc = c - dual1 - dual2;
+            // make var
+            let var_obj = model.add_priced_var(0.0, 1.0, c, "testvar", VarType::Continuous);
+            model.add_cons_coef(cons1, &var_obj, 1.0);
+            model.add_cons_coef(cons2, &var_obj, 1.0);
+            // check if calculated rc matches Variable::redcost
+            assert_eq!(rc, var_obj.redcost().unwrap());
+
+            crate::PricerResult {
+                state: crate::PricerResultState::FoundColumns,
+                lower_bound: None,
+            }
+        }
+    }
+
+    #[test]
+    fn var_redcost() {
+        let mut model = minimal_model()
+            .set_longint_param("limits/nodes", 3)
+            .unwrap()
+            .minimize();
+        let x = model.add_var(0.0, 1.0, 10.3, "x", VarType::Binary);
+        let y = model.add_var(0.0, 1.0, 5.5, "y", VarType::Binary);
+        let cons1 = model.add(cons().modifiable(true).ge(5.0));
+        let cons2 = model.add(cons().modifiable(true).ge(10.0));
+        model.add_cons_coef(&cons1, &y, 10.0);
+        model.add_cons_coef(&cons2, &x, 10.0);
+        let pricer_obj = PricerRedcost;
+        model.add(pricer(pricer_obj));
+        // Check if variable is none
+        assert_eq!(x.redcost(), None);
+
+        model.solve();
+        assert!(x.redcost().is_some());
+        assert!(x.transformed().is_some());
     }
 }
