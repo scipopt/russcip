@@ -49,11 +49,11 @@ impl Node {
     }
 
     /// Returns the children of the node.
-    pub fn children(&self) -> Option<Vec<Node>> {
+    pub fn children(&self) -> Vec<Node> {
         let num_children = self.n_children();
-        // no children -> return None
+        // no children -> return empty vec
         if num_children == 0 {
-            return None;
+            return vec![];
         }
 
         // get raw pointers to child nodes
@@ -71,7 +71,7 @@ impl Node {
                 scip: self.scip.clone(),
             });
         }
-        Some(children_vec)
+        children_vec
     }
 }
 
@@ -79,9 +79,9 @@ impl Node {
 mod tests {
     use crate::prelude::{branchrule, eventhdlr};
     use crate::{
-        EventMask, Eventhdlr, SCIPBranchRule, Solving,
         branchrule::{BranchRule, BranchingResult},
         model::Model,
+        EventMask, Eventhdlr, SCIPBranchRule, Solving,
     };
 
     struct NodeDataBranchRule;
@@ -104,7 +104,7 @@ mod tests {
                 assert!(node.parent().is_some());
             }
             // before branching, there should be no children
-            assert!(node.children().is_none());
+            assert!(node.children().is_empty());
             BranchingResult::BranchOn(candidates[0].clone())
         }
     }
@@ -138,7 +138,7 @@ mod tests {
         ) {
             // after branching! There should be children now
             let current_node = model.focus_node();
-            assert!(current_node.children().is_some());
+            assert!(!current_node.children().is_empty());
         }
     }
 
