@@ -1589,7 +1589,7 @@ impl ScipPtr {
         Ok(unsafe { row_ptr.assume_init() })
     }
 
-    pub(crate) fn free_transform(&self) -> Result<(), Retcode> {
+    pub(crate) unsafe fn free_transform(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPfreeTransform(self.raw));
         Ok(())
     }
