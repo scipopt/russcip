@@ -55,7 +55,7 @@ impl Model<Unsolved> {
     ///
     /// Returns a `Result` with the new `Model` instance on success, or a `Retcode` error on failure.
     pub fn try_new() -> Result<Self, Retcode> {
-        let scip_ptr = ScipPtr::new();
+        let scip_ptr = ScipPtr::new()?;
         Ok(Model {
             scip: Rc::new(scip_ptr),
             state: Unsolved {},
