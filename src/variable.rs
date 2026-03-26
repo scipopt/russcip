@@ -139,7 +139,7 @@ impl Variable {
         unsafe { ffi::SCIPvarIsActive(self.raw) != 0 }
     }
 
-    /// Returns the trasnformed variable if it exists.
+    /// Returns the transformed variable if it exists.
     pub fn transformed(&self) -> Option<Variable> {
         let var_ptr = unsafe { ffi::SCIPvarGetTransVar(self.raw) };
         if var_ptr.is_null() {
