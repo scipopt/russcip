@@ -453,12 +453,12 @@ impl ScipPtr {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
         if local {
-            if node.is_none() {
+            if let Some(node) = node {
+                // adding to given node
+                scip_call! { ffi::SCIPaddConsNode(self.raw, node.raw, scip_cons, std::ptr::null_mut()) };
+            } else {
                 // adding to current node
                 scip_call! { ffi::SCIPaddConsLocal(self.raw, scip_cons, std::ptr::null_mut()) };
-            } else {
-                // adding to given node
-                scip_call! { ffi::SCIPaddConsNode(self.raw, node.unwrap().raw, scip_cons, std::ptr::null_mut()) };
             }
         } else {
             scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
@@ -1531,19 +1531,8 @@ impl ScipPtr {
         let removable = row.removable.unwrap_or(true);
         let local = row.local.unwrap_or(true);
 
-        if row.source.is_none() {
-            scip_call!(ffi::SCIPcreateEmptyRowUnspec(
-                self.raw,
-                row_ptr.as_mut_ptr(),
-                row_name.as_ptr(),
-                row.lhs,
-                row.rhs,
-                local.into(),
-                modifiable.into(),
-                removable.into(),
-            ));
-        } else {
-            match row.source.as_ref().unwrap() {
+        if let Some(source) = &row.source {
+            match source {
                 RowSource::Constraint(c) => {
                     scip_call!(ffi::SCIPcreateEmptyRowCons(
                         self.raw,
@@ -1584,6 +1573,17 @@ impl ScipPtr {
                     ));
                 }
             }
+        } else {
+            scip_call!(ffi::SCIPcreateEmptyRowUnspec(
+                self.raw,
+                row_ptr.as_mut_ptr(),
+                row_name.as_ptr(),
+                row.lhs,
+                row.rhs,
+                local.into(),
+                modifiable.into(),
+                removable.into(),
+            ));
         }
 
         Ok(unsafe { row_ptr.assume_init() })
@@ -1729,10 +1729,10 @@ impl ScipPtr {
             return Err(Retcode::ParameterWrongVal);
         }
 
-        if let Some(ws) = weights {
-            if vars.len() != ws.len() {
-                return Err(Retcode::ParameterWrongVal);
-            }
+        if let Some(ws) = weights
+            && vars.len() != ws.len()
+        {
+            return Err(Retcode::ParameterWrongVal);
         }
 
         let c_name = CString::new(name).unwrap();
