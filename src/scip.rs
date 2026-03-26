@@ -1276,7 +1276,7 @@ impl ScipPtr {
 
             let solution = Solution {
                 raw: sol,
-                scip_ptr: scip_ptr.clone(),
+                scip_ptr: &scip_ptr,
             };
 
             let feasible = unsafe { (*conshdlr_ptr).check(model, scip_conshdlr, &solution) };
