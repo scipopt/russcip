@@ -1093,8 +1093,8 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// # Returns
     /// A `Result` indicating whether the solution was added successfully.
     fn add_sol(&self, sol: Solution) -> Result<(), SolError> {
-        let succesfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
-        if succesfully_stored {
+        let successfully_stored = self.scip.add_sol(sol).expect("Failed to add solution");
+        if successfully_stored {
             Ok(())
         } else {
             Err(SolError::Infeasible)
@@ -1663,7 +1663,7 @@ impl<T> Model<T> {
             .to_string()
     }
 
-    /// Returns the value of a SCIP paramter.
+    /// Returns the value of a SCIP parameter.
     pub fn param<P: ScipParameter>(&self, param: &str) -> P {
         P::get(self, param)
     }
