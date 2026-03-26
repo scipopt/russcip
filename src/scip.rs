@@ -34,15 +34,15 @@ pub struct ScipPtr {
 }
 
 impl ScipPtr {
-    pub(crate) fn new() -> Self {
+    pub(crate) fn new() -> Result<Self, Retcode> {
         let mut scip_ptr = MaybeUninit::uninit();
-        scip_call_panic!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
+        scip_call!(ffi::SCIPcreate(scip_ptr.as_mut_ptr()));
         let scip_ptr = unsafe { scip_ptr.assume_init() };
-        ScipPtr {
+        Ok(ScipPtr {
             raw: scip_ptr,
             weak: false,
             vars_added_in_solving: Vec::new(),
-        }
+        })
     }
 
     pub(crate) fn from_raw(raw: *mut ffi::SCIP, weak: bool) -> Self {
@@ -1818,7 +1818,7 @@ mod tests {
     fn test_datastore() {
         use crate::scip::ScipPtr;
 
-        let scip = ScipPtr::new();
+        let scip = ScipPtr::new().unwrap();
         assert!(!scip.raw.is_null());
 
         // Test with a simple integer
