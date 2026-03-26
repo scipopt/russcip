@@ -420,14 +420,14 @@ impl Model<Solving> {
     }
 
     /// Creates a new solution initialized to zero.
-    pub fn create_sol(&self) -> Solution {
+    pub fn create_sol(&'_ self) -> Solution<'_> {
         let sol_ptr = self
             .scip
             .create_sol(false)
             .expect("Failed to create solution in state ProblemCreated");
         Solution {
-            scip_ptr: self.scip.clone(),
             raw: sol_ptr,
+            scip_ptr: &self.scip,
         }
     }
 
@@ -855,7 +855,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 /// A trait for optimization models with a problem created or solved.
 pub trait ProblemOrSolving {
     /// Create a solution in the original space
-    fn create_orig_sol(&self) -> Solution;
+    fn create_orig_sol(&'_ self) -> Solution<'_>;
 
     /// Adds a solution to the model
     ///
@@ -1077,14 +1077,14 @@ impl ModelStageProblemOrSolving for Solving {}
 
 impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
     /// Create a new solution in the original space
-    fn create_orig_sol(&self) -> Solution {
+    fn create_orig_sol(&'_ self) -> Solution<'_> {
         let sol_ptr = self
             .scip
             .create_sol(true)
             .expect("Failed to create solution in state ProblemCreated");
         Solution {
-            scip_ptr: self.scip.clone(),
             raw: sol_ptr,
+            scip_ptr: &self.scip,
         }
     }
 
@@ -1430,10 +1430,10 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
 /// A trait for optimization models with any state that might have solutions.
 pub trait WithSolutions {
     /// Returns the best solution for the optimization model, if one exists.
-    fn best_sol(&self) -> Option<Solution>;
+    fn best_sol(&'_ self) -> Option<Solution<'_>>;
 
     /// Return vector containing all solutions
-    fn get_sols(&self) -> Option<Vec<Solution>>;
+    fn get_sols(&'_ self) -> Option<Vec<Solution<'_>>>;
 
     /// Returns the number of solutions found by the optimization model.
     fn n_sols(&self) -> usize;
@@ -1446,11 +1446,11 @@ impl ModelStageWithSolutions for ProblemCreated {}
 
 impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
     /// Returns the best solution for the optimization model, if one exists.
-    fn best_sol(&self) -> Option<Solution> {
-        if self.n_sols() > 0 {
+    fn best_sol(&'_ self) -> Option<Solution<'_>> {
+        if let Some(raw) = self.scip.best_sol() {
             let sol = Solution {
-                scip_ptr: self.scip.clone(),
-                raw: self.scip.best_sol().unwrap(),
+                raw,
+                scip_ptr: &self.scip,
             };
             Some(sol)
         } else {
@@ -1464,22 +1464,16 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
     }
 
     /// Returns a vector containing all solutions stored in the solution storage.
-    fn get_sols(&self) -> Option<Vec<Solution>> {
-        if self.n_sols() > 0 {
-            let scip_sols = self
-                .scip
-                .get_sols()
-                .unwrap()
+    fn get_sols(&'_ self) -> Option<Vec<Solution<'_>>> {
+        self.scip.get_sols().map(|raw_sols| {
+            raw_sols
                 .into_iter()
                 .map(|x| Solution {
                     raw: x,
-                    scip_ptr: self.scip.clone(),
+                    scip_ptr: &self.scip,
                 })
-                .collect();
-            Some(scip_sols)
-        } else {
-            None
-        }
+                .collect()
+        })
     }
 }
 
