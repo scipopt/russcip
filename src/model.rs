@@ -14,6 +14,7 @@ use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
 use crate::{Conshdlr, Diver};
 use crate::{Row, Separator, ffi, scip_call_panic};
 use scip_sys::SCIP;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 /// Represents an optimization model.
@@ -21,8 +22,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 pub struct Model<State> {
     pub(crate) scip: Rc<ScipPtr>,
-    #[allow(dead_code)]
-    pub(crate) state: State,
+    pub(crate) state: PhantomData<State>,
 }
 
 /// Represents the state of an optimization model that has not yet been solved.
@@ -58,7 +58,7 @@ impl Model<Unsolved> {
         let scip_ptr = ScipPtr::new()?;
         Ok(Model {
             scip: Rc::new(scip_ptr),
-            state: Unsolved {},
+            state: PhantomData,
         })
     }
 }
@@ -80,7 +80,7 @@ impl Model<PluginsIncluded> {
             .expect("Failed to create problem in state PluginsIncluded");
         Model {
             scip,
-            state: ProblemCreated {},
+            state: PhantomData,
         }
     }
 
@@ -99,7 +99,7 @@ impl Model<PluginsIncluded> {
         scip.read_prob(filename)?;
         let new_model = Model {
             scip: self.scip,
-            state: ProblemCreated {},
+            state: PhantomData,
         };
         Ok(new_model)
     }
@@ -377,7 +377,7 @@ impl Model<ProblemCreated> {
             .expect("Failed to solve problem in state ProblemCreated");
         Model {
             scip: self.scip,
-            state: Solved {},
+            state: PhantomData,
         }
     }
 }
@@ -693,7 +693,7 @@ impl Model<Solved> {
             .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {retcode:?}"));
         Model {
             scip: self.scip,
-            state: ProblemCreated {},
+            state: PhantomData,
         }
     }
 }
@@ -1616,7 +1616,7 @@ impl<T> Model<T> {
             .expect("Failed to include default plugins");
         Model {
             scip: self.scip,
-            state: PluginsIncluded {},
+            state: PhantomData,
         }
     }
 

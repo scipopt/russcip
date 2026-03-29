@@ -7,7 +7,7 @@ use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
     ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
-    SCIPSeparator, Separator, Solution, Solving, Status, VarType, Variable, ffi, scip_call_panic,
+    SCIPSeparator, Separator, Solution, Status, VarType, Variable, ffi, scip_call_panic,
 };
 use crate::{HeurTiming, Heuristic, scip_call};
 use core::panic;
@@ -17,6 +17,7 @@ use scip_sys::{
 };
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString, c_int};
+use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 
@@ -759,7 +760,7 @@ impl ScipPtr {
             let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
             let model = Model {
                 scip: scip_ptr.clone(),
-                state: Solving,
+                state: PhantomData,
             };
             let eventhdlr = SCIPEventhdlr { raw: eventhdlr };
             let event = Event {
@@ -858,7 +859,7 @@ impl ScipPtr {
             let scip_ptr = ScipPtr::from_raw(scip, true);
             let model = Model {
                 scip: Rc::new(scip_ptr),
-                state: Solving,
+                state: PhantomData,
             };
             let branchrule = SCIPBranchRule { raw: branchrule };
             let branching_res = unsafe { (*rule_ptr).execute(model, branchrule, cands) };
@@ -943,7 +944,7 @@ impl ScipPtr {
             let scip_ptr = ScipPtr::from_raw(scip, true);
             let model = Model {
                 scip: Rc::new(scip_ptr),
-                state: Solving,
+                state: PhantomData,
             };
 
             let pricer = SCIPPricer { raw: pricer };
@@ -1066,7 +1067,7 @@ impl ScipPtr {
             let scip_ptr = ScipPtr::from_raw(scip, true);
             let model = Model {
                 scip: Rc::new(scip_ptr),
-                state: Solving,
+                state: PhantomData,
             };
             let heur_res =
                 unsafe { (*rule_ptr).execute(model, heurtiming.into(), nodeinfeasible != 0) };
@@ -1152,7 +1153,7 @@ impl ScipPtr {
             let scip_ptr = ScipPtr::from_raw(scip, true);
             let model = Model {
                 scip: Rc::new(scip_ptr),
-                state: Solving,
+                state: PhantomData,
             };
             let separator = SCIPSeparator { raw: separator };
             let sep_res = unsafe { (*rule_ptr).execute_lp(model, separator) };
@@ -1236,7 +1237,7 @@ impl ScipPtr {
             let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
             let model = Model {
                 scip: scip_ptr.clone(),
-                state: Solving,
+                state: PhantomData,
             };
 
             let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
@@ -1267,7 +1268,7 @@ impl ScipPtr {
             let scip_ptr = Rc::new(ScipPtr::from_raw(scip, true));
             let model = Model {
                 scip: scip_ptr.clone(),
-                state: Solving,
+                state: PhantomData,
             };
 
             let scip_conshdlr = SCIPConshdlr { raw: conshdlr };
