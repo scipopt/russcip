@@ -2014,6 +2014,12 @@ mod tests {
     }
 
     #[test]
+    fn try_solve_on_valid_model() {
+        let solved = create_model().try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    #[test]
     fn build_model_with_functions() {
         let model = create_model();
         assert_eq!(model.vars().len(), 2);
