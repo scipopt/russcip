@@ -361,6 +361,21 @@ impl Model<ProblemCreated> {
             .expect("Failed to include constraint handler at state ProblemCreated");
     }
 
+    /// Tries to solve the model, and returns a new `Model` instance with a `Solved` state if successful.
+    ///
+    /// # Returns
+    ///
+    /// A new `Model` instance with a `Solved` state, or a [`Retcode`] if the problem cannot be solved in the current state.
+    #[allow(unused_mut)]
+    pub fn try_solve(mut self) -> Result<Model<Solved>, Retcode> {
+        self.scip.solve()?;
+
+        Ok(Model {
+            scip: self.scip,
+            state: PhantomData,
+        })
+    }
+
     /// Solves the model and returns a new `Model` instance with a `Solved` state.
     ///
     /// # Returns
@@ -372,13 +387,8 @@ impl Model<ProblemCreated> {
     /// This method panics if the problem cannot be solved in the current state.
     #[allow(unused_mut)]
     pub fn solve(mut self) -> Model<Solved> {
-        self.scip
-            .solve()
-            .expect("Failed to solve problem in state ProblemCreated");
-        Model {
-            scip: self.scip,
-            state: PhantomData,
-        }
+        self.try_solve()
+            .expect("Failed to solve problem in state ProblemCreated")
     }
 }
 
