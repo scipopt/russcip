@@ -682,6 +682,15 @@ impl ScipPtr {
         Ok(sol)
     }
 
+    /// Create a partial solution: unset variables are UNKNOWN, not 0.
+    pub(crate) fn create_partial_sol(&self) -> Result<*mut SCIP_SOL, Retcode> {
+        let mut sol = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreatePartialSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        let sol = unsafe { sol.assume_init() };
+        assert!(!sol.is_null());
+        Ok(sol)
+    }
+
     /// Add coefficient to set packing/partitioning/covering constraint
     pub(crate) fn add_cons_coef_setppc(
         &self,
@@ -1495,6 +1504,13 @@ impl ScipPtr {
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut feasible = 0;
         assert!(!sol.raw.is_null());
+        // Partial solutions can't be checked/tried (they have UNKNOWN entries);
+        // add them directly for the completesol heuristic to complete.
+        let is_partial = unsafe { ffi::SCIPsolIsPartial(sol.raw) } == 1;
+        if is_partial {
+            scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            return Ok(feasible != 0);
+        }
         let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw) } == 1;
         if is_orig {
             scip_call!(ffi::SCIPcheckSolOrig(

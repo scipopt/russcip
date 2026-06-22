@@ -106,6 +106,21 @@ impl Model<PluginsIncluded> {
 }
 
 impl Model<ProblemCreated> {
+    /// Creates a new *partial* solution: variables left unset are UNKNOWN rather
+    /// than zero, and are filled in by the `completesol` heuristic when the
+    /// solution is added via [`add_sol`](ProblemOrSolving::add_sol). Useful as a
+    /// MIP-start that fixes only some variables and lets the solver complete the rest.
+    pub fn create_partial_sol(&'_ self) -> Solution<'_> {
+        let sol_ptr = self
+            .scip
+            .create_partial_sol()
+            .expect("Failed to create partial solution in state ProblemCreated");
+        Solution {
+            raw: sol_ptr,
+            scip_ptr: &self.scip,
+        }
+    }
+
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -2219,6 +2234,35 @@ mod tests {
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
         assert!(solved.n_sols() >= 2);
+    }
+
+    #[test]
+    fn create_partial_sol() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Minimize);
+
+        let x1 = model.add_var(0., 1., 3., "x1", VarType::Binary);
+        let x2 = model.add_var(0., 1., 4., "x2", VarType::Binary);
+        // Covering: at least one of x1, x2 must be 1.
+        model.add_cons(vec![&x1, &x2], &[1., 1.], 1., 2., "cover");
+
+        // A partial solution that fixes ONLY x1; x2 is left UNKNOWN and is filled
+        // in by the completesol heuristic.
+        let partial = model.create_partial_sol();
+        assert!(partial.is_partial());
+        partial.set_val(&x1, 1.);
+        // A full (non-partial) solution is not partial.
+        assert!(!model.create_orig_sol().is_partial());
+        // Registering a partial solution for completion must not error.
+        assert!(model.add_sol(partial).is_ok());
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        // Optimum is x1 = 1, x2 = 0 -> objective 3.
+        assert!((solved.best_sol().unwrap().obj_val() - 3.).abs() < 1e-9);
     }
 
     #[test]
