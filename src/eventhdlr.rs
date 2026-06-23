@@ -59,42 +59,46 @@ impl EventMask {
     pub const IMPL_ADDED: Self = EventMask(0x000008000);
     /// The type of a variable has changed.
     pub const TYPE_CHANGED: Self = EventMask(0x000010000);
+    /// The implied integral type of a variable has changed.
+    pub const IMPL_TYPE_CHANGED: Self = EventMask(0x000020000);
     /// A presolving round has been finished.
-    pub const PRESOLVE_ROUND: Self = EventMask(0x000020000);
+    pub const PRESOLVE_ROUND: Self = EventMask(0x000040000);
     /// A node has been focused and is now the focus node.
-    pub const NODE_FOCUSED: Self = EventMask(0x000040000);
+    pub const NODE_FOCUSED: Self = EventMask(0x000080000);
     /// The LP/pseudo solution of the node was feasible.
-    pub const NODE_FEASIBLE: Self = EventMask(0x000080000);
+    pub const NODE_FEASIBLE: Self = EventMask(0x000100000);
     /// The focus node has been proven to be infeasible or was bounded.
-    pub const NODE_INFEASIBLE: Self = EventMask(0x000100000);
+    pub const NODE_INFEASIBLE: Self = EventMask(0x000200000);
     /// The focus node has been solved by branching.
-    pub const NODE_BRANCHED: Self = EventMask(0x000200000);
+    pub const NODE_BRANCHED: Self = EventMask(0x000400000);
     /// A node is about to be deleted from the tree.
-    pub const NODE_DELETE: Self = EventMask(0x000400000);
+    pub const NODE_DELETE: Self = EventMask(0x000800000);
+    /// The dual bound has improved.
+    pub const DUAL_BOUND_IMPROVED: Self = EventMask(0x001000000);
     /// The node's initial LP was solved.
-    pub const FIRST_LP_SOLVED: Self = EventMask(0x000800000);
+    pub const FIRST_LP_SOLVED: Self = EventMask(0x002000000);
     /// The node's LP was completely solved with cut & price.
-    pub const LP_SOLVED: Self = EventMask(0x001000000);
+    pub const LP_SOLVED: Self = EventMask(0x004000000);
     /// A good enough primal feasible (but not new best) solution was found.
-    pub const POOR_SOL_FOUND: Self = EventMask(0x002000000);
+    pub const POOR_SOL_FOUND: Self = EventMask(0x008000000);
     /// A new best primal feasible solution was found.
-    pub const BEST_SOL_FOUND: Self = EventMask(0x004000000);
+    pub const BEST_SOL_FOUND: Self = EventMask(0x010000000);
     /// A row has been added to SCIP's separation storage.
-    pub const ROW_ADDED_SEPA: Self = EventMask(0x008000000);
+    pub const ROW_ADDED_SEPA: Self = EventMask(0x020000000);
     /// A row has been removed from SCIP's separation storage.
-    pub const ROW_DELETED_SEPA: Self = EventMask(0x010000000);
+    pub const ROW_DELETED_SEPA: Self = EventMask(0x040000000);
     /// A row has been added to the LP.
-    pub const ROW_ADDED_LP: Self = EventMask(0x020000000);
+    pub const ROW_ADDED_LP: Self = EventMask(0x080000000);
     /// A row has been removed from the LP.
-    pub const ROW_DELETED_LP: Self = EventMask(0x040000000);
+    pub const ROW_DELETED_LP: Self = EventMask(0x100000000);
     /// A coefficient of a row has been changed (row specific event).
-    pub const ROW_COEF_CHANGED: Self = EventMask(0x080000000);
+    pub const ROW_COEF_CHANGED: Self = EventMask(0x200000000);
     /// The constant of a row has been changed (row specific event).
-    pub const ROW_CONST_CHANGED: Self = EventMask(0x100000000);
+    pub const ROW_CONST_CHANGED: Self = EventMask(0x400000000);
     /// A side of a row has been changed (row specific event).
-    pub const ROW_SIDE_CHANGED: Self = EventMask(0x200000000);
+    pub const ROW_SIDE_CHANGED: Self = EventMask(0x800000000);
     /// Synchronization event.
-    pub const SYNC: Self = EventMask(0x400000000);
+    pub const SYNC: Self = EventMask(0x1000000000);
     /// Event mask for the change of both global lower bound and global upper bound of a variable.
     /// Event mask for the change of both global lower bound and global upper bound of a variable.
     pub const GBD_CHANGED: Self = Self(Self::GLB_CHANGED.0 | Self::GUB_CHANGED.0);

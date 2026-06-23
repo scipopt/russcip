@@ -150,11 +150,8 @@ mod tests {
                 assert_eq!(model.lp_status(), LPStatus::Optimal);
                 assert!(model.lp_obj_val().abs() < 1e-6);
 
-                // Since SCIP 10 the node LP is freed before `NODE_SOLVED` fires, so
-                // the dive LP is (re)constructed on demand and is not associated with
-                // the focus node; `last_dive_node` is therefore 0 here rather than the
-                // focus node number.
-                assert_eq!(diver.last_dive_node(), 0);
+                let current_node = model.focus_node().number();
+                assert_eq!(diver.last_dive_node(), current_node);
 
                 diver.add_row(&model.add(row().eq(-1.0))); // unsatisfiable row
                 diver.solve_lp(None).unwrap();
