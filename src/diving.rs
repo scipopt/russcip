@@ -37,15 +37,19 @@ impl Diver {
             limit = iterations.try_into().unwrap();
         }
         let mut lperror = 0;
-        let mut lpsolved = 0;
+        // The fourth argument of `SCIPsolveDiveLP` is `cutoff` (the diving LP was
+        // infeasible or hit the objective limit), not "LP solved".
+        let mut cutoff = 0;
 
-        scip_call! { ffi::SCIPsolveDiveLP(self.scip.raw, limit, &mut lperror, &mut lpsolved) }
+        scip_call! { ffi::SCIPsolveDiveLP(self.scip.raw, limit, &mut lperror, &mut cutoff) }
 
         if lperror != 0 {
             return Err(Retcode::LpError);
         }
 
-        Ok(lpsolved != 0)
+        // Report whether the diving LP was solved to optimality.
+        Ok(unsafe { ffi::SCIPgetLPSolstat(self.scip.raw) }
+            == ffi::SCIP_LPSolStat_SCIP_LPSOLSTAT_OPTIMAL)
     }
 
     /// Adds a row to the diving LP
@@ -106,10 +110,16 @@ mod tests {
     use crate::prelude::{eventhdlr, row};
     use crate::{Event, EventMask, SCIPEventhdlr, Solving};
     use crate::{Eventhdlr, LPStatus, ModelWithProblem, ParamSetting, ffi};
+    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
     fn test_diver() {
-        struct DivingTester;
+        struct DivingTester {
+            /// Set once the diving assertions run, so the test cannot pass
+            /// vacuously if the node LP is never solved.
+            checked: Rc<AtomicBool>,
+        }
 
         impl Eventhdlr for DivingTester {
             fn get_type(&self) -> EventMask {
@@ -122,6 +132,10 @@ mod tests {
                 _eventhdlr: SCIPEventhdlr,
                 _event: Event,
             ) {
+                if self.checked.load(Ordering::SeqCst) {
+                    return;
+                }
+
                 let mut diver = model.start_diving();
 
                 let vars = model.vars();
@@ -136,8 +150,11 @@ mod tests {
                 assert_eq!(model.lp_status(), LPStatus::Optimal);
                 assert!(model.lp_obj_val().abs() < 1e-6);
 
-                let current_node = model.focus_node().number();
-                assert_eq!(diver.last_dive_node(), current_node);
+                // Since SCIP 10 the node LP is freed before `NODE_SOLVED` fires, so
+                // the dive LP is (re)constructed on demand and is not associated with
+                // the focus node; `last_dive_node` is therefore 0 here rather than the
+                // focus node number.
+                assert_eq!(diver.last_dive_node(), 0);
 
                 diver.add_row(&model.add(row().eq(-1.0))); // unsatisfiable row
                 diver.solve_lp(None).unwrap();
@@ -148,9 +165,12 @@ mod tests {
 
                 // Check that diving mode is ended
                 assert_eq!(unsafe { ffi::SCIPinDive(model.scip.raw) }, 0);
+
+                self.checked.store(true, Ordering::SeqCst);
             }
         }
 
+        let checked = Rc::new(AtomicBool::new(false));
         let mut model = Model::new()
             .include_default_plugins()
             .read_prob("data/test/simple.mps")
@@ -160,7 +180,13 @@ mod tests {
             .set_separating(ParamSetting::Off)
             .set_heuristics(ParamSetting::Off);
 
-        model.add(eventhdlr(DivingTester));
+        model.add(eventhdlr(DivingTester {
+            checked: checked.clone(),
+        }));
         model.solve();
+        assert!(
+            checked.load(Ordering::SeqCst),
+            "diving assertions never ran"
+        );
     }
 }

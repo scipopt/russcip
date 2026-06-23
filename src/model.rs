@@ -638,7 +638,14 @@ impl Model<Solving> {
     pub fn start_diving(&mut self) -> Diver {
         let scip = self.scip.clone();
 
-        unsafe { ffi::SCIPstartDive(scip.raw) };
+        // Since SCIP 10, `SCIPstartDive` requires the current node's LP to be
+        // constructed first (it returns `SCIP_INVALIDCALL` otherwise). Construct
+        // it on demand so diving works regardless of whether the LP was solved yet.
+        if unsafe { ffi::SCIPisLPConstructed(scip.raw) } == 0 {
+            let mut cutoff = 0u32;
+            scip_call_panic!(ffi::SCIPconstructLP(scip.raw, &mut cutoff));
+        }
+        scip_call_panic!(ffi::SCIPstartDive(scip.raw));
 
         Diver { scip }
     }
