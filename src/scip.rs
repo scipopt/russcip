@@ -188,6 +188,12 @@ impl ScipPtr {
         }
     }
 
+    pub(crate) fn find_heur(&self, name: &str) -> Option<*mut ffi::SCIP_HEUR> {
+        let c_name = CString::new(name).unwrap();
+        let heur = unsafe { ffi::SCIPfindHeur(self.raw, c_name.as_ptr()) };
+        if heur.is_null() { None } else { Some(heur) }
+    }
+
     pub(crate) fn get_transformed_cons(
         &self,
         cons: &Constraint,
