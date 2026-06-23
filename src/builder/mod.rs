@@ -6,6 +6,8 @@ pub mod cons;
 pub mod eventhdlr;
 /// This module contains `HeurBuilder` for easily creating heuristics.
 pub mod heur;
+/// This module contains `NodeSelBuilder` for easily creating node selectors.
+pub mod nodesel;
 /// This module contains `PricerBuilder` for easily creating pricers.
 pub mod pricer;
 pub(crate) mod row;

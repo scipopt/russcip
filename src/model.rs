@@ -3,6 +3,7 @@ use crate::builder::cons::ConsBuilder;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::node::Node;
+use crate::nodesel::{NodeSel, SCIPNodesel};
 use crate::param::ScipParameter;
 use crate::probing::Prober;
 use crate::retcode::Retcode;
@@ -221,6 +222,32 @@ impl Model<ProblemCreated> {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
+    }
+
+    /// Includes a new node selector in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the node selector. This should be a unique identifier.
+    /// * `desc` - A brief description of the node selector. This is used for informational purposes.
+    /// * `std_priority` - The standard priority of the node selector. Among all included node selectors, the one with the highest standard priority is used in standard mode. A higher value indicates a higher priority.
+    /// * `mem_save_priority` - The memory saving priority of the node selector. When SCIP switches to memory saving mode, the node selector with the highest memory saving priority is used instead.
+    /// * `nodesel` - The node selector to be included. This should be a Box of an object that implements the `NodeSel` trait, and represents the node selection logic.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if the inclusion of the node selector fails. This can happen if another node selector with the same name already exists.
+    pub fn include_nodesel(
+        &mut self,
+        name: &str,
+        desc: &str,
+        std_priority: i32,
+        mem_save_priority: i32,
+        nodesel: Box<dyn NodeSel>,
+    ) {
+        self.scip
+            .include_nodesel(name, desc, std_priority, mem_save_priority, nodesel)
+            .expect("Failed to include node selector at state ProblemCreated");
     }
 
     /// Include a new primal heuristic in the model.
@@ -476,6 +503,72 @@ impl Model<Solving> {
             raw: node_ptr,
             scip: self.scip.clone(),
         }
+    }
+
+    fn wrap_node(&self, ptr: Option<*mut ffi::SCIP_NODE>) -> Option<Node> {
+        ptr.map(|raw| Node {
+            raw,
+            scip: self.scip.clone(),
+        })
+    }
+
+    fn wrap_nodes(&self, ptrs: Vec<*mut ffi::SCIP_NODE>) -> Vec<Node> {
+        ptrs.into_iter()
+            .map(|raw| Node {
+                raw,
+                scip: self.scip.clone(),
+            })
+            .collect()
+    }
+
+    /// Returns the best open node with respect to the active node selector, or `None` if the tree is empty.
+    pub fn best_node(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_node())
+    }
+
+    /// Returns the open node with the best (smallest) lower bound, or `None` if the tree is empty.
+    pub fn best_bound_node(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_bound_node())
+    }
+
+    /// Returns the best leaf from the leaf queue with respect to the active node selector, or `None` if it is empty.
+    pub fn best_leaf(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_leaf())
+    }
+
+    /// Returns the best child of the focus node with respect to the active node selector, or `None` if there is none.
+    pub fn best_child(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_child())
+    }
+
+    /// Returns the best sibling of the focus node with respect to the active node selector, or `None` if there is none.
+    pub fn best_sibling(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_sibling())
+    }
+
+    /// Returns the child of the focus node with the largest node selection priority, or `None` if there is none.
+    pub fn prio_child(&self) -> Option<Node> {
+        self.wrap_node(self.scip.prio_child())
+    }
+
+    /// Returns the sibling of the focus node with the largest node selection priority, or `None` if there is none.
+    pub fn prio_sibling(&self) -> Option<Node> {
+        self.wrap_node(self.scip.prio_sibling())
+    }
+
+    /// Returns the leaves of the branch-and-bound tree (the open nodes that are neither children nor siblings of the focus node).
+    pub fn leaves(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.leaves())
+    }
+
+    /// Returns the children of the focus node.
+    pub fn children(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.children())
+    }
+
+    /// Returns the siblings of the focus node.
+    pub fn siblings(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.siblings())
     }
 
     /// Adds a new priced variable to the SCIP data structure.
@@ -1593,6 +1686,13 @@ impl<T> Model<T> {
     /// Adds anything that could be added to the model (variables, constraints, plugins, etc.).
     pub fn add<R, O: CanBeAddedToModel<T, Return = R>>(&mut self, object: O) -> R {
         object.add(self)
+    }
+
+    /// Finds an included node selector by its name (e.g. `"bfs"`), giving access
+    /// to its priorities and statistics. Returns `None` if no such node selector
+    /// is included.
+    pub fn find_nodesel(&self, name: &str) -> Option<SCIPNodesel> {
+        self.scip.find_nodesel(name).map(|raw| SCIPNodesel { raw })
     }
 
     /// Returns the status of the optimization model.
