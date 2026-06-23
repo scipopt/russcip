@@ -70,7 +70,7 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly
-          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test 
+          LSAN_OPTIONS=suppressions=$PWD/.github/lsan-suppressions.txt RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
 
   linux-bundled-test:
     if: github.event.pull_request.draft == false
