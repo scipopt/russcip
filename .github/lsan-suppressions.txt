@@ -11,3 +11,6 @@ leak:computeAutomorphisms
 leak:sparsenauty
 leak:refine_sg
 leak:nauty
+leak:doref
+leak:firstpathnode0
+leak:preparemarks1
