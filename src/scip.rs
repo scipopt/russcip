@@ -1528,12 +1528,17 @@ impl ScipPtr {
             ));
             if feasible == 1 {
                 scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            } else {
+                // Not added: we own the solution, so free it to avoid a leak.
+                scip_call!(ffi::SCIPfreeSol(self.raw, &mut sol.raw));
             }
             return Ok(feasible != 0);
         } else {
-            scip_call!(ffi::SCIPtrySol(
+            // `SCIPtrySolFree` takes ownership and frees the solution whether or
+            // not it is stored, so the solution we own is never leaked.
+            scip_call!(ffi::SCIPtrySolFree(
                 self.raw,
-                sol.raw,
+                &mut sol.raw,
                 false.into(),
                 true.into(),
                 true.into(),

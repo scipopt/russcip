@@ -2291,8 +2291,12 @@ mod tests {
                 let partial = model.create_partial_sol();
                 assert!(partial.is_partial());
                 partial.set_val(&x1, 1.);
-                // A full (non-partial) solution is not partial.
-                assert!(!model.create_orig_sol().is_partial());
+                // A full (non-partial) solution is not partial. Hand it to
+                // `add_sol` so it is freed rather than leaked (it is the all-zero
+                // assignment, which is infeasible for this covering model).
+                let full = model.create_orig_sol();
+                assert!(!full.is_partial());
+                let _ = model.add_sol(full);
                 // Registering a partial solution for completion must not error.
                 assert!(model.add_sol(partial).is_ok());
             }
