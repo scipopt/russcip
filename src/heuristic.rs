@@ -1,7 +1,54 @@
 use scip_sys::SCIP_Result;
 use std::ops::{BitOr, BitOrAssign};
+use std::rc::Rc;
 
+use crate::scip::ScipPtr;
 use crate::{Model, Solving, ffi};
+
+/// A primal heuristic that is part of the model, providing access to its
+/// runtime statistics (e.g. how often it ran and how many solutions it found).
+///
+/// Obtain one via [`ModelWithProblem::find_heur`](crate::ModelWithProblem::find_heur).
+#[derive(Clone)]
+pub struct Heur {
+    /// A pointer to the underlying `SCIP_HEUR` C struct.
+    pub(crate) raw: *mut ffi::SCIP_HEUR,
+    /// A reference to the SCIP instance that owns this heuristic (to prevent
+    /// freeing the model while the heuristic is live).
+    #[allow(dead_code)]
+    pub(crate) scip: Rc<ScipPtr>,
+}
+
+impl Heur {
+    /// Returns a pointer to the underlying `SCIP_HEUR` C struct.
+    pub fn inner(&self) -> *mut ffi::SCIP_HEUR {
+        self.raw
+    }
+
+    /// Returns the name of the heuristic.
+    pub fn name(&self) -> String {
+        unsafe {
+            let name = ffi::SCIPheurGetName(self.raw);
+            String::from(std::ffi::CStr::from_ptr(name).to_str().unwrap())
+        }
+    }
+
+    /// Returns the number of times the heuristic was called during the solving process.
+    pub fn n_calls(&self) -> usize {
+        (unsafe { ffi::SCIPheurGetNCalls(self.raw) }) as usize
+    }
+
+    /// Returns the number of solutions the heuristic found during the solving process.
+    pub fn n_sols_found(&self) -> usize {
+        (unsafe { ffi::SCIPheurGetNSolsFound(self.raw) }) as usize
+    }
+
+    /// Returns the number of new best (incumbent) solutions the heuristic found
+    /// during the solving process.
+    pub fn n_best_sols_found(&self) -> usize {
+        (unsafe { ffi::SCIPheurGetNBestSolsFound(self.raw) }) as usize
+    }
+}
 
 /// A trait for defining custom primal heuristics.
 pub trait Heuristic {
@@ -105,6 +152,28 @@ mod tests {
     use super::*;
     use crate::prelude::heur;
     use crate::{Model, ModelWithProblem, ProblemOrSolving};
+
+    #[test]
+    fn find_heur_by_name() {
+        let model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+
+        let heur = model
+            .find_heur("completesol")
+            .expect("completesol is a default heuristic");
+        assert_eq!(heur.name(), "completesol");
+        // completesol only runs given a partial solution, so on this instance
+        // all of its counters stay at zero.
+        assert_eq!(heur.n_calls(), 0);
+        assert_eq!(heur.n_sols_found(), 0);
+        assert_eq!(heur.n_best_sols_found(), 0);
+
+        assert!(model.find_heur("definitely_not_a_heuristic").is_none());
+    }
 
     struct NoSolutionFoundHeur;
 

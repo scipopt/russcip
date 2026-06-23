@@ -10,7 +10,7 @@ use crate::scip::ScipPtr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
-use crate::{BranchRule, HeurTiming, Heuristic, Pricer};
+use crate::{BranchRule, Heur, HeurTiming, Heuristic, Pricer};
 use crate::{Conshdlr, Diver};
 use crate::{Row, Separator, ffi, scip_call_panic};
 use scip_sys::SCIP;
@@ -730,6 +730,10 @@ pub trait ModelWithProblem {
     /// Returns a vector of all constraints in the optimization model.
     fn conss(&self) -> Vec<Constraint>;
 
+    /// Finds a primal heuristic by its name (e.g. `"completesol"`), giving access
+    /// to its runtime statistics. Returns `None` if no such heuristic is included.
+    fn find_heur(&self, name: &str) -> Option<Heur>;
+
     /// Returns the modifiable flag of the given constraint
     fn cons_is_modifiable(&self, cons: &Constraint) -> bool;
 
@@ -828,6 +832,14 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
                 scip: self.scip.clone(),
             })
             .collect()
+    }
+
+    /// Finds a primal heuristic by its name
+    fn find_heur(&self, name: &str) -> Option<Heur> {
+        self.scip.find_heur(name).map(|raw| Heur {
+            raw,
+            scip: self.scip.clone(),
+        })
     }
 
     /// Returns the modifiable flag of the given constraint
