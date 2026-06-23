@@ -119,9 +119,10 @@ impl Prober {
         if let Some(iterations) = iteration_limit {
             limit = iterations.try_into().unwrap();
         }
-        let mut cutoff = 0;
         let mut lperror = 0;
-        scip_call! { ffi::SCIPsolveProbingLP(self.scip.raw, limit, &mut cutoff, &mut lperror) }
+        let mut cutoff = 0;
+        // `SCIPsolveProbingLP` takes `lperror` before `cutoff`.
+        scip_call! { ffi::SCIPsolveProbingLP(self.scip.raw, limit, &mut lperror, &mut cutoff) }
 
         if lperror != 0 {
             return Err(Retcode::LpError);
@@ -150,8 +151,8 @@ impl Prober {
         if let Some(r) = max_pricing_rounds {
             rounds = r.try_into().unwrap();
         }
-        let mut cutoff = 0;
         let mut lperror = 0;
+        let mut cutoff = 0;
 
         // set a default for now to communicate the current state, any further needed communication
         // can be done by sharing data between plugins
@@ -160,14 +161,15 @@ impl Prober {
         // enable always for now, to avoid unnecessary complexity
         const DISPLAYINFO: u32 = 1;
 
+        // `SCIPsolveProbingLPWithPricing` takes `lperror` before `cutoff`.
         scip_call! {
             ffi::SCIPsolveProbingLPWithPricing(
                 self.scip.raw,
                 PRETENDATROOT,
                 DISPLAYINFO,
                 rounds,
-                &mut cutoff,
                 &mut lperror,
+                &mut cutoff,
             )
         }
 
@@ -253,7 +255,11 @@ mod tests {
 
     #[test]
     fn test_probing_add_row() {
-        struct ProbingAddRowTester;
+        struct ProbingAddRowTester {
+            /// Set once the probing assertions run, so the test cannot pass
+            /// vacuously.
+            checked: std::rc::Rc<std::sync::atomic::AtomicBool>,
+        }
 
         impl Eventhdlr for ProbingAddRowTester {
             fn get_type(&self) -> EventMask {
@@ -266,7 +272,16 @@ mod tests {
                 _eventhdlr: SCIPEventhdlr,
                 _event: Event,
             ) {
+                use std::sync::atomic::Ordering;
+                if self.checked.load(Ordering::SeqCst) {
+                    return;
+                }
+
                 let mut prober = model.start_probing();
+                // Since SCIP 10 the node LP is freed before NODE_SOLVED, so solve
+                // the probing LP first; with no probing changes yet this is just
+                // the node LP relaxation.
+                prober.solve_lp(None).unwrap();
                 let obj = model.lp_obj_val();
                 assert!(obj < -25.0);
                 let row = model.add(row().eq(-1.0)); // unsatisfiable row
@@ -274,9 +289,11 @@ mod tests {
                 let _ = prober.solve_lp(None);
                 let obj = model.lp_obj_val();
                 assert!(obj.abs() > 1e15); // infeasible
+                self.checked.store(true, Ordering::SeqCst);
             }
         }
 
+        let checked = std::rc::Rc::new(std::sync::atomic::AtomicBool::new(false));
         let mut model = Model::new()
             .include_default_plugins()
             .read_prob("data/test/simple.mps")
@@ -287,8 +304,14 @@ mod tests {
             .set_heuristics(ParamSetting::Off)
             .set_param("branching/pscost/priority", 100000);
 
-        model.add(eventhdlr(ProbingAddRowTester));
+        model.add(eventhdlr(ProbingAddRowTester {
+            checked: checked.clone(),
+        }));
 
         model.solve();
+        assert!(
+            checked.load(std::sync::atomic::Ordering::SeqCst),
+            "probing assertions never ran"
+        );
     }
 }

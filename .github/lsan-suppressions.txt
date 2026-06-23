@@ -1,0 +1,16 @@
+# LeakSanitizer suppressions for the conda CI job.
+#
+# SCIP 10's symmetry detection (the bundled nauty/dejavu code reached via
+# SCIPpresolve -> ... -> SYMcomputeSymmetryGenerators -> computeAutomorphisms)
+# leaks its internal graph allocations; they are not freed even after SCIPfree.
+# This is internal to SCIP, not russcip (there is no russcip-owned handle to
+# release), and only the SCIP symmetry path is suppressed here -- every other
+# allocation site is still leak-checked.
+leak:SYMcomputeSymmetryGenerators
+leak:computeAutomorphisms
+leak:sparsenauty
+leak:refine_sg
+leak:nauty
+leak:doref
+leak:firstpathnode0
+leak:preparemarks1

@@ -245,13 +245,21 @@ impl From<ffi::SCIP_ROWORIGINTYPE> for RowOrigin {
 
 #[cfg(test)]
 mod tests {
-    use crate::prelude::{cons, eventhdlr, var};
+    use crate::prelude::eventhdlr;
     use crate::{Event, ProblemOrSolving};
-    use crate::{EventMask, Eventhdlr, Model, ModelWithProblem, Solving, minimal_model};
+    use crate::{
+        EventMask, Eventhdlr, Model, ModelWithProblem, ObjSense, ParamSetting, Solving, VarType,
+    };
+    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     #[test]
     fn test_row() {
-        struct RowTesterEventHandler;
+        struct RowTesterEventHandler {
+            /// Set once the row assertions run, so the test cannot pass vacuously
+            /// if the inspected row is never in the LP.
+            checked: Rc<AtomicBool>,
+        }
 
         impl Eventhdlr for RowTesterEventHandler {
             fn get_type(&self) -> EventMask {
@@ -264,17 +272,27 @@ mod tests {
                 _eventhdlr: crate::SCIPEventhdlr,
                 _event: Event,
             ) {
+                // Since SCIP 10 this event also fires for the initial (empty) LP,
+                // where the constraint has no LP row yet; only inspect once it does.
                 let first_cons = model.conss()[0].clone();
-                let mut row = first_cons.row().unwrap();
-                assert_eq!(row.n_non_zeroes(), 1);
-                assert_eq!(row.lhs(), 1.0);
+                let Some(mut row) = first_cons.row() else {
+                    return;
+                };
+                let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip.raw) };
+
+                // c1 is `2 x1 + x2 <= 100`.
+                assert_eq!(row.n_non_zeroes(), 2);
+                assert!(row.lhs() <= -infinity);
+                assert_eq!(row.rhs(), 100.0);
                 assert_eq!(row.index(), 0);
-                assert!(row.is_modifiable());
+                assert!(!row.is_modifiable());
                 assert!(!row.is_removable());
                 assert!(!row.is_local());
-                assert!(row.is_integral());
+                assert!(!row.is_integral());
                 assert!(row.constraint().is_some());
-                assert_eq!(row.basis_status(), crate::BasisStatus::Lower);
+                // The row is binding at its rhs in the optimal LP, so its slack is
+                // nonbasic at the upper bound.
+                assert_eq!(row.basis_status(), crate::BasisStatus::Upper);
                 assert_eq!(row.origin_type(), crate::RowOrigin::Constraint);
                 assert!(!row.is_in_global_cut_pool());
                 assert!(row.is_in_lp());
@@ -285,27 +303,48 @@ mod tests {
                 assert_eq!(row.rank(), 0);
                 row.set_rank(1);
                 assert_eq!(row.rank(), 1);
-                assert_eq!(row.name(), "cons1");
+                assert_eq!(row.name(), "c1");
                 assert_eq!(row.age(), 0);
-                assert_eq!(row.dual(), 1.0);
-                let infinity = unsafe { crate::ffi::SCIPinfinity(model.scip.raw) };
+                // Dual value of c1 is 2/3, negated for the internally-minimized sense.
+                assert!((row.dual() - (-2.0 / 3.0)).abs() < 1e-9);
+                // The LP is feasible, so there is no Farkas (infeasibility) certificate.
                 assert!(row.farkas_dual() >= infinity);
-                assert!(row.rhs() - 1.0 < 1e-9);
-                assert!(row.lhs() - 1.0 < 1e-9);
                 let cols = row.cols();
-                assert_eq!(cols.len(), 1);
+                assert_eq!(cols.len(), 2);
                 assert_eq!(cols[0].index(), 0);
+
+                self.checked.store(true, Ordering::SeqCst);
             }
         }
 
-        let mut model = minimal_model();
-        let x = model.add(var().bin().name("x").obj(1.0));
-
-        let cons = model.add(cons().name("cons1").eq(1.0).coef(&x, 1.0));
-        model.set_cons_modifiable(&cons, true);
-
-        let e = RowTesterEventHandler;
-        model.add(eventhdlr(e).name("RowTesterEventHandler"));
+        let checked = Rc::new(AtomicBool::new(false));
+        let mut model = row_test_model();
+        model.add(
+            eventhdlr(RowTesterEventHandler {
+                checked: checked.clone(),
+            })
+            .name("RowTesterEventHandler"),
+        );
         model.solve();
+        assert!(checked.load(Ordering::SeqCst), "row assertions never ran");
+    }
+
+    /// Same LP as the `col` test: maximize `3 x1 + 4 x2` s.t. `2 x1 + x2 <= 100`
+    /// and `x1 + 2 x2 <= 80`, both continuous. `c1` is the first constraint.
+    fn row_test_model() -> Model<crate::ProblemCreated> {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize)
+            .set_presolving(ParamSetting::Off)
+            .set_separating(ParamSetting::Off)
+            .set_heuristics(ParamSetting::Off);
+
+        let x1 = model.add_var(0.0, f64::INFINITY, 3.0, "x1", VarType::Continuous);
+        let x2 = model.add_var(0.0, f64::INFINITY, 4.0, "x2", VarType::Continuous);
+        model.add_cons(vec![&x1, &x2], &[2.0, 1.0], f64::NEG_INFINITY, 100.0, "c1");
+        model.add_cons(vec![&x1, &x2], &[1.0, 2.0], f64::NEG_INFINITY, 80.0, "c2");
+        model
     }
 }

@@ -1,7 +1,7 @@
 name: russcip_pipelines
 
 env:
-  version: 9.2.4
+  version: 10.0.2
   RUST_VERSION: 1.88.0
 
 on:
@@ -26,9 +26,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-Linux-ubuntu22.deb
+          wget --quiet --no-check-certificate https://github.com/scipopt/scip/releases/download/v${{ env.version }}/scipoptsuite_${{ env.version }}-1+jammy_amd64.deb
           sudo apt-get update
-          sudo apt install -y ./SCIPOptSuite-${{ env.version }}-Linux-ubuntu22.deb
+          sudo apt install -y ./scipoptsuite_${{ env.version }}-1+jammy_amd64.deb
 
       - name: Install rust stable toolchain
         uses: actions-rs/toolchain@v1
@@ -59,7 +59,7 @@ jobs:
 
       - name: Install dependencies (SCIPOptSuite)
         run: |
-          conda install -y --prefix $CONDA/envs/test --channel conda-forge scip=9.2.4
+          conda install -y --prefix $CONDA/envs/test --channel conda-forge scip=10.0.2
           echo "LD_LIBRARY_PATH=$CONDA/envs/test/lib" >> "${GITHUB_ENV}"
           echo "CONDA_PREFIX=$CONDA/envs/test" >> "${GITHUB_ENV}"
 
@@ -70,7 +70,13 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly
-          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test 
+          # LeakSanitizer needs llvm-symbolizer to resolve libscip frames so the
+          # symmetry-leak suppressions (matched by function name) can apply.
+          sudo apt-get update && sudo apt-get install -y llvm
+          SYMBOLIZER="$(command -v llvm-symbolizer || ls /usr/bin/llvm-symbolizer-* | head -1)"
+          echo "Using symbolizer: $SYMBOLIZER"
+          export LSAN_OPTIONS="suppressions=$PWD/.github/lsan-suppressions.txt:external_symbolizer_path=$SYMBOLIZER:symbolize=1"
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
 
   linux-bundled-test:
     if: github.event.pull_request.draft == false
@@ -93,7 +99,7 @@ jobs:
 
       - name: Download dependencies (SCIPOptSuite)
         shell: powershell
-        run: wget https://github.com/scipopt/scip/releases/download/$(echo "v${{env.version}}" | tr -d '.')/SCIPOptSuite-${{ env.version }}-win64.exe -outfile scipopt-installer.exe
+        run: wget https://github.com/scipopt/scip/releases/download/v${{ env.version }}/scipoptsuite-${{ env.version }}-win-x64.exe -outfile scipopt-installer.exe
 
       - name: Install dependencies (SCIPOptSuite)
         shell: cmd
