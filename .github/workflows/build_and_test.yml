@@ -70,7 +70,13 @@ jobs:
       - name: Test
         run: |
           rustup toolchain install nightly
-          LSAN_OPTIONS=suppressions=$PWD/.github/lsan-suppressions.txt RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
+          # LeakSanitizer needs llvm-symbolizer to resolve libscip frames so the
+          # symmetry-leak suppressions (matched by function name) can apply.
+          sudo apt-get update && sudo apt-get install -y llvm
+          SYMBOLIZER="$(command -v llvm-symbolizer || ls /usr/bin/llvm-symbolizer-* | head -1)"
+          echo "Using symbolizer: $SYMBOLIZER"
+          export LSAN_OPTIONS="suppressions=$PWD/.github/lsan-suppressions.txt:external_symbolizer_path=$SYMBOLIZER:symbolize=1"
+          RUSTFLAGS=-Zsanitizer=leak cargo +nightly test
 
   linux-bundled-test:
     if: github.event.pull_request.draft == false
