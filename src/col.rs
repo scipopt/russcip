@@ -186,11 +186,17 @@ impl PartialEq for Col {
 mod tests {
     use crate::prelude::eventhdlr;
     use crate::{
-        BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem, ProblemOrSolving,
-        SCIPEventhdlr, Solving, VarType, minimal_model,
+        BasisStatus, Event, EventMask, Eventhdlr, Model, ModelWithProblem, ObjSense, ParamSetting,
+        ProblemOrSolving, SCIPEventhdlr, Solving, VarType,
     };
+    use std::rc::Rc;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-    struct ColTesterEventHandler;
+    struct ColTesterEventHandler {
+        /// Set once the column assertions have actually run, so the test cannot
+        /// pass vacuously if the inspected column is never in the LP.
+        checked: Rc<AtomicBool>,
+    }
 
     impl Eventhdlr for ColTesterEventHandler {
         fn get_type(&self) -> EventMask {
@@ -199,45 +205,76 @@ mod tests {
 
         fn execute(&mut self, model: Model<Solving>, _eventhdlr: SCIPEventhdlr, event: Event) {
             assert_eq!(event.event_type(), EventMask::FIRST_LP_SOLVED);
+            // Since SCIP 10 this event also fires for the initial (empty) LP, where
+            // the variables are still loose; only inspect once x1 is an LP column.
             let vars = model.vars();
-            let first_var = vars[0].clone();
-            let col = first_var.col().unwrap();
+            let Some(col) = vars[0].col() else { return };
+
             assert_eq!(col.index(), 0);
-            assert_eq!(col.index(), 0);
-            assert_eq!(col.index(), 0);
-            assert_eq!(col.obj(), 1.0);
+            // The model maximizes, which SCIP stores internally as minimizing the
+            // negated objective, so the column objective is -3 (not 3).
+            assert_eq!(col.obj(), -3.0);
             assert_eq!(col.lb(), 0.0);
-            assert_eq!(col.ub(), 1.0);
-            assert_eq!(col.best_bound(), 0.0);
-            assert_eq!(col.primal_sol(), 1.0);
-            assert_eq!(col.min_primal_sol(), 1.0);
-            assert_eq!(col.max_primal_sol(), 1.0);
+            // x1's infinite upper bound is tightened to 50 by root propagation of
+            // `2 x1 + x2 <= 100` (with x2 >= 0).
+            assert_eq!(col.ub(), 50.0);
+            assert_eq!(col.best_bound(), 50.0);
+            assert_eq!(col.primal_sol(), 40.0);
+            assert_eq!(col.min_primal_sol(), 40.0);
+            assert_eq!(col.max_primal_sol(), 40.0);
             assert_eq!(col.basis_status(), BasisStatus::Basic);
             assert_eq!(col.var_probindex(), Some(0));
-            assert!(col.is_integral());
+            assert!(!col.is_integral());
             assert!(!col.is_removable());
             assert_eq!(col.lp_pos(), Some(0));
             assert_eq!(col.lp_depth(), Some(0));
             assert!(col.is_in_lp());
-            assert_eq!(col.n_non_zeros(), 1);
-            assert_eq!(col.n_lp_non_zeros(), 1);
-            assert_eq!(col.vals(), vec![1.0]);
+            // x1 appears in both rows: 2*x1 in c1 and 1*x1 in c2.
+            assert_eq!(col.n_non_zeros(), 2);
+            assert_eq!(col.n_lp_non_zeros(), 2);
+            assert_eq!(col.vals(), vec![2.0, 1.0]);
             assert_eq!(col.strong_branching_node(), None);
             assert_eq!(col.n_strong_branches(), 0);
             assert_eq!(col.age(), 0);
+
+            self.checked.store(true, Ordering::SeqCst);
         }
+    }
+
+    /// Builds the `simple.lp` model: maximize `3 x1 + 4 x2` subject to
+    /// `2 x1 + x2 <= 100` and `x1 + 2 x2 <= 80`, both variables continuous.
+    /// Its LP optimum is `x1 = 40`, `x2 = 20`, with both variables basic.
+    fn col_test_model() -> Model<crate::ProblemCreated> {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize)
+            .set_presolving(ParamSetting::Off)
+            .set_separating(ParamSetting::Off)
+            .set_heuristics(ParamSetting::Off);
+
+        let x1 = model.add_var(0.0, f64::INFINITY, 3.0, "x1", VarType::Continuous);
+        let x2 = model.add_var(0.0, f64::INFINITY, 4.0, "x2", VarType::Continuous);
+        model.add_cons(vec![&x1, &x2], &[2.0, 1.0], f64::NEG_INFINITY, 100.0, "c1");
+        model.add_cons(vec![&x1, &x2], &[1.0, 2.0], f64::NEG_INFINITY, 80.0, "c2");
+        model
     }
 
     #[test]
     fn test_col() {
-        let mut model = minimal_model();
-        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
-
-        let cons = model.add_cons(vec![&x], &[1.0], 1.0, 1.0, "cons1");
-        model.set_cons_modifiable(&cons, true);
-
-        let e = ColTesterEventHandler;
-        model.add(eventhdlr(e).name("ColTesterEventHandler"));
+        let checked = Rc::new(AtomicBool::new(false));
+        let mut model = col_test_model();
+        model.add(
+            eventhdlr(ColTesterEventHandler {
+                checked: checked.clone(),
+            })
+            .name("ColTesterEventHandler"),
+        );
         model.solve();
+        assert!(
+            checked.load(Ordering::SeqCst),
+            "column assertions never ran"
+        );
     }
 }

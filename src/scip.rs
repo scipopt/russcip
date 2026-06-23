@@ -211,6 +211,13 @@ impl ScipPtr {
     }
 
     pub(crate) fn status(&self) -> Status {
+        // Since SCIP 10, `SCIPgetStatus` dereferences `scip->stat`, which is not
+        // allocated before a problem is created (the `INIT` stage). Guard against
+        // that so querying the status of a fresh model yields `Unknown` instead
+        // of dereferencing a null pointer.
+        if unsafe { ffi::SCIPgetStage(self.raw) } == ffi::SCIP_Stage_SCIP_STAGE_INIT {
+            return Status::Unknown;
+        }
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.into()
     }
