@@ -106,6 +106,21 @@ impl Model<PluginsIncluded> {
 }
 
 impl Model<ProblemCreated> {
+    /// Creates a new *partial* solution: variables left unset are UNKNOWN rather
+    /// than zero, and are filled in by the `completesol` heuristic when the
+    /// solution is added via [`add_sol`](ProblemOrSolving::add_sol). Useful as a
+    /// MIP-start that fixes only some variables and lets the solver complete the rest.
+    pub fn create_partial_sol(&'_ self) -> Solution<'_> {
+        let sol_ptr = self
+            .scip
+            .create_partial_sol()
+            .expect("Failed to create partial solution in state ProblemCreated");
+        Solution {
+            raw: sol_ptr,
+            scip_ptr: &self.scip,
+        }
+    }
+
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -2254,6 +2269,62 @@ mod tests {
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
         assert!(solved.n_sols() >= 2);
+    }
+
+    #[test]
+    fn create_partial_sol() {
+        // Returns the `completesol` heuristic's (n_calls, n_sols_found) after
+        // solving, optionally seeded with a partial solution that fixes only x1.
+        fn solve_and_count(seed: bool) -> (usize, usize) {
+            let mut model = Model::new()
+                .hide_output()
+                .include_default_plugins()
+                .create_prob("test")
+                .set_obj_sense(ObjSense::Minimize)
+                .set_presolving(ParamSetting::Off); // keep the LP-solving path deterministic
+
+            // Odd-cycle vertex cover: LP optimum is fractional (all 0.5 -> 1.5),
+            // integer optimum is 2, so the root LP does NOT already yield the optimum.
+            let x1 = model.add_var(0., 1., 1., "x1", VarType::Binary);
+            let x2 = model.add_var(0., 1., 1., "x2", VarType::Binary);
+            let x3 = model.add_var(0., 1., 1., "x3", VarType::Binary);
+            model.add_cons(vec![&x1, &x2], &[1., 1.], 1., 2., "e12");
+            model.add_cons(vec![&x2, &x3], &[1., 1.], 1., 2., "e23");
+            model.add_cons(vec![&x1, &x3], &[1., 1.], 1., 2., "e13");
+
+            if seed {
+                // A partial solution that fixes ONLY x1; the other vertices are
+                // left UNKNOWN and filled in by the completesol heuristic.
+                let partial = model.create_partial_sol();
+                assert!(partial.is_partial());
+                partial.set_val(&x1, 1.);
+                // A full (non-partial) solution is not partial. Hand it to
+                // `add_sol` so it is freed rather than leaked (it is the all-zero
+                // assignment, which is infeasible for this covering model).
+                let full = model.create_orig_sol();
+                assert!(!full.is_partial());
+                let _ = model.add_sol(full);
+                // Registering a partial solution for completion must not error.
+                assert!(model.add_sol(partial).is_ok());
+            }
+
+            let solved = model.solve();
+            assert_eq!(solved.status(), Status::Optimal);
+
+            let completesol = solved.find_heur("completesol").unwrap();
+            (completesol.n_calls(), completesol.n_sols_found())
+        }
+
+        // With a partial seed, completesol runs and completes it into a solution.
+        let (calls, found) = solve_and_count(true);
+        assert!(
+            calls >= 1,
+            "completesol should run when a partial solution exists"
+        );
+        assert!(found >= 1, "completesol should complete the partial seed");
+
+        // Control: with no partial solution, completesol never even fires.
+        assert_eq!(solve_and_count(false).0, 0);
     }
 
     #[test]

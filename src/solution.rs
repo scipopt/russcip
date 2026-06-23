@@ -36,6 +36,13 @@ impl Solution<'_> {
         ));
     }
 
+    /// Returns whether this is a *partial* solution (see
+    /// [`Model::create_partial_sol`](crate::Model::create_partial_sol)): unset
+    /// variables are UNKNOWN rather than zero.
+    pub fn is_partial(&self) -> bool {
+        (unsafe { ffi::SCIPsolIsPartial(self.raw) }) == 1
+    }
+
     /// Returns the solution as a var-name to value map.
     pub fn as_name_map(&self) -> std::collections::HashMap<String, f64> {
         let vars = unsafe { ffi::SCIPgetVars(self.scip_ptr.raw) };
