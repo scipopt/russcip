@@ -286,6 +286,65 @@ impl ScipPtr {
         Ok(())
     }
 
+    /// Returns the solving statistics in JSON format (`SCIPprintStatisticsJson`,
+    /// available since SCIP 10). SCIP writes to a `FILE*`, so we capture the
+    /// output through a temporary file and read it back into a `String`.
+    pub(crate) fn statistics_json(&self) -> Result<String, Retcode> {
+        unsafe {
+            let file = ffi::tmpfile();
+            if file.is_null() {
+                return Err(Retcode::FileCreateError);
+            }
+
+            let retcode = Retcode::from(ffi::SCIPprintStatisticsJson(self.raw, file));
+            if retcode != Retcode::Okay {
+                ffi::fclose(file);
+                return Err(retcode);
+            }
+
+            ffi::fflush(file);
+            ffi::rewind(file);
+
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                let n = ffi::fread(
+                    chunk.as_mut_ptr() as *mut std::os::raw::c_void,
+                    1,
+                    chunk.len() as _,
+                    file,
+                );
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n as usize]);
+            }
+            ffi::fclose(file);
+
+            Ok(String::from_utf8_lossy(&buf).into_owned())
+        }
+    }
+
+    /// Writes the solving statistics in JSON format directly to `path`
+    /// (`SCIPprintStatisticsJson`), streaming through SCIP's `FILE*` writer
+    /// without buffering the output in memory.
+    pub(crate) fn write_statistics_json(&self, path: &str) -> Result<(), Retcode> {
+        let c_path = CString::new(path).unwrap();
+        unsafe {
+            let file = ffi::fopen(c_path.as_ptr(), c"w".as_ptr());
+            if file.is_null() {
+                return Err(Retcode::FileCreateError);
+            }
+
+            let retcode = Retcode::from(ffi::SCIPprintStatisticsJson(self.raw, file));
+            ffi::fclose(file);
+            if retcode != Retcode::Okay {
+                return Err(retcode);
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn vars(&self, original: bool, capture: bool) -> BTreeMap<usize, *mut SCIP_Var> {
         // NOTE: this method should only be called once per SCIP instance
         let n_vars = {

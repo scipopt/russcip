@@ -18,10 +18,14 @@ bindgen = ["scip-sys/bindgen"]
 bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 datastore = ["anymap3"]
+# Enables serde-based helpers, e.g. parsing the statistics JSON into a
+# `serde_json::Value`.
+serde = ["dep:serde_json"]
 
 [dependencies]
 scip-sys = { version = "0.1.28", default-features = false }
 anymap3 = { version = "1.0.1", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 rayon = "1.5.1"
