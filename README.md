@@ -22,9 +22,11 @@ The project is currently actively developed, issues/pull-requests are very welco
 ### Installation
 The easiest way is to run this in your crate directory
 ```bash
-cargo add russcip --features bundled
+cargo add russcip --no-default-features --features bundled
 ```
-for other installation methods, please check [INSTALL.md](INSTALL.md).
+The `bundled` feature ships prebuilt bindings, so this build needs neither a SCIP
+installation nor `libclang`.
+For other installation methods, please check [INSTALL.md](INSTALL.md).
 
 ### Usage
 
