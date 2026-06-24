@@ -30,3 +30,8 @@ rand = "0.8"
 
 [lints.clippy]
 too_many_arguments = "allow"
+
+# Uses the datastore API, so it only builds when the `datastore` feature is on.
+[[example]]
+name = "bin_packing"
+required-features = ["datastore"]
