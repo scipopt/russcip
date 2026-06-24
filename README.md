@@ -19,6 +19,9 @@ A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). Th
 SCIP's C-API through the `ffi` module.
 The project is currently actively developed, issues/pull-requests are very welcome.
 
+russcip is currently compatible with **SCIP 10.0.2**, which is what the `bundled` feature ships. Linking against
+older SCIP versions may work but is not guaranteed and is not supported.
+
 ### Installation
 The easiest way is to run this in your crate directory
 ```bash

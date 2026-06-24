@@ -1667,6 +1667,24 @@ pub trait WithSolvingStats {
 
     /// Returns the number of LP iterations performed by the optimization model.
     fn n_lp_iterations(&self) -> usize;
+
+    /// Returns the solving statistics in JSON format.
+    ///
+    /// This wraps SCIP's `SCIPprintStatisticsJson`, available since SCIP 10.
+    fn stats_json(&self) -> String;
+
+    /// Writes the solving statistics in JSON format directly to `path`.
+    ///
+    /// Unlike [`stats_json`](Self::stats_json), this streams the output to the
+    /// file without buffering it in memory, mirroring SCIP's native
+    /// `SCIPprintStatisticsJson` behaviour.
+    fn write_stats_json(&self, path: &str) -> Result<(), Retcode>;
+
+    /// Returns the solving statistics parsed as a [`serde_json::Value`].
+    ///
+    /// Requires the `serde` feature.
+    #[cfg(feature = "serde")]
+    fn stats_json_value(&self) -> serde_json::Value;
 }
 
 trait ModelStageWithSolvingStats {}
@@ -1698,6 +1716,24 @@ impl<S: ModelStageWithSolvingStats> WithSolvingStats for Model<S> {
     /// Returns the number of LP iterations performed by the optimization model.
     fn n_lp_iterations(&self) -> usize {
         self.scip.n_lp_iterations()
+    }
+
+    /// Returns the solving statistics in JSON format.
+    fn stats_json(&self) -> String {
+        self.scip
+            .statistics_json()
+            .expect("Failed to get statistics in JSON format")
+    }
+
+    /// Writes the solving statistics in JSON format directly to `path`.
+    fn write_stats_json(&self, path: &str) -> Result<(), Retcode> {
+        self.scip.write_statistics_json(path)
+    }
+
+    /// Returns the solving statistics parsed as a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    fn stats_json_value(&self) -> serde_json::Value {
+        serde_json::from_str(&self.stats_json()).expect("SCIP produced invalid statistics JSON")
     }
 }
 
@@ -2242,6 +2278,36 @@ mod tests {
             .solve_concurrent();
         assert_eq!(solved.status(), Status::Optimal);
         assert_eq!(solved.obj_val(), 200.);
+    }
+
+    #[test]
+    fn stats_json_after_solve() {
+        let solved = create_model().solve();
+        let json = solved.stats_json();
+        // Looks like a JSON object and carries the optimal status.
+        assert!(json.trim_start().starts_with('{'));
+        assert!(json.contains("optimal solution found"));
+    }
+
+    #[test]
+    fn write_stats_json_after_solve() {
+        let solved = create_model().solve();
+        let path = std::env::temp_dir().join("russcip_stats_test.json");
+        let path_str = path.to_str().unwrap();
+        solved.write_stats_json(path_str).unwrap();
+
+        let from_file = std::fs::read_to_string(&path).unwrap();
+        assert!(from_file.trim_start().starts_with('{'));
+        assert!(from_file.contains("optimal solution found"));
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn stats_json_value_after_solve() {
+        let solved = create_model().solve();
+        let stats = solved.stats_json_value();
+        assert_eq!(stats["status"]["status"], "optimal solution found");
     }
 
     #[test]
