@@ -432,6 +432,43 @@ impl Model<ProblemCreated> {
         self.try_solve()
             .expect("Failed to solve problem in state ProblemCreated")
     }
+
+    /// Tries to solve the model using SCIP's concurrent solvers, leveraging
+    /// multiple CPU cores when the underlying SCIP was built with thread
+    /// support (the `bundled` library is). Returns a new `Model` instance with
+    /// a `Solved` state if successful.
+    ///
+    /// The number of threads can be controlled with the `parallel/maxnthreads`
+    /// parameter, and `parallel/mode` selects between opportunistic
+    /// (nondeterministic, `0`, the default) and deterministic (`1`) solving,
+    /// e.g. `model.set_int_param("parallel/mode", 1)`.
+    ///
+    /// If SCIP was built without thread support this returns a [`Retcode`]
+    /// error; use [`Model::try_solve`] for the sequential solve in that case.
+    #[allow(unused_mut)]
+    pub fn try_solve_concurrent(mut self) -> Result<Model<Solved>, Retcode> {
+        self.scip.solve_concurrent()?;
+
+        Ok(Model {
+            scip: self.scip,
+            state: PhantomData,
+        })
+    }
+
+    /// Solves the model using SCIP's concurrent solvers and returns a new
+    /// `Model` instance with a `Solved` state.
+    ///
+    /// See [`Model::try_solve_concurrent`] for details and requirements.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the problem cannot be solved concurrently in the
+    /// current state (e.g. SCIP was built without thread support).
+    #[allow(unused_mut)]
+    pub fn solve_concurrent(mut self) -> Model<Solved> {
+        self.try_solve_concurrent()
+            .expect("Failed to solve problem concurrently in state ProblemCreated")
+    }
 }
 
 impl Model<Solving> {
@@ -2151,6 +2188,16 @@ mod tests {
     fn try_solve_on_valid_model() {
         let solved = create_model().try_solve().unwrap();
         assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    #[test]
+    fn solve_concurrent_on_valid_model() {
+        let solved = create_model()
+            .set_int_param("parallel/maxnthreads", 2)
+            .unwrap()
+            .solve_concurrent();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 200.);
     }
 
     #[test]

@@ -13,3 +13,4 @@ This directory contains examples of how to use the `russcip` library.
 8. [Node event handler](node_event_handler.rs): An example demonstrating how to track and report information about nodes during the branch-and-bound process.
 9. [Depth-first node selection](depth_first_node_selection.rs): An example showing how to implement a custom node selector that traverses the branch-and-bound tree in depth-first order.
 10. [Bin packing](bin_packing.rs): An example branch-and-price implementation for the bin packing problem, following the guide in https://github.com/mmghannam/co-work2024/blob/main/Day3/README.md
+11. [Concurrent solve](concurrent_solve.rs): An example showing how to solve a model using SCIP's concurrent solvers to leverage multiple CPU cores.
