@@ -50,6 +50,7 @@ Some of SCIP's plugins are imported to the rust interface as traits. Currently t
 | Primal Heuristic   | [heuristic.rs](https://github.com/scipopt/russcip/blob/main/src/heuristic.rs)   | [docs](https://docs.rs/russcip/latest/russcip/heuristic/trait.Heuristic.html)   |
 | Separator          | [separator.rs](https://github.com/scipopt/russcip/blob/main/src/separator.rs)   | [docs](https://docs.rs/russcip/latest/russcip/separator/trait.Separator.html)   |
 | Constraint Handler | [conshdlr.rs](https://github.com/scipopt/russcip/blob/main/src/conshdlr.rs)     | [docs](https://docs.rs/russcip/latest/russcip/conshdlr/trait.Conshdlr.html)     |
+| Node Selector      | [nodesel.rs](https://github.com/scipopt/russcip/blob/main/src/nodesel.rs)       | [docs](https://docs.rs/russcip/latest/russcip/nodesel/trait.NodeSel.html)       |
 
 To add a custom plugin to a SCIP `Model` instance, you should implement its trait and call the corresponding
 `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the

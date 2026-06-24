@@ -3,6 +3,7 @@ use anymap3::AnyMap;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
+use crate::nodesel::NodeSel;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
@@ -192,6 +193,16 @@ impl ScipPtr {
         let c_name = CString::new(name).unwrap();
         let heur = unsafe { ffi::SCIPfindHeur(self.raw, c_name.as_ptr()) };
         if heur.is_null() { None } else { Some(heur) }
+    }
+
+    pub(crate) fn find_nodesel(&self, name: &str) -> Option<*mut ffi::SCIP_NODESEL> {
+        let c_name = CString::new(name).unwrap();
+        let nodesel = unsafe { ffi::SCIPfindNodesel(self.raw, c_name.as_ptr()) };
+        if nodesel.is_null() {
+            None
+        } else {
+            Some(nodesel)
+        }
     }
 
     pub(crate) fn get_transformed_cons(
@@ -938,6 +949,95 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn include_nodesel(
+        &self,
+        name: &str,
+        desc: &str,
+        std_priority: i32,
+        mem_save_priority: i32,
+        nodesel: Box<dyn NodeSel>,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn nodeselselect(
+            scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+            selnode: *mut *mut ffi::SCIP_NODE,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            let nodesel_ptr = data_ptr as *mut Box<dyn NodeSel>;
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: PhantomData,
+            };
+            let selected = unsafe { (*nodesel_ptr).select(model) };
+            unsafe {
+                *selnode = match selected {
+                    Some(node) => node.raw,
+                    None => std::ptr::null_mut(),
+                };
+            }
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn nodeselcomp(
+            scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+            node1: *mut ffi::SCIP_NODE,
+            node2: *mut ffi::SCIP_NODE,
+        ) -> c_int {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            let nodesel_ptr = data_ptr as *mut Box<dyn NodeSel>;
+            let scip_rc = Rc::new(ScipPtr::from_raw(scip, true));
+            let n1 = Node {
+                raw: node1,
+                scip: scip_rc.clone(),
+            };
+            let n2 = Node {
+                raw: node2,
+                scip: scip_rc,
+            };
+            let ordering = unsafe { (*nodesel_ptr).comp(n1, n2) };
+            ordering as c_int
+        }
+
+        extern "C" fn nodeselfree(
+            _scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn NodeSel>) });
+            Retcode::Okay.into()
+        }
+
+        let nodesel_ptr = Box::into_raw(Box::new(nodesel));
+        let nodesel_faker = nodesel_ptr as *mut ffi::SCIP_NODESELDATA;
+
+        scip_call!(ffi::SCIPincludeNodesel(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            std_priority,
+            mem_save_priority,
+            None,
+            Some(nodeselfree),
+            None,
+            None,
+            None,
+            None,
+            Some(nodeselselect),
+            Some(nodeselcomp),
+            nodesel_faker,
+        ));
+
+        Ok(())
+    }
+
     pub(crate) fn include_pricer(
         &self,
         name: &str,
@@ -1512,6 +1612,71 @@ impl ScipPtr {
 
         let node_ptr = unsafe { node_ptr.assume_init() };
         Ok(node_ptr)
+    }
+
+    pub(crate) fn best_node(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestNode(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_bound_node(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestboundNode(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_leaf(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestLeaf(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_child(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestChild(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_sibling(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestSibling(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn prio_child(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetPrioChild(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn prio_sibling(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetPrioSibling(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn leaves(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetLeaves(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
+    }
+
+    pub(crate) fn children(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetChildren(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
+    }
+
+    pub(crate) fn siblings(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetSiblings(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
     }
 
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
