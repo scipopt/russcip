@@ -25,8 +25,7 @@ The easiest way is to run this in your crate directory
 cargo add russcip --no-default-features --features bundled
 ```
 The `bundled` feature ships prebuilt bindings, so this build needs neither a SCIP
-installation nor `libclang`. (Add the datastore back with
-`--no-default-features --features bundled,datastore` if you need it.)
+installation nor `libclang`.
 For other installation methods, please check [INSTALL.md](INSTALL.md).
 
 ### Usage
