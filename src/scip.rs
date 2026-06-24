@@ -150,15 +150,28 @@ impl ScipPtr {
 
     pub(crate) fn read_prob(&self, filename: &str) -> Result<(), Retcode> {
         let filename = CString::new(filename).unwrap();
-        scip_call!(ffi::SCIPreadProb(
-            self.raw,
-            filename.as_ptr(),
-            std::ptr::null_mut()
-        ));
-        // capture vars and cons since they were not created by the user (and SCIP will free them later)
-        self.vars(false, true);
-        self.conss(true);
-        Ok(())
+        let retcode = Retcode::from(unsafe {
+            ffi::SCIPreadProb(self.raw, filename.as_ptr(), std::ptr::null_mut())
+        });
+
+        // SCIPreadProb creates the problem (and its variables/constraints) before
+        // it can fail on, e.g., invalid data. The Drop impl unconditionally
+        // releases every original variable/constraint, so we must capture them
+        // here whenever the problem stage was reached — not only on success.
+        // Otherwise a failed read over-releases the partially-read objects,
+        // causing a use-after-free when the model is dropped (issue #281).
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM {
+            // capture vars and cons since they were not created by the user (and SCIP will free them later)
+            self.vars(false, true);
+            self.conss(true);
+        }
+
+        if retcode == Retcode::Okay {
+            Ok(())
+        } else {
+            Err(retcode)
+        }
     }
 
     pub(crate) fn set_obj_sense(&self, sense: ObjSense) -> Result<(), Retcode> {

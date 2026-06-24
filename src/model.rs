@@ -2030,6 +2030,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn read_prob_failure_balances_refcounts() {
+        // Regression test for issue #281. `SCIPreadProb` creates the problem's
+        // variables before it can fail on invalid data, and the Drop impl
+        // unconditionally releases every original variable. So those variables
+        // must be captured even when the read fails, otherwise they are
+        // over-released on drop (a use-after-free that segfaults on some builds).
+        let model = Model::new().hide_output().include_default_plugins();
+        let scip = model.scip.clone();
+
+        let res = scip.read_prob("data/test/bad.opb");
+        assert!(res.is_err());
+
+        // SCIP created variable `x1` before the constraint failed. It must be
+        // captured (use count >= 2: one held by SCIP's problem, one by russcip),
+        // so that Drop's release stays balanced. Without the fix the count is 1
+        // and dropping the model below over-releases it.
+        unsafe {
+            let n = ffi::SCIPgetNOrigVars(scip.raw);
+            assert!(n > 0, "expected a partially-read variable to remain");
+            let vars = ffi::SCIPgetOrigVars(scip.raw);
+            for i in 0..n as usize {
+                let var = *vars.add(i);
+                assert!(
+                    ffi::SCIPvarGetNUses(var) >= 2,
+                    "variable left uncaptured after a failed read_prob"
+                );
+            }
+        }
+
+        // Dropping must not crash from an unbalanced release.
+        drop(scip);
+        drop(model);
+
+        // The library still works afterwards.
+        let solved = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+        assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    #[test]
     fn solve_from_lp_file() {
         let model = Model::new()
             .hide_output()
