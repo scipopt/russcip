@@ -2763,10 +2763,7 @@ mod tests {
         model.add_var(0., 1., 1., "x", VarType::Continuous);
         model.add_var(0., 1., 1., "y", VarType::Continuous);
 
-        assert_eq!(
-            model.parse_expr("<x> <y>").err(),
-            Some(Retcode::ReadError)
-        );
+        assert_eq!(model.parse_expr("<x> <y>").err(), Some(Retcode::ReadError));
     }
 
     #[test]
