@@ -9,6 +9,7 @@ pub use crate::builder::sepa::sepa;
 pub use crate::builder::var::var;
 pub use crate::conshdlr::*;
 pub use crate::eventhdlr::*;
+pub use crate::expr::Expr;
 pub use crate::heuristic::*;
 pub use crate::model::Model;
 pub use crate::model::ModelWithProblem;

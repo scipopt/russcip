@@ -5,8 +5,8 @@ use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
-    BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
-    ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
+    BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, Expr, HeurResult, LPStatus, Model,
+    ObjSense, ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
     SCIPSeparator, Separator, Solution, Status, VarType, Variable, ffi, scip_call_panic,
 };
 use crate::{HeurTiming, Heuristic, scip_call};
@@ -575,6 +575,171 @@ impl ScipPtr {
 
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(scip_cons)
+    }
+
+    /// Parse an expression from a string.
+    ///
+    /// Returns an error if SCIP cannot parse the string or if it stops before
+    /// the end of the input. The returned expression is owned by the caller
+    /// and must eventually be released via `SCIPreleaseExpr`.
+    pub(crate) fn parse_expr(&self, expr_str: &str) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let c_expr = CString::new(expr_str).map_err(|_| Retcode::Error)?;
+        let mut scip_expr = MaybeUninit::uninit();
+        let mut final_pos: *const std::os::raw::c_char = std::ptr::null();
+
+        scip_call! { ffi::SCIPparseExpr(
+            self.raw,
+            scip_expr.as_mut_ptr(),
+            c_expr.as_ptr(),
+            &mut final_pos,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let mut scip_expr = unsafe { scip_expr.assume_init() };
+
+        // `SCIPparseExpr` returns `SCIP_OKAY` even when it stops before the end of
+        // the string, so verify the whole input was consumed,
+        // otherwise the parse silently dropped part of the expression.
+        unsafe {
+            let mut p = final_pos;
+            while *p != 0 && (*p as u8).is_ascii_whitespace() {
+                p = p.add(1);
+            }
+            if *p != 0 {
+                let _ = ffi::SCIPreleaseExpr(self.raw, &mut scip_expr);
+                return Err(Retcode::ReadError);
+            }
+        }
+
+        Ok(scip_expr)
+    }
+
+    /// Create an expression representing a variable.
+    pub(crate) fn create_expr_var(&self, var: &Variable) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let mut expr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprVar(
+            self.raw,
+            expr.as_mut_ptr(),
+            var.raw,
+            None,
+            std::ptr::null_mut(),
+        ) };
+        Ok(unsafe { expr.assume_init() })
+    }
+
+    /// Create an expression representing a constant value.
+    pub(crate) fn create_expr_value(&self, value: f64) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let mut expr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprValue(
+            self.raw,
+            expr.as_mut_ptr(),
+            value,
+            None,
+            std::ptr::null_mut(),
+        ) };
+        Ok(unsafe { expr.assume_init() })
+    }
+
+    /// Create an expression representing `constant + sum_i coefs[i] * children[i]`.
+    pub(crate) fn create_expr_sum(
+        &self,
+        children: &[&Expr],
+        coefs: &[f64],
+        constant: f64,
+    ) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        assert_eq!(children.len(), coefs.len());
+        assert!(
+            children.len() <= c_int::MAX as usize,
+            "Number of children exceeds SCIP capabilities"
+        );
+        let mut child_ptrs = children.iter().map(|c| c.raw).collect::<Vec<_>>();
+        let mut coefs = coefs.to_vec();
+        let mut expr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprSum(
+            self.raw,
+            expr.as_mut_ptr(),
+            child_ptrs.len() as c_int,
+            child_ptrs.as_mut_ptr(),
+            coefs.as_mut_ptr(),
+            constant,
+            None,
+            std::ptr::null_mut(),
+        ) };
+        Ok(unsafe { expr.assume_init() })
+    }
+
+    /// Create an expression representing `coef * prod_i children[i]`.
+    pub(crate) fn create_expr_product(
+        &self,
+        children: &[&Expr],
+        coef: f64,
+    ) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        assert!(
+            children.len() <= c_int::MAX as usize,
+            "Number of children exceeds SCIP capabilities"
+        );
+        let mut child_ptrs = children.iter().map(|c| c.raw).collect::<Vec<_>>();
+        let mut expr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprProduct(
+            self.raw,
+            expr.as_mut_ptr(),
+            child_ptrs.len() as c_int,
+            child_ptrs.as_mut_ptr(),
+            coef,
+            None,
+            std::ptr::null_mut(),
+        ) };
+        Ok(unsafe { expr.assume_init() })
+    }
+
+    /// Create an expression representing `child ^ exponent`.
+    pub(crate) fn create_expr_pow(
+        &self,
+        child: &Expr,
+        exponent: f64,
+    ) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let mut expr = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateExprPow(
+            self.raw,
+            expr.as_mut_ptr(),
+            child.raw,
+            exponent,
+            None,
+            std::ptr::null_mut(),
+        ) };
+        Ok(unsafe { expr.assume_init() })
+    }
+
+    /// Create a basic nonlinear constraint `lhs <= expr <= rhs` and add it to the problem.
+    ///
+    /// The constraint captures the expression, so the caller still owns its own
+    /// reference to `expr` and is responsible for releasing it.
+    pub(crate) fn create_cons_nonlinear(
+        &self,
+        expr: *mut ffi::SCIP_EXPR,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            expr,
+            lhs,
+            rhs,
+        ) };
+        let mut scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
+            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+        }
         Ok(scip_cons)
     }
 
