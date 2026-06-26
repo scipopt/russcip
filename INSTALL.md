@@ -3,11 +3,18 @@
 By running
 
 ```bash
-cargo add russcip --features bundled
+cargo add russcip --no-default-features --features bundled
 ```
 
 The `bundled` feature will download a precompiled SCIP as part of the build process.
-This is the easiest to get started with russcip.
+It also ships prebuilt bindings, so this build requires neither a SCIP installation
+nor `libclang` (bindgen). This is the easiest way to get started with russcip.
+
+If you also use the `datastore`, re-enable it explicitly:
+
+```bash
+cargo add russcip --no-default-features --features bundled,datastore
+```
 
 ### Custom SCIP installation
 

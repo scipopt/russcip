@@ -19,12 +19,17 @@ A safe Rust interface for [SCIP](https://www.scipopt.org/index.php#download). Th
 SCIP's C-API through the `ffi` module.
 The project is currently actively developed, issues/pull-requests are very welcome.
 
+russcip is currently compatible with **SCIP 10.0.2**, which is what the `bundled` feature ships. Linking against
+older SCIP versions may work but is not guaranteed and is not supported.
+
 ### Installation
 The easiest way is to run this in your crate directory
 ```bash
-cargo add russcip --features bundled
+cargo add russcip --no-default-features --features bundled
 ```
-for other installation methods, please check [INSTALL.md](INSTALL.md).
+The `bundled` feature ships prebuilt bindings, so this build needs neither a SCIP
+installation nor `libclang`.
+For other installation methods, please check [INSTALL.md](INSTALL.md).
 
 ### Usage
 
@@ -50,6 +55,7 @@ Some of SCIP's plugins are imported to the rust interface as traits. Currently t
 | Primal Heuristic   | [heuristic.rs](https://github.com/scipopt/russcip/blob/main/src/heuristic.rs)   | [docs](https://docs.rs/russcip/latest/russcip/heuristic/trait.Heuristic.html)   |
 | Separator          | [separator.rs](https://github.com/scipopt/russcip/blob/main/src/separator.rs)   | [docs](https://docs.rs/russcip/latest/russcip/separator/trait.Separator.html)   |
 | Constraint Handler | [conshdlr.rs](https://github.com/scipopt/russcip/blob/main/src/conshdlr.rs)     | [docs](https://docs.rs/russcip/latest/russcip/conshdlr/trait.Conshdlr.html)     |
+| Node Selector      | [nodesel.rs](https://github.com/scipopt/russcip/blob/main/src/nodesel.rs)       | [docs](https://docs.rs/russcip/latest/russcip/nodesel/trait.NodeSel.html)       |
 
 To add a custom plugin to a SCIP `Model` instance, you should implement its trait and call the corresponding
 `include_{PLUGIN_NAME}` method. For examples on implementing the specific plugin trait you can check the tests in the

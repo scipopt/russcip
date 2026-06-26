@@ -3,6 +3,7 @@ use anymap3::AnyMap;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::node::Node;
+use crate::nodesel::NodeSel;
 use crate::pricer::{Pricer, PricerResultState};
 use crate::{
     BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, Expr, HeurResult, LPStatus, Model,
@@ -149,15 +150,28 @@ impl ScipPtr {
 
     pub(crate) fn read_prob(&self, filename: &str) -> Result<(), Retcode> {
         let filename = CString::new(filename).unwrap();
-        scip_call!(ffi::SCIPreadProb(
-            self.raw,
-            filename.as_ptr(),
-            std::ptr::null_mut()
-        ));
-        // capture vars and cons since they were not created by the user (and SCIP will free them later)
-        self.vars(false, true);
-        self.conss(true);
-        Ok(())
+        let retcode = Retcode::from(unsafe {
+            ffi::SCIPreadProb(self.raw, filename.as_ptr(), std::ptr::null_mut())
+        });
+
+        // SCIPreadProb creates the problem (and its variables/constraints) before
+        // it can fail on, e.g., invalid data. The Drop impl unconditionally
+        // releases every original variable/constraint, so we must capture them
+        // here whenever the problem stage was reached — not only on success.
+        // Otherwise a failed read over-releases the partially-read objects,
+        // causing a use-after-free when the model is dropped (issue #281).
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_PROBLEM {
+            // capture vars and cons since they were not created by the user (and SCIP will free them later)
+            self.vars(false, true);
+            self.conss(true);
+        }
+
+        if retcode == Retcode::Okay {
+            Ok(())
+        } else {
+            Err(retcode)
+        }
     }
 
     pub(crate) fn set_obj_sense(&self, sense: ObjSense) -> Result<(), Retcode> {
@@ -194,6 +208,16 @@ impl ScipPtr {
         if heur.is_null() { None } else { Some(heur) }
     }
 
+    pub(crate) fn find_nodesel(&self, name: &str) -> Option<*mut ffi::SCIP_NODESEL> {
+        let c_name = CString::new(name).unwrap();
+        let nodesel = unsafe { ffi::SCIPfindNodesel(self.raw, c_name.as_ptr()) };
+        if nodesel.is_null() {
+            None
+        } else {
+            Some(nodesel)
+        }
+    }
+
     pub(crate) fn get_transformed_cons(
         &self,
         cons: &Constraint,
@@ -211,6 +235,13 @@ impl ScipPtr {
     }
 
     pub(crate) fn status(&self) -> Status {
+        // Since SCIP 10, `SCIPgetStatus` dereferences `scip->stat`, which is not
+        // allocated before a problem is created (the `INIT` stage). Guard against
+        // that so querying the status of a fresh model yields `Unknown` instead
+        // of dereferencing a null pointer.
+        if unsafe { ffi::SCIPgetStage(self.raw) } == ffi::SCIP_Stage_SCIP_STAGE_INIT {
+            return Status::Unknown;
+        }
         let status = unsafe { ffi::SCIPgetStatus(self.raw) };
         status.into()
     }
@@ -252,6 +283,65 @@ impl ScipPtr {
 
     pub(crate) fn include_default_plugins(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPincludeDefaultPlugins(self.raw));
+        Ok(())
+    }
+
+    /// Returns the solving statistics in JSON format (`SCIPprintStatisticsJson`,
+    /// available since SCIP 10). SCIP writes to a `FILE*`, so we capture the
+    /// output through a temporary file and read it back into a `String`.
+    pub(crate) fn statistics_json(&self) -> Result<String, Retcode> {
+        unsafe {
+            let file = ffi::tmpfile();
+            if file.is_null() {
+                return Err(Retcode::FileCreateError);
+            }
+
+            let retcode = Retcode::from(ffi::SCIPprintStatisticsJson(self.raw, file));
+            if retcode != Retcode::Okay {
+                ffi::fclose(file);
+                return Err(retcode);
+            }
+
+            ffi::fflush(file);
+            ffi::rewind(file);
+
+            let mut buf = Vec::new();
+            let mut chunk = [0u8; 4096];
+            loop {
+                let n = ffi::fread(
+                    chunk.as_mut_ptr() as *mut std::os::raw::c_void,
+                    1,
+                    chunk.len() as _,
+                    file,
+                );
+                if n == 0 {
+                    break;
+                }
+                buf.extend_from_slice(&chunk[..n as usize]);
+            }
+            ffi::fclose(file);
+
+            Ok(String::from_utf8_lossy(&buf).into_owned())
+        }
+    }
+
+    /// Writes the solving statistics in JSON format directly to `path`
+    /// (`SCIPprintStatisticsJson`), streaming through SCIP's `FILE*` writer
+    /// without buffering the output in memory.
+    pub(crate) fn write_statistics_json(&self, path: &str) -> Result<(), Retcode> {
+        let c_path = CString::new(path).unwrap();
+        unsafe {
+            let file = ffi::fopen(c_path.as_ptr(), c"w".as_ptr());
+            if file.is_null() {
+                return Err(Retcode::FileCreateError);
+            }
+
+            let retcode = Retcode::from(ffi::SCIPprintStatisticsJson(self.raw, file));
+            ffi::fclose(file);
+            if retcode != Retcode::Okay {
+                return Err(retcode);
+            }
+        }
         Ok(())
     }
 
@@ -303,6 +393,11 @@ impl ScipPtr {
 
     pub(crate) fn solve(&self) -> Result<(), Retcode> {
         scip_call!(ffi::SCIPsolve(self.raw));
+        Ok(())
+    }
+
+    pub(crate) fn solve_concurrent(&self) -> Result<(), Retcode> {
+        scip_call!(ffi::SCIPsolveConcurrent(self.raw));
         Ok(())
     }
 
@@ -853,6 +948,15 @@ impl ScipPtr {
         Ok(sol)
     }
 
+    /// Create a partial solution: unset variables are UNKNOWN, not 0.
+    pub(crate) fn create_partial_sol(&self) -> Result<*mut SCIP_SOL, Retcode> {
+        let mut sol = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreatePartialSol(self.raw, sol.as_mut_ptr(), std::ptr::null_mut()) }
+        let sol = unsafe { sol.assume_init() };
+        assert!(!sol.is_null());
+        Ok(sol)
+    }
+
     /// Add coefficient to set packing/partitioning/covering constraint
     pub(crate) fn add_cons_coef_setppc(
         &self,
@@ -1082,6 +1186,95 @@ impl ScipPtr {
             None,
             None,
             branchrule_faker,
+        ));
+
+        Ok(())
+    }
+
+    pub(crate) fn include_nodesel(
+        &self,
+        name: &str,
+        desc: &str,
+        std_priority: i32,
+        mem_save_priority: i32,
+        nodesel: Box<dyn NodeSel>,
+    ) -> Result<(), Retcode> {
+        let c_name = CString::new(name).unwrap();
+        let c_desc = CString::new(desc).unwrap();
+
+        extern "C" fn nodeselselect(
+            scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+            selnode: *mut *mut ffi::SCIP_NODE,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            let nodesel_ptr = data_ptr as *mut Box<dyn NodeSel>;
+            let scip_ptr = ScipPtr::from_raw(scip, true);
+            let model = Model {
+                scip: Rc::new(scip_ptr),
+                state: PhantomData,
+            };
+            let selected = unsafe { (*nodesel_ptr).select(model) };
+            unsafe {
+                *selnode = match selected {
+                    Some(node) => node.raw,
+                    None => std::ptr::null_mut(),
+                };
+            }
+            Retcode::Okay.into()
+        }
+
+        extern "C" fn nodeselcomp(
+            scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+            node1: *mut ffi::SCIP_NODE,
+            node2: *mut ffi::SCIP_NODE,
+        ) -> c_int {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            let nodesel_ptr = data_ptr as *mut Box<dyn NodeSel>;
+            let scip_rc = Rc::new(ScipPtr::from_raw(scip, true));
+            let n1 = Node {
+                raw: node1,
+                scip: scip_rc.clone(),
+            };
+            let n2 = Node {
+                raw: node2,
+                scip: scip_rc,
+            };
+            let ordering = unsafe { (*nodesel_ptr).comp(n1, n2) };
+            ordering as c_int
+        }
+
+        extern "C" fn nodeselfree(
+            _scip: *mut ffi::SCIP,
+            nodesel: *mut ffi::SCIP_NODESEL,
+        ) -> ffi::SCIP_Retcode {
+            let data_ptr = unsafe { ffi::SCIPnodeselGetData(nodesel) };
+            assert!(!data_ptr.is_null());
+            drop(unsafe { Box::from_raw(data_ptr as *mut Box<dyn NodeSel>) });
+            Retcode::Okay.into()
+        }
+
+        let nodesel_ptr = Box::into_raw(Box::new(nodesel));
+        let nodesel_faker = nodesel_ptr as *mut ffi::SCIP_NODESELDATA;
+
+        scip_call!(ffi::SCIPincludeNodesel(
+            self.raw,
+            c_name.as_ptr(),
+            c_desc.as_ptr(),
+            std_priority,
+            mem_save_priority,
+            None,
+            Some(nodeselfree),
+            None,
+            None,
+            None,
+            None,
+            Some(nodeselselect),
+            Some(nodeselcomp),
+            nodesel_faker,
         ));
 
         Ok(())
@@ -1663,9 +1856,81 @@ impl ScipPtr {
         Ok(node_ptr)
     }
 
+    pub(crate) fn best_node(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestNode(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_bound_node(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestboundNode(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_leaf(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestLeaf(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_child(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestChild(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn best_sibling(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetBestSibling(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn prio_child(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetPrioChild(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn prio_sibling(&self) -> Option<*mut SCIP_NODE> {
+        let ptr = unsafe { ffi::SCIPgetPrioSibling(self.raw) };
+        if ptr.is_null() { None } else { Some(ptr) }
+    }
+
+    pub(crate) fn leaves(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetLeaves(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
+    }
+
+    pub(crate) fn children(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetChildren(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
+    }
+
+    pub(crate) fn siblings(&self) -> Vec<*mut SCIP_NODE> {
+        let mut nodes_ptr = std::ptr::null_mut();
+        let mut n_nodes: c_int = 0;
+        scip_call_panic!(ffi::SCIPgetSiblings(self.raw, &mut nodes_ptr, &mut n_nodes));
+        if n_nodes <= 0 {
+            return vec![];
+        }
+        unsafe { std::slice::from_raw_parts(nodes_ptr, n_nodes as usize) }.to_vec()
+    }
+
     pub(crate) fn add_sol(&self, mut sol: Solution) -> Result<bool, Retcode> {
         let mut feasible = 0;
         assert!(!sol.raw.is_null());
+        // Partial solutions can't be checked/tried (they have UNKNOWN entries);
+        // add them directly for the completesol heuristic to complete.
+        let is_partial = unsafe { ffi::SCIPsolIsPartial(sol.raw) } == 1;
+        if is_partial {
+            scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            return Ok(feasible != 0);
+        }
         let is_orig = unsafe { ffi::SCIPsolIsOriginal(sol.raw) } == 1;
         if is_orig {
             scip_call!(ffi::SCIPcheckSolOrig(
@@ -1677,12 +1942,17 @@ impl ScipPtr {
             ));
             if feasible == 1 {
                 scip_call!(ffi::SCIPaddSolFree(self.raw, &mut sol.raw, &mut feasible));
+            } else {
+                // Not added: we own the solution, so free it to avoid a leak.
+                scip_call!(ffi::SCIPfreeSol(self.raw, &mut sol.raw));
             }
             return Ok(feasible != 0);
         } else {
-            scip_call!(ffi::SCIPtrySol(
+            // `SCIPtrySolFree` takes ownership and frees the solution whether or
+            // not it is stored, so the solution we own is never leaked.
+            scip_call!(ffi::SCIPtrySolFree(
                 self.raw,
-                sol.raw,
+                &mut sol.raw,
                 false.into(),
                 true.into(),
                 true.into(),

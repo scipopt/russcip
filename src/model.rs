@@ -4,6 +4,7 @@ use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
 use crate::expr::Expr;
 use crate::node::Node;
+use crate::nodesel::{NodeSel, SCIPNodesel};
 use crate::param::ScipParameter;
 use crate::probing::Prober;
 use crate::retcode::Retcode;
@@ -107,6 +108,21 @@ impl Model<PluginsIncluded> {
 }
 
 impl Model<ProblemCreated> {
+    /// Creates a new *partial* solution: variables left unset are UNKNOWN rather
+    /// than zero, and are filled in by the `completesol` heuristic when the
+    /// solution is added via [`add_sol`](ProblemOrSolving::add_sol). Useful as a
+    /// MIP-start that fixes only some variables and lets the solver complete the rest.
+    pub fn create_partial_sol(&'_ self) -> Solution<'_> {
+        let sol_ptr = self
+            .scip
+            .create_partial_sol()
+            .expect("Failed to create partial solution in state ProblemCreated");
+        Solution {
+            raw: sol_ptr,
+            scip_ptr: &self.scip,
+        }
+    }
+
     /// Sets the objective sense of the model to the given value and returns the same `Model` instance.
     ///
     /// # Arguments
@@ -207,6 +223,32 @@ impl Model<ProblemCreated> {
         self.scip
             .include_branch_rule(name, desc, priority, maxdepth, maxbounddist, rule)
             .expect("Failed to include branch rule at state ProblemCreated");
+    }
+
+    /// Includes a new node selector in the model.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the node selector. This should be a unique identifier.
+    /// * `desc` - A brief description of the node selector. This is used for informational purposes.
+    /// * `std_priority` - The standard priority of the node selector. Among all included node selectors, the one with the highest standard priority is used in standard mode. A higher value indicates a higher priority.
+    /// * `mem_save_priority` - The memory saving priority of the node selector. When SCIP switches to memory saving mode, the node selector with the highest memory saving priority is used instead.
+    /// * `nodesel` - The node selector to be included. This should be a Box of an object that implements the `NodeSel` trait, and represents the node selection logic.
+    ///
+    /// # Panics
+    ///
+    /// This method will panic if the inclusion of the node selector fails. This can happen if another node selector with the same name already exists.
+    pub fn include_nodesel(
+        &mut self,
+        name: &str,
+        desc: &str,
+        std_priority: i32,
+        mem_save_priority: i32,
+        nodesel: Box<dyn NodeSel>,
+    ) {
+        self.scip
+            .include_nodesel(name, desc, std_priority, mem_save_priority, nodesel)
+            .expect("Failed to include node selector at state ProblemCreated");
     }
 
     /// Include a new primal heuristic in the model.
@@ -391,6 +433,43 @@ impl Model<ProblemCreated> {
         self.try_solve()
             .expect("Failed to solve problem in state ProblemCreated")
     }
+
+    /// Tries to solve the model using SCIP's concurrent solvers, leveraging
+    /// multiple CPU cores when the underlying SCIP was built with thread
+    /// support (the `bundled` library is). Returns a new `Model` instance with
+    /// a `Solved` state if successful.
+    ///
+    /// The number of threads can be controlled with the `parallel/maxnthreads`
+    /// parameter, and `parallel/mode` selects between opportunistic
+    /// (nondeterministic, `0`, the default) and deterministic (`1`) solving,
+    /// e.g. `model.set_int_param("parallel/mode", 1)`.
+    ///
+    /// If SCIP was built without thread support this returns a [`Retcode`]
+    /// error; use [`Model::try_solve`] for the sequential solve in that case.
+    #[allow(unused_mut)]
+    pub fn try_solve_concurrent(mut self) -> Result<Model<Solved>, Retcode> {
+        self.scip.solve_concurrent()?;
+
+        Ok(Model {
+            scip: self.scip,
+            state: PhantomData,
+        })
+    }
+
+    /// Solves the model using SCIP's concurrent solvers and returns a new
+    /// `Model` instance with a `Solved` state.
+    ///
+    /// See [`Model::try_solve_concurrent`] for details and requirements.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the problem cannot be solved concurrently in the
+    /// current state (e.g. SCIP was built without thread support).
+    #[allow(unused_mut)]
+    pub fn solve_concurrent(mut self) -> Model<Solved> {
+        self.try_solve_concurrent()
+            .expect("Failed to solve problem concurrently in state ProblemCreated")
+    }
 }
 
 impl Model<Solving> {
@@ -462,6 +541,72 @@ impl Model<Solving> {
             raw: node_ptr,
             scip: self.scip.clone(),
         }
+    }
+
+    fn wrap_node(&self, ptr: Option<*mut ffi::SCIP_NODE>) -> Option<Node> {
+        ptr.map(|raw| Node {
+            raw,
+            scip: self.scip.clone(),
+        })
+    }
+
+    fn wrap_nodes(&self, ptrs: Vec<*mut ffi::SCIP_NODE>) -> Vec<Node> {
+        ptrs.into_iter()
+            .map(|raw| Node {
+                raw,
+                scip: self.scip.clone(),
+            })
+            .collect()
+    }
+
+    /// Returns the best open node with respect to the active node selector, or `None` if the tree is empty.
+    pub fn best_node(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_node())
+    }
+
+    /// Returns the open node with the best (smallest) lower bound, or `None` if the tree is empty.
+    pub fn best_bound_node(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_bound_node())
+    }
+
+    /// Returns the best leaf from the leaf queue with respect to the active node selector, or `None` if it is empty.
+    pub fn best_leaf(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_leaf())
+    }
+
+    /// Returns the best child of the focus node with respect to the active node selector, or `None` if there is none.
+    pub fn best_child(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_child())
+    }
+
+    /// Returns the best sibling of the focus node with respect to the active node selector, or `None` if there is none.
+    pub fn best_sibling(&self) -> Option<Node> {
+        self.wrap_node(self.scip.best_sibling())
+    }
+
+    /// Returns the child of the focus node with the largest node selection priority, or `None` if there is none.
+    pub fn prio_child(&self) -> Option<Node> {
+        self.wrap_node(self.scip.prio_child())
+    }
+
+    /// Returns the sibling of the focus node with the largest node selection priority, or `None` if there is none.
+    pub fn prio_sibling(&self) -> Option<Node> {
+        self.wrap_node(self.scip.prio_sibling())
+    }
+
+    /// Returns the leaves of the branch-and-bound tree (the open nodes that are neither children nor siblings of the focus node).
+    pub fn leaves(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.leaves())
+    }
+
+    /// Returns the children of the focus node.
+    pub fn children(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.children())
+    }
+
+    /// Returns the siblings of the focus node.
+    pub fn siblings(&self) -> Vec<Node> {
+        self.wrap_nodes(self.scip.siblings())
     }
 
     /// Adds a new priced variable to the SCIP data structure.
@@ -639,7 +784,14 @@ impl Model<Solving> {
     pub fn start_diving(&mut self) -> Diver {
         let scip = self.scip.clone();
 
-        unsafe { ffi::SCIPstartDive(scip.raw) };
+        // Since SCIP 10, `SCIPstartDive` requires the current node's LP to be
+        // constructed first (it returns `SCIP_INVALIDCALL` otherwise). Construct
+        // it on demand so diving works regardless of whether the LP was solved yet.
+        if unsafe { ffi::SCIPisLPConstructed(scip.raw) } == 0 {
+            let mut cutoff = 0u32;
+            scip_call_panic!(ffi::SCIPconstructLP(scip.raw, &mut cutoff));
+        }
+        scip_call_panic!(ffi::SCIPstartDive(scip.raw));
 
         Diver { scip }
     }
@@ -1683,6 +1835,24 @@ pub trait WithSolvingStats {
 
     /// Returns the number of LP iterations performed by the optimization model.
     fn n_lp_iterations(&self) -> usize;
+
+    /// Returns the solving statistics in JSON format.
+    ///
+    /// This wraps SCIP's `SCIPprintStatisticsJson`, available since SCIP 10.
+    fn stats_json(&self) -> String;
+
+    /// Writes the solving statistics in JSON format directly to `path`.
+    ///
+    /// Unlike [`stats_json`](Self::stats_json), this streams the output to the
+    /// file without buffering it in memory, mirroring SCIP's native
+    /// `SCIPprintStatisticsJson` behaviour.
+    fn write_stats_json(&self, path: &str) -> Result<(), Retcode>;
+
+    /// Returns the solving statistics parsed as a [`serde_json::Value`].
+    ///
+    /// Requires the `serde` feature.
+    #[cfg(feature = "serde")]
+    fn stats_json_value(&self) -> serde_json::Value;
 }
 
 trait ModelStageWithSolvingStats {}
@@ -1715,6 +1885,24 @@ impl<S: ModelStageWithSolvingStats> WithSolvingStats for Model<S> {
     fn n_lp_iterations(&self) -> usize {
         self.scip.n_lp_iterations()
     }
+
+    /// Returns the solving statistics in JSON format.
+    fn stats_json(&self) -> String {
+        self.scip
+            .statistics_json()
+            .expect("Failed to get statistics in JSON format")
+    }
+
+    /// Writes the solving statistics in JSON format directly to `path`.
+    fn write_stats_json(&self, path: &str) -> Result<(), Retcode> {
+        self.scip.write_statistics_json(path)
+    }
+
+    /// Returns the solving statistics parsed as a [`serde_json::Value`].
+    #[cfg(feature = "serde")]
+    fn stats_json_value(&self) -> serde_json::Value {
+        serde_json::from_str(&self.stats_json()).expect("SCIP produced invalid statistics JSON")
+    }
 }
 
 /// Creates a minimal `Model` instance and sets off a lot of SCIP plugins, useful for writing tests.
@@ -1739,6 +1927,13 @@ impl<T> Model<T> {
     /// Adds anything that could be added to the model (variables, constraints, plugins, etc.).
     pub fn add<R, O: CanBeAddedToModel<T, Return = R>>(&mut self, object: O) -> R {
         object.add(self)
+    }
+
+    /// Finds an included node selector by its name (e.g. `"bfs"`), giving access
+    /// to its priorities and statistics. Returns `None` if no such node selector
+    /// is included.
+    pub fn find_nodesel(&self, name: &str) -> Option<SCIPNodesel> {
+        self.scip.find_nodesel(name).map(|raw| SCIPNodesel { raw })
     }
 
     /// Returns the status of the optimization model.
@@ -2076,6 +2271,50 @@ mod tests {
     use super::*;
 
     #[test]
+    fn read_prob_failure_balances_refcounts() {
+        // Regression test for issue #281. `SCIPreadProb` creates the problem's
+        // variables before it can fail on invalid data, and the Drop impl
+        // unconditionally releases every original variable. So those variables
+        // must be captured even when the read fails, otherwise they are
+        // over-released on drop (a use-after-free that segfaults on some builds).
+        let model = Model::new().hide_output().include_default_plugins();
+        let scip = model.scip.clone();
+
+        let res = scip.read_prob("data/test/bad.opb");
+        assert!(res.is_err());
+
+        // SCIP created variable `x1` before the constraint failed. It must be
+        // captured (use count >= 2: one held by SCIP's problem, one by russcip),
+        // so that Drop's release stays balanced. Without the fix the count is 1
+        // and dropping the model below over-releases it.
+        unsafe {
+            let n = ffi::SCIPgetNOrigVars(scip.raw);
+            assert!(n > 0, "expected a partially-read variable to remain");
+            let vars = ffi::SCIPgetOrigVars(scip.raw);
+            for i in 0..n as usize {
+                let var = *vars.add(i);
+                assert!(
+                    ffi::SCIPvarGetNUses(var) >= 2,
+                    "variable left uncaptured after a failed read_prob"
+                );
+            }
+        }
+
+        // Dropping must not crash from an unbalanced release.
+        drop(scip);
+        drop(model);
+
+        // The library still works afterwards.
+        let solved = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .read_prob("data/test/simple.lp")
+            .unwrap()
+            .solve();
+        assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    #[test]
     fn solve_from_lp_file() {
         let model = Model::new()
             .hide_output()
@@ -2197,6 +2436,46 @@ mod tests {
     fn try_solve_on_valid_model() {
         let solved = create_model().try_solve().unwrap();
         assert_eq!(solved.status(), Status::Optimal);
+    }
+
+    #[test]
+    fn solve_concurrent_on_valid_model() {
+        let solved = create_model()
+            .set_int_param("parallel/maxnthreads", 2)
+            .unwrap()
+            .solve_concurrent();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 200.);
+    }
+
+    #[test]
+    fn stats_json_after_solve() {
+        let solved = create_model().solve();
+        let json = solved.stats_json();
+        // Looks like a JSON object and carries the optimal status.
+        assert!(json.trim_start().starts_with('{'));
+        assert!(json.contains("optimal solution found"));
+    }
+
+    #[test]
+    fn write_stats_json_after_solve() {
+        let solved = create_model().solve();
+        let path = std::env::temp_dir().join("russcip_stats_test.json");
+        let path_str = path.to_str().unwrap();
+        solved.write_stats_json(path_str).unwrap();
+
+        let from_file = std::fs::read_to_string(&path).unwrap();
+        assert!(from_file.trim_start().starts_with('{'));
+        assert!(from_file.contains("optimal solution found"));
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn stats_json_value_after_solve() {
+        let solved = create_model().solve();
+        let stats = solved.stats_json_value();
+        assert_eq!(stats["status"]["status"], "optimal solution found");
     }
 
     #[test]
@@ -2415,6 +2694,62 @@ mod tests {
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
         assert!(solved.n_sols() >= 2);
+    }
+
+    #[test]
+    fn create_partial_sol() {
+        // Returns the `completesol` heuristic's (n_calls, n_sols_found) after
+        // solving, optionally seeded with a partial solution that fixes only x1.
+        fn solve_and_count(seed: bool) -> (usize, usize) {
+            let mut model = Model::new()
+                .hide_output()
+                .include_default_plugins()
+                .create_prob("test")
+                .set_obj_sense(ObjSense::Minimize)
+                .set_presolving(ParamSetting::Off); // keep the LP-solving path deterministic
+
+            // Odd-cycle vertex cover: LP optimum is fractional (all 0.5 -> 1.5),
+            // integer optimum is 2, so the root LP does NOT already yield the optimum.
+            let x1 = model.add_var(0., 1., 1., "x1", VarType::Binary);
+            let x2 = model.add_var(0., 1., 1., "x2", VarType::Binary);
+            let x3 = model.add_var(0., 1., 1., "x3", VarType::Binary);
+            model.add_cons(vec![&x1, &x2], &[1., 1.], 1., 2., "e12");
+            model.add_cons(vec![&x2, &x3], &[1., 1.], 1., 2., "e23");
+            model.add_cons(vec![&x1, &x3], &[1., 1.], 1., 2., "e13");
+
+            if seed {
+                // A partial solution that fixes ONLY x1; the other vertices are
+                // left UNKNOWN and filled in by the completesol heuristic.
+                let partial = model.create_partial_sol();
+                assert!(partial.is_partial());
+                partial.set_val(&x1, 1.);
+                // A full (non-partial) solution is not partial. Hand it to
+                // `add_sol` so it is freed rather than leaked (it is the all-zero
+                // assignment, which is infeasible for this covering model).
+                let full = model.create_orig_sol();
+                assert!(!full.is_partial());
+                let _ = model.add_sol(full);
+                // Registering a partial solution for completion must not error.
+                assert!(model.add_sol(partial).is_ok());
+            }
+
+            let solved = model.solve();
+            assert_eq!(solved.status(), Status::Optimal);
+
+            let completesol = solved.find_heur("completesol").unwrap();
+            (completesol.n_calls(), completesol.n_sols_found())
+        }
+
+        // With a partial seed, completesol runs and completes it into a solution.
+        let (calls, found) = solve_and_count(true);
+        assert!(
+            calls >= 1,
+            "completesol should run when a partial solution exists"
+        );
+        assert!(found >= 1, "completesol should complete the partial seed");
+
+        // Control: with no partial solution, completesol never even fires.
+        assert_eq!(solve_and_count(false).0, 0);
     }
 
     #[test]

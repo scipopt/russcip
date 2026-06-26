@@ -76,6 +76,10 @@ pub use heuristic::*;
 pub mod separator;
 pub use separator::*;
 
+/// Contains the `NodeSel` trait used to define custom node selectors.
+pub mod nodesel;
+pub use nodesel::*;
+
 /// Contains all the traits and structs that are re-exported by default.
 pub mod prelude;
 

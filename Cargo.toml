@@ -9,14 +9,23 @@ edition = "2024"
 exclude = ["data/test/*"]
 
 [features]
-default = ["datastore"]
+default = ["datastore", "bindgen"]
+# Generate SCIP bindings at build time with bindgen (requires libclang). Needed
+# for the system/SCIPOPTDIR/conda paths where the SCIP ABI isn't known ahead of
+# time. The `bundled` path ships prebuilt bindings, so a libclang-free build is
+# `--no-default-features --features bundled`.
+bindgen = ["scip-sys/bindgen"]
 bundled = ["scip-sys/bundled"]
 from-source = ["scip-sys/from-source"]
 datastore = ["anymap3"]
+# Enables serde-based helpers, e.g. parsing the statistics JSON into a
+# `serde_json::Value`.
+serde = ["dep:serde_json"]
 
 [dependencies]
-scip-sys = "0.1.26"
+scip-sys = { version = "0.1.28", default-features = false }
 anymap3 = { version = "1.0.1", optional = true }
+serde_json = { version = "1.0", optional = true }
 
 [dev-dependencies]
 rayon = "1.5.1"
@@ -25,3 +34,8 @@ rand = "0.8"
 
 [lints.clippy]
 too_many_arguments = "allow"
+
+# Uses the datastore API, so it only builds when the `datastore` feature is on.
+[[example]]
+name = "bin_packing"
+required-features = ["datastore"]

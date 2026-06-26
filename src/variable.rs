@@ -250,7 +250,9 @@ mod tests {
     #[test]
     fn var_data() {
         let mut model = Model::new().include_default_plugins().create_prob("test");
-        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::ImplInt);
+        // NB: `VarType::ImplInt` is deprecated in SCIP 10 (implied integrality is
+        // now a separate attribute), so a plain continuous variable is used here.
+        let var = model.add_var(0.0, 1.0, 2.0, "x", VarType::Continuous);
 
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
@@ -259,7 +261,7 @@ mod tests {
         assert_eq!(var.ub_local(), 1.0);
         assert_eq!(var.obj(), 2.0);
         assert_eq!(var.name(), "x");
-        assert_eq!(var.var_type(), VarType::ImplInt);
+        assert_eq!(var.var_type(), VarType::Continuous);
         assert_eq!(var.status(), VarStatus::Original);
         assert!(!var.is_in_lp());
         assert!(!var.is_deleted());
