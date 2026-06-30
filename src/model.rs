@@ -2,6 +2,7 @@ use crate::builder::CanBeAddedToModel;
 use crate::builder::cons::ConsBuilder;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
+use crate::expr::Expr;
 use crate::node::Node;
 use crate::nodesel::{NodeSel, SCIPNodesel};
 use crate::param::ScipParameter;
@@ -1242,6 +1243,87 @@ pub trait ProblemOrSolving {
         weights: Option<&[f64]>,
         name: &str,
     ) -> Constraint;
+
+    /// Parses an expression from a string into an [`Expr`].
+    ///
+    /// Variable names in the string (e.g. `<x>`) are resolved against the
+    /// variables already added to the model, so any referenced variable must
+    /// exist before calling this.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr_str`: The expression string.
+    ///
+    /// # Returns
+    ///
+    /// The parsed [`Expr`], or a [`Retcode`] error if the string cannot be
+    /// parsed or is only partially consumed.
+    fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode>;
+
+    /// Creates an [`Expr`] representing a single variable.
+    fn expr_from_var(&self, var: &Variable) -> Expr;
+
+    /// Creates an [`Expr`] representing a constant value.
+    fn expr_const(&self, value: f64) -> Expr;
+
+    /// Creates an [`Expr`] representing `constant + sum_i coefs[i] * children[i]`.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if `children.len() != coefs.len()`.
+    fn expr_sum(&self, children: &[&Expr], coefs: &[f64], constant: f64) -> Expr;
+
+    /// Creates an [`Expr`] representing `coef * prod_i children[i]`.
+    fn expr_product(&self, children: &[&Expr], coef: f64) -> Expr;
+
+    /// Creates an [`Expr`] representing `base ^ exponent`.
+    fn expr_pow(&self, base: &Expr, exponent: f64) -> Expr;
+
+    /// Adds a nonlinear constraint `lhs <= expr <= rhs` to the model.
+    ///
+    /// The expression is borrowed, so it may be reused to build further
+    /// constraints or expressions.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The constraint expression.
+    /// * `lhs` - The left-hand side (lower bound) of the constraint.
+    /// * `rhs` - The right-hand side (upper bound) of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// The created [`Constraint`].
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_nonlinear(&mut self, expr: &Expr, lhs: f64, rhs: f64, name: &str) -> Constraint;
+
+    /// Parses an expression string and adds it as a nonlinear constraint
+    /// `lhs <= expr <= rhs`.
+    ///
+    /// Convenience method combining [`parse_expr`](ProblemOrSolving::parse_expr)
+    /// and [`add_cons_nonlinear`](ProblemOrSolving::add_cons_nonlinear).
+    ///
+    /// # Arguments
+    ///
+    /// * `expr_str`: The expression string.
+    /// * `lhs`: The left-hand side (lower bound) of the constraint.
+    /// * `rhs`: The right-hand side (upper bound) of the constraint.
+    /// * `name`: The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// The created [`Constraint`], or a [`Retcode`] error if the expression
+    /// cannot be parsed.
+    fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode>;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1598,6 +1680,92 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         self.scip
             .set_cons_separated(cons, separate)
             .expect("Failed to set constraint separated");
+    }
+
+    fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        let raw = self.scip.parse_expr(expr_str)?;
+        Ok(Expr {
+            raw,
+            scip: self.scip.clone(),
+        })
+    }
+
+    fn expr_from_var(&self, var: &Variable) -> Expr {
+        let raw = self
+            .scip
+            .create_expr_var(var)
+            .expect("Failed to create variable expression");
+        Expr {
+            raw,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn expr_const(&self, value: f64) -> Expr {
+        let raw = self
+            .scip
+            .create_expr_value(value)
+            .expect("Failed to create constant expression");
+        Expr {
+            raw,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn expr_sum(&self, children: &[&Expr], coefs: &[f64], constant: f64) -> Expr {
+        assert_eq!(children.len(), coefs.len());
+        let raw = self
+            .scip
+            .create_expr_sum(children, coefs, constant)
+            .expect("Failed to create sum expression");
+        Expr {
+            raw,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn expr_product(&self, children: &[&Expr], coef: f64) -> Expr {
+        let raw = self
+            .scip
+            .create_expr_product(children, coef)
+            .expect("Failed to create product expression");
+        Expr {
+            raw,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn expr_pow(&self, base: &Expr, exponent: f64) -> Expr {
+        let raw = self
+            .scip
+            .create_expr_pow(base, exponent)
+            .expect("Failed to create power expression");
+        Expr {
+            raw,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn add_cons_nonlinear(&mut self, expr: &Expr, lhs: f64, rhs: f64, name: &str) -> Constraint {
+        let cons = self
+            .scip
+            .create_cons_nonlinear(expr.raw, lhs, rhs, name)
+            .expect("Failed to create nonlinear constraint");
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
+    }
+
+    fn add_cons_from_expr_str(
+        &mut self,
+        expr_str: &str,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<Constraint, Retcode> {
+        let expr = self.parse_expr(expr_str)?;
+        Ok(self.add_cons_nonlinear(&expr, lhs, rhs, name))
     }
 }
 
@@ -2874,5 +3042,103 @@ mod tests {
         assert_eq!(solution.val(&x2), 0.);
         assert_eq!(solution.val(&x3), 0.);
         assert_eq!(solved_model.obj_val(), 10.);
+    }
+
+    #[test]
+    fn nonlinear_cons_from_expr_str() {
+        // maximize x + y  s.t.  x^2 + y^2 <= 1,  0 <= x, y <= 1
+        // optimum is at x = y = 1/sqrt(2), objective = sqrt(2).
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        model.add_var(0., 1., 1., "x", VarType::Continuous);
+        model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        model
+            .add_cons_from_expr_str("<x>^2 + <y>^2", -f64::INFINITY, 1.0, "circle")
+            .expect("Failed to parse and add nonlinear constraint");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 2f64.sqrt()).abs() < 1e-3);
+    }
+
+    #[test]
+    fn nonlinear_cons_from_builders() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x = model.add_var(0., 1., 1., "x", VarType::Continuous);
+        let y = model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        let x_sq = model.expr_pow(&model.expr_from_var(&x), 2.0);
+        let y_sq = model.expr_pow(&model.expr_from_var(&y), 2.0);
+        let sum = model.expr_sum(&[&x_sq, &y_sq], &[1.0, 1.0], 0.0);
+        model.add_cons_nonlinear(&sum, -f64::INFINITY, 1.0, "circle");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 2f64.sqrt()).abs() < 1e-3);
+    }
+
+    #[test]
+    fn parse_expr_rejects_trailing_garbage() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .minimize();
+
+        model.add_var(0., 1., 1., "x", VarType::Continuous);
+        model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        assert_eq!(model.parse_expr("<x> <y>").err(), Some(Retcode::ReadError));
+    }
+
+    #[test]
+    fn nonlinear_expr_can_be_reused() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        model.add_var(0., 1., 1., "x", VarType::Continuous);
+        model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        let expr = model.parse_expr("<x>^2 + <y>^2").unwrap();
+        model.add_cons_nonlinear(&expr, -f64::INFINITY, 1.0, "c1");
+        model.add_cons_nonlinear(&expr, -f64::INFINITY, 2.0, "c2");
+        drop(expr);
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 2f64.sqrt()).abs() < 1e-3);
+    }
+
+    #[test]
+    fn parsed_expr_dropped_without_use() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x = model.add_var(0., 10., 1., "x", VarType::Continuous);
+
+        {
+            let _unused = model.parse_expr("<x>^2").unwrap();
+        }
+
+        model.add_cons(vec![&x], &[1.0], -f64::INFINITY, 5.0, "c");
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 5.0);
     }
 }
