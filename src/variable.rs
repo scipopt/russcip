@@ -68,6 +68,16 @@ impl Variable {
         unsafe { ffi::SCIPvarGetUbLocal(self.raw) }
     }
 
+    /// Returns the global lower bound of the variable.
+    pub fn lb_global(&self) -> f64 {
+        unsafe { ffi::SCIPvarGetLbGlobal(self.raw) }
+    }
+
+    /// Returns the global upper bound of the variable.
+    pub fn ub_global(&self) -> f64 {
+        unsafe { ffi::SCIPvarGetUbGlobal(self.raw) }
+    }
+
     /// Returns the type of the variable.
     pub fn var_type(&self) -> VarType {
         let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
@@ -257,8 +267,10 @@ mod tests {
         assert_eq!(var.index(), 0);
         assert_eq!(var.lb(), 0.0);
         assert_eq!(var.lb_local(), 0.0);
+        assert_eq!(var.lb_global(), 0.0);
         assert_eq!(var.ub(), 1.0);
         assert_eq!(var.ub_local(), 1.0);
+        assert_eq!(var.ub_global(), 1.0);
         assert_eq!(var.obj(), 2.0);
         assert_eq!(var.name(), "x");
         assert_eq!(var.var_type(), VarType::Continuous);
