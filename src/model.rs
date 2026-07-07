@@ -2,6 +2,7 @@ use crate::builder::CanBeAddedToModel;
 use crate::builder::cons::ConsBuilder;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
+use crate::expr::Expr;
 use crate::node::Node;
 use crate::nodesel::{NodeSel, SCIPNodesel};
 use crate::param::ScipParameter;
@@ -1242,6 +1243,22 @@ pub trait ProblemOrSolving {
         weights: Option<&[f64]>,
         name: &str,
     ) -> Constraint;
+
+    /// Parses an expression from a string into an [`Expr`].
+    ///
+    /// Variable names in the string (e.g. `<x>`) are resolved against the
+    /// variables already added to the model, so any referenced variable must
+    /// exist before calling this.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr_str`: The expression string.
+    ///
+    /// # Returns
+    ///
+    /// The parsed [`Expr`], or a [`Retcode`] error if the string cannot be
+    /// parsed or is only partially consumed.
+    fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode>;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1598,6 +1615,14 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         self.scip
             .set_cons_separated(cons, separate)
             .expect("Failed to set constraint separated");
+    }
+
+    fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode> {
+        let raw = self.scip.parse_expr(expr_str)?;
+        Ok(Expr {
+            raw,
+            scip: self.scip.clone(),
+        })
     }
 }
 
@@ -2874,5 +2899,39 @@ mod tests {
         assert_eq!(solution.val(&x2), 0.);
         assert_eq!(solution.val(&x3), 0.);
         assert_eq!(solved_model.obj_val(), 10.);
+    }
+
+    #[test]
+    fn parse_expr_rejects_trailing_garbage() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .minimize();
+
+        model.add_var(0., 1., 1., "x", VarType::Continuous);
+        model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        assert_eq!(model.parse_expr("<x> <y>").err(), Some(Retcode::ReadError));
+    }
+
+    #[test]
+    fn parsed_expr_dropped_without_use() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x = model.add_var(0., 10., 1., "x", VarType::Continuous);
+
+        {
+            let _unused = model.parse_expr("<x>^2").unwrap();
+        }
+
+        model.add_cons(vec![&x], &[1.0], -f64::INFINITY, 5.0, "c");
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 5.0);
     }
 }

@@ -32,6 +32,10 @@ pub use branchrule::*;
 pub mod constraint;
 pub use constraint::*;
 
+/// Contains the `Expr` struct, which represents a (nonlinear) expression.
+pub mod expr;
+pub use expr::*;
+
 /// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;
 pub use model::*;

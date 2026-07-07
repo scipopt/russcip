@@ -673,6 +673,44 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
+    /// Parse an expression from a string.
+    ///
+    /// Returns an error if SCIP cannot parse the string or if it stops before
+    /// the end of the input. The returned expression is owned by the caller
+    /// and must eventually be released via `SCIPreleaseExpr`.
+    pub(crate) fn parse_expr(&self, expr_str: &str) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let c_expr = CString::new(expr_str).map_err(|_| Retcode::Error)?;
+        let mut scip_expr = MaybeUninit::uninit();
+        let mut final_pos: *const std::os::raw::c_char = std::ptr::null();
+
+        scip_call! { ffi::SCIPparseExpr(
+            self.raw,
+            scip_expr.as_mut_ptr(),
+            c_expr.as_ptr(),
+            &mut final_pos,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let mut scip_expr = unsafe { scip_expr.assume_init() };
+
+        // `SCIPparseExpr` returns `SCIP_OKAY` even when it stops before the end of
+        // the string, so verify the whole input was consumed,
+        // otherwise the parse silently dropped part of the expression.
+        unsafe {
+            let mut p = final_pos;
+            while *p != 0 && (*p as u8).is_ascii_whitespace() {
+                p = p.add(1);
+            }
+            if *p != 0 {
+                let _ = ffi::SCIPreleaseExpr(self.raw, &mut scip_expr);
+                return Err(Retcode::ReadError);
+            }
+        }
+
+        Ok(scip_expr)
+    }
+
     /// Create set packing constraint
     pub(crate) fn create_cons_set_pack(
         &self,
