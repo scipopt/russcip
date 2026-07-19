@@ -1,6 +1,18 @@
 use crate::{Model, Retcode};
 
-pub trait ScipParameter: Sized {
+/// Sealing for [`ScipParameter`], which is implemented only for the fixed set of
+/// primitive types SCIP's C API accepts. Sealing keeps it closed to downstream
+/// implementations so new methods can be added without a breaking change.
+mod sealed {
+    pub trait Sealed {}
+    impl Sealed for f64 {}
+    impl Sealed for i32 {}
+    impl Sealed for i64 {}
+    impl Sealed for bool {}
+    impl Sealed for String {}
+}
+
+pub trait ScipParameter: Sized + sealed::Sealed {
     fn set<T>(model: Model<T>, name: &str, value: Self) -> Result<Model<T>, Retcode>;
     fn get<T>(model: &Model<T>, name: &str) -> Self;
 }
