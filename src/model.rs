@@ -47,6 +47,22 @@ pub struct Solving;
 #[derive(Debug)]
 pub struct Solved;
 
+/// Sealing for the crate's model-behavior and stage-marker traits.
+///
+/// These traits exist only to organize `Model<S>`'s methods by lifecycle stage;
+/// they are not extension points. Requiring [`sealed::Sealed`] as a supertrait
+/// prevents downstream crates from implementing them, which in turn lets us add
+/// new methods to them without a breaking change (see cargo-semver-checks'
+/// `trait_method_added` lint).
+mod sealed {
+    /// Marker trait that only types within this crate implement.
+    pub trait Sealed {}
+}
+impl<S> sealed::Sealed for Model<S> {}
+impl sealed::Sealed for ProblemCreated {}
+impl sealed::Sealed for Solving {}
+impl sealed::Sealed for Solved {}
+
 impl Model<Unsolved> {
     /// Creates a new `Model` instance with an `Unsolved` state.
     pub fn new() -> Self {
@@ -862,7 +878,7 @@ impl Model<Solved> {
 }
 
 /// A trait for optimization models with a problem created.
-pub trait ModelWithProblem {
+pub trait ModelWithProblem: sealed::Sealed {
     /// Returns a vector of all variables in the optimization model.
     fn vars(&self) -> Vec<Variable>;
     /// Returns a vector of all original variables in the optimization model.
@@ -912,7 +928,7 @@ pub trait ModelWithProblem {
 }
 
 /// A trait for model stages that have a problem.
-pub trait ModelStageWithProblem {}
+pub trait ModelStageWithProblem: sealed::Sealed {}
 impl ModelStageWithProblem for ProblemCreated {}
 impl ModelStageWithProblem for Solved {}
 impl ModelStageWithProblem for Solving {}
@@ -1028,7 +1044,7 @@ impl<S: ModelStageWithProblem> ModelWithProblem for Model<S> {
 }
 
 /// A trait for optimization models with a problem created or solved.
-pub trait ProblemOrSolving {
+pub trait ProblemOrSolving: sealed::Sealed {
     /// Create a solution in the original space
     fn create_orig_sol(&'_ self) -> Solution<'_>;
 
@@ -1283,7 +1299,7 @@ pub trait ProblemOrSolving {
 }
 
 /// A trait for model stages that have a problem or are during solving.
-pub trait ModelStageProblemOrSolving {}
+pub trait ModelStageProblemOrSolving: sealed::Sealed {}
 impl ModelStageProblemOrSolving for ProblemCreated {}
 impl ModelStageProblemOrSolving for Solving {}
 
@@ -1660,7 +1676,7 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
 }
 
 /// A trait for optimization models with any state that might have solutions.
-pub trait WithSolutions {
+pub trait WithSolutions: sealed::Sealed {
     /// Returns the best solution for the optimization model, if one exists.
     fn best_sol(&'_ self) -> Option<Solution<'_>>;
 
@@ -1710,7 +1726,7 @@ impl<S: ModelStageWithSolutions> WithSolutions for Model<S> {
 }
 
 /// A trait for optimization models with any state that might have solving statistics.
-pub trait WithSolvingStats {
+pub trait WithSolvingStats: sealed::Sealed {
     /// Returns the objective value of the best solution found by the optimization model.
     fn obj_val(&self) -> f64;
 
