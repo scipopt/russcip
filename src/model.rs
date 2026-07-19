@@ -1259,6 +1259,27 @@ pub trait ProblemOrSolving {
     /// The parsed [`Expr`], or a [`Retcode`] error if the string cannot be
     /// parsed or is only partially consumed.
     fn parse_expr(&self, expr_str: &str) -> Result<Expr, Retcode>;
+
+    /// Adds a nonlinear constraint `lhs <= expr <= rhs` to the model.
+    ///
+    /// The `expr` is typically produced by [`ProblemOrSolving::parse_expr`].
+    /// Use `-f64::INFINITY` / `f64::INFINITY` for one-sided constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The (nonlinear) expression.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_nonlinear(&mut self, expr: &Expr, lhs: f64, rhs: f64, name: &str) -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1623,6 +1644,18 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
             raw,
             scip: self.scip.clone(),
         })
+    }
+
+    fn add_cons_nonlinear(&mut self, expr: &Expr, lhs: f64, rhs: f64, name: &str) -> Constraint {
+        let cons = self
+            .scip
+            .create_cons_nonlinear(expr, lhs, rhs, name)
+            .expect("Failed to create nonlinear constraint");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
     }
 }
 
@@ -2933,5 +2966,22 @@ mod tests {
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
         assert_eq!(solved.obj_val(), 5.0);
+    }
+
+    #[test]
+    fn add_nonlinear_cons_from_expr() {
+        use crate::prelude::var;
+
+        let mut model = Model::default().maximize().hide_output();
+
+        model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+        // x^2 <= 16  =>  x <= 4, so max x = 4
+        let expr = model.parse_expr("<x>^2").unwrap();
+        model.add_cons_nonlinear(&expr, -f64::INFINITY, 16.0, "c");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 4.0).abs() < 1e-6);
     }
 }

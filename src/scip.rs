@@ -2,6 +2,7 @@
 use anymap3::AnyMap;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
+use crate::expr::Expr;
 use crate::node::Node;
 use crate::nodesel::NodeSel;
 use crate::pricer::{Pricer, PricerResultState};
@@ -670,6 +671,34 @@ impl ScipPtr {
 
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+        Ok(scip_cons)
+    }
+
+    /// Create a nonlinear constraint `lhs <= expr <= rhs` from a parsed expression.
+    pub(crate) fn create_cons_nonlinear(
+        &self,
+        expr: &Expr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let c_name = CString::new(name).map_err(|_| Retcode::Error)?;
+        let mut scip_cons = MaybeUninit::uninit();
+        scip_call! { ffi::SCIPcreateConsBasicNonlinear(
+            self.raw,
+            scip_cons.as_mut_ptr(),
+            c_name.as_ptr(),
+            expr.raw,
+            lhs,
+            rhs,
+        ) };
+        let mut scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
+            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+        }
         Ok(scip_cons)
     }
 

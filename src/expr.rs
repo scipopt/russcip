@@ -9,6 +9,32 @@ use std::rc::Rc;
 /// once no constraint (or parent expression) still holds it. The retained
 /// [`Rc<ScipPtr>`] keeps the owning model alive for at least as long as the
 /// expression.
+///
+/// # Creating an expression
+///
+/// Expressions are built by parsing a string with
+/// [`parse_expr`](crate::ProblemOrSolving::parse_expr). Reference a variable by
+/// its name wrapped in angle brackets (`<name>`); the name is resolved against
+/// the variables already added to the model, so add the variables first. SCIP's
+/// syntax supports the usual operators (`+ - * / ^`) and functions such as
+/// `exp`, `log`, `sqrt`, `sin`, `cos`, and `abs`.
+///
+/// ```
+/// use russcip::prelude::*;
+///
+/// let mut model = Model::default().maximize().hide_output();
+/// model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+///
+/// // Parse `x^2` into an expression, then bound it: x^2 <= 16  =>  x <= 4.
+/// let expr = model.parse_expr("<x>^2").unwrap();
+/// model.add_cons_nonlinear(&expr, -f64::INFINITY, 16.0, "c");
+///
+/// let solved = model.solve();
+/// assert!((solved.obj_val() - 4.0).abs() < 1e-6);
+/// ```
+///
+/// The same `expr` may be reused in several constraints: `add_cons_nonlinear`
+/// takes it by reference and SCIP captures its own reference internally.
 #[derive(Debug)]
 pub struct Expr {
     /// A pointer to the underlying `SCIP_EXPR` C struct.
