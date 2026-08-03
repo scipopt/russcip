@@ -67,6 +67,11 @@ This is enabled with the help of the [`anymap`](https://github.com/chris-morgan/
 This is useful for communicating data between plugins, or storing other representations of the
 variables/constraints in the model.
 
+Note that storing a `Variable` or `Constraint` here — or in a plugin — creates a reference cycle
+and leaks the model: both hold a strong reference back to it, and the store is only released
+when the model is freed. Use `downgrade()` to get a `VarRef` / `ConsRef` and `upgrade()` to
+recover the handle.
+
 ```rust
 let mut model = Model::new();
 

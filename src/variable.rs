@@ -15,6 +15,29 @@ pub struct Variable {
     pub(crate) scip: Rc<ScipPtr>,
 }
 
+/// A non-owning reference to a [`Variable`].
+///
+/// A `Variable` holds a strong `Rc` to the model, which keeps SCIP alive for as
+/// long as the handle exists. That is what you want for a local binding, but it
+/// forms a reference cycle if the handle is stored somewhere the model itself
+/// owns — a plugin, or the datastore — and then the model is never freed.
+/// A `VarRef` holds the model weakly, so it can be stored in those places.
+#[derive(Debug, Clone)]
+pub struct VarRef {
+    raw: *mut ffi::SCIP_VAR,
+    scip: std::rc::Weak<ScipPtr>,
+}
+
+impl VarRef {
+    /// Recovers the [`Variable`], or `None` if the model has been dropped.
+    pub fn upgrade(&self) -> Option<Variable> {
+        self.scip.upgrade().map(|scip| Variable {
+            raw: self.raw,
+            scip,
+        })
+    }
+}
+
 impl PartialEq for Variable {
     fn eq(&self, other: &Self) -> bool {
         self.index() == other.index() && self.raw == other.raw
@@ -27,6 +50,15 @@ impl Variable {
     /// Returns a raw pointer to the underlying `ffi::SCIP_VAR` struct.
     pub fn inner(&self) -> *mut ffi::SCIP_VAR {
         self.raw
+    }
+
+    /// Produces a non-owning [`VarRef`], safe to store inside a plugin or the
+    /// model's datastore without leaking the model.
+    pub fn downgrade(&self) -> VarRef {
+        VarRef {
+            raw: self.raw,
+            scip: Rc::downgrade(&self.scip),
+        }
     }
 
     /// Returns the index of the variable.
@@ -246,6 +278,99 @@ impl From<SCIP_Status> for VarStatus {
             ffi::SCIP_Varstatus_SCIP_VARSTATUS_NEGATED => VarStatus::NegatedVar,
             _ => panic!("Unhandled SCIP variable status {:?}", status),
         }
+    }
+}
+
+#[cfg(test)]
+mod weak_ref_tests {
+    use crate::prelude::*;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    struct DropProbe(Rc<Cell<bool>>);
+    impl Drop for DropProbe {
+        fn drop(&mut self) {
+            self.0.set(true);
+        }
+    }
+
+    /// A `Variable` stored in a plugin keeps the model alive forever, because the
+    /// model owns the plugin: plugin -> Variable -> Rc<ScipPtr> -> plugin. A
+    /// `VarRef` holds the model weakly, so the cycle never forms.
+    #[test]
+    fn var_ref_does_not_keep_the_model_alive() {
+        use crate::conshdlr::{Conshdlr, ConshdlrResult, SCIPConshdlr};
+        use crate::{Model, Solution, Solving, VarRef, Variable};
+
+        struct Holder {
+            _probe: DropProbe,
+            _strong: Option<Variable>,
+            weak: Option<VarRef>,
+        }
+
+        impl Conshdlr for Holder {
+            fn check(
+                &mut self,
+                _model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                _solution: &Solution,
+            ) -> bool {
+                true
+            }
+            fn enforce(
+                &mut self,
+                _model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
+                // A weak handle is still usable from inside the callback.
+                if let Some(w) = &self.weak {
+                    assert_eq!(w.upgrade().expect("model is alive").name(), "x");
+                }
+                ConshdlrResult::Feasible
+            }
+        }
+
+        fn model_is_freed(strong: bool) -> bool {
+            let dropped = Rc::new(Cell::new(false));
+            {
+                let mut model = Model::default().hide_output();
+                let x = model.add(var().name("x").obj(1.).cont(0.0..=1.0));
+                model.include_conshdlr(
+                    "holder",
+                    "holds a variable",
+                    -1,
+                    -1,
+                    Box::new(Holder {
+                        _probe: DropProbe(Rc::clone(&dropped)),
+                        _strong: if strong { Some(x.clone()) } else { None },
+                        weak: if strong { None } else { Some(x.downgrade()) },
+                    }),
+                );
+                let solved = model.solve();
+                assert_eq!(solved.status(), Status::Optimal);
+            }
+            dropped.get()
+        }
+
+        assert!(
+            !model_is_freed(true),
+            "a stored Variable should leak the model"
+        );
+        assert!(model_is_freed(false), "a stored VarRef should not");
+    }
+
+    /// Once the model is gone, upgrading yields `None` rather than a dangling
+    /// pointer.
+    #[test]
+    fn var_ref_upgrade_fails_after_the_model_is_dropped() {
+        let weak = {
+            let mut model = Model::default().hide_output();
+            let x = model.add(var().name("x").cont(0.0..=1.0));
+            let w = x.downgrade();
+            assert!(w.upgrade().is_some());
+            w
+        };
+        assert!(weak.upgrade().is_none());
     }
 }
 

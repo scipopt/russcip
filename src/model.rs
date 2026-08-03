@@ -2002,6 +2002,14 @@ impl<T> Model<T> {
 
     #[cfg(feature = "datastore")]
     /// Set generic data attached to the model
+    /// # Storing variables and constraints
+    ///
+    /// The datastore lives inside the SCIP instance, so a [`Variable`] or
+    /// [`Constraint`] placed here forms a reference cycle — each holds a strong
+    /// reference back to the model, and the store is only freed when the model
+    /// is. The model would then never be freed. Store
+    /// [`VarRef`](crate::VarRef) / [`ConsRef`](crate::ConsRef) instead, obtained
+    /// with `downgrade()`, and call `upgrade()` to use them.
     pub fn set_data<D: 'static>(&mut self, data: D) {
         self.scip.set_store(data).expect("Failed to set data");
     }
