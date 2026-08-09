@@ -2,9 +2,11 @@
 use anymap3::AnyMap;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
+use crate::expr::Expr;
 use crate::node::Node;
 use crate::nodesel::NodeSel;
 use crate::pricer::{Pricer, PricerResultState};
+use crate::scip_expr::ScipExpr;
 use crate::{
     BranchingResult, Conshdlr, Constraint, Event, Eventhdlr, HeurResult, LPStatus, Model, ObjSense,
     ParamSetting, Retcode, Row, SCIPBranchRule, SCIPConshdlr, SCIPEventhdlr, SCIPPricer,
@@ -33,6 +35,79 @@ pub struct ScipPtr {
     pub(crate) weak: bool,
     /// Variables added during solving (to be released after solving)
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
+}
+
+/// The `ownercreate` callback threaded through SCIP's expression copy API.
+type ExprOwnerCreate = Option<
+    unsafe extern "C" fn(
+        *mut ffi::SCIP,
+        *mut ffi::SCIP_EXPR,
+        *mut *mut ffi::SCIP_EXPR_OWNERDATA,
+        *mut Option<
+            unsafe extern "C" fn(
+                *mut ffi::SCIP,
+                *mut ffi::SCIP_EXPR,
+                *mut *mut ffi::SCIP_EXPR_OWNERDATA,
+            ) -> ffi::SCIP_RETCODE,
+        >,
+        *mut Option<
+            unsafe extern "C" fn(
+                *mut ffi::SCIP,
+                *mut ffi::FILE,
+                *mut ffi::SCIP_EXPR,
+                *mut ffi::SCIP_EXPR_OWNERDATA,
+            ) -> ffi::SCIP_RETCODE,
+        >,
+        *mut Option<
+            unsafe extern "C" fn(
+                *mut ffi::SCIP,
+                *mut ffi::SCIP_EXPR,
+                *mut ffi::SCIP_EXPR_OWNERDATA,
+            ) -> ffi::SCIP_RETCODE,
+        >,
+        *mut std::os::raw::c_void,
+    ) -> ffi::SCIP_RETCODE,
+>;
+
+/// `mapexpr` callback for `SCIPduplicateExpr` that rewrites every variable
+/// expression to reference the *transformed* variable.
+///
+/// `cons_nonlinear` only maps original variables to transformed ones in its
+/// `CONSTRANS` callback, which runs when the original problem is transformed. A
+/// constraint created *during* solving never goes through it, so its expression
+/// would keep referencing original variables and the handler would fail with
+/// "cannot catch events on original variable". `cons_linear` avoids this by
+/// transforming in `consdataCreate`; this is the equivalent for expressions.
+unsafe extern "C" fn map_expr_to_transformed_var(
+    targetscip: *mut ffi::SCIP,
+    targetexpr: *mut *mut ffi::SCIP_EXPR,
+    sourcescip: *mut ffi::SCIP,
+    sourceexpr: *mut ffi::SCIP_EXPR,
+    ownercreate: ExprOwnerCreate,
+    ownercreatedata: *mut std::os::raw::c_void,
+    _mapexprdata: *mut std::os::raw::c_void,
+) -> ffi::SCIP_RETCODE {
+    unsafe {
+        // Leaving `*targetexpr` null tells SCIP to duplicate this node itself.
+        if ffi::SCIPisExprVar(sourcescip, sourceexpr) == 0 {
+            return ffi::SCIP_Retcode_SCIP_OKAY;
+        }
+
+        let var = ffi::SCIPgetVarExprVar(sourceexpr);
+        let tvar = if ffi::SCIPvarIsTransformed(var) != 0 {
+            var
+        } else {
+            let t = ffi::SCIPvarGetTransVar(var);
+            if t.is_null() {
+                // Matches what `cons_linear` reports for a variable with no
+                // transformed counterpart, which usually means it was deleted.
+                return ffi::SCIP_Retcode_SCIP_INVALIDDATA;
+            }
+            t
+        };
+
+        ffi::SCIPcreateExprVar(targetscip, targetexpr, tvar, ownercreate, ownercreatedata)
+    }
 }
 
 impl ScipPtr {
@@ -671,6 +746,296 @@ impl ScipPtr {
         let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
         Ok(scip_cons)
+    }
+
+    /// Create a nonlinear constraint `lhs <= expr <= rhs` from a parsed expression.
+    pub(crate) fn create_cons_nonlinear(
+        &self,
+        expr: &ScipExpr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Result<*mut SCIP_Cons, Retcode> {
+        let c_name = CString::new(name).map_err(|_| Retcode::Error)?;
+
+        // Once the problem is transformed, the expression has to reference
+        // transformed variables. Both ways of building one — `parse_expr`,
+        // which resolves names against the original problem, and `build_expr`,
+        // which uses the handles it was given — can yield original variables,
+        // so rewrite them here, at the single point both routes pass through.
+        let mut dup: *mut ffi::SCIP_EXPR = std::ptr::null_mut();
+        if unsafe { ffi::SCIPisTransformed(self.raw) } != 0 {
+            scip_call! { ffi::SCIPduplicateExpr(
+                self.raw,
+                expr.raw,
+                &mut dup,
+                Some(map_expr_to_transformed_var),
+                std::ptr::null_mut(),
+                None,
+                std::ptr::null_mut(),
+            ) };
+        }
+        let expr_raw = if dup.is_null() { expr.raw } else { dup };
+
+        let mut scip_cons = MaybeUninit::uninit();
+        let rc = unsafe {
+            ffi::SCIPcreateConsBasicNonlinear(
+                self.raw,
+                scip_cons.as_mut_ptr(),
+                c_name.as_ptr(),
+                expr_raw,
+                lhs,
+                rhs,
+            )
+        };
+        if !dup.is_null() {
+            // The constraint took its own copy, so drop ours either way.
+            unsafe {
+                let _ = ffi::SCIPreleaseExpr(self.raw, &mut dup);
+            }
+        }
+        let rc = Retcode::from(rc);
+        if rc != Retcode::Okay {
+            return Err(rc);
+        }
+        let mut scip_cons = unsafe { scip_cons.assume_init() };
+        scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
+
+        let stage = unsafe { ffi::SCIPgetStage(self.raw) };
+        if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
+            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+        }
+        Ok(scip_cons)
+    }
+
+    /// Parse an expression from a string.
+    ///
+    /// Returns an error if SCIP cannot parse the string or if it stops before
+    /// the end of the input. The returned expression is owned by the caller
+    /// and must eventually be released via `SCIPreleaseExpr`.
+    pub(crate) fn parse_expr(&self, expr_str: &str) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let c_expr = CString::new(expr_str).map_err(|_| Retcode::Error)?;
+        let mut scip_expr = MaybeUninit::uninit();
+        let mut final_pos: *const std::os::raw::c_char = std::ptr::null();
+
+        scip_call! { ffi::SCIPparseExpr(
+            self.raw,
+            scip_expr.as_mut_ptr(),
+            c_expr.as_ptr(),
+            &mut final_pos,
+            None,
+            std::ptr::null_mut(),
+        ) };
+
+        let mut scip_expr = unsafe { scip_expr.assume_init() };
+
+        // `SCIPparseExpr` returns `SCIP_OKAY` even when it stops before the end of
+        // the string, so verify the whole input was consumed,
+        // otherwise the parse silently dropped part of the expression.
+        unsafe {
+            let mut p = final_pos;
+            while *p != 0 && (*p as u8).is_ascii_whitespace() {
+                p = p.add(1);
+            }
+            if *p != 0 {
+                let _ = ffi::SCIPreleaseExpr(self.raw, &mut scip_expr);
+                return Err(Retcode::ReadError);
+            }
+        }
+
+        Ok(scip_expr)
+    }
+
+    /// Release an expression reference, ignoring the return code.
+    ///
+    /// `SCIPreleaseExpr` only decrements a use count; there is no meaningful
+    /// recovery if it were to fail, and this runs on error paths where a
+    /// `?` would leak the very reference being cleaned up.
+    fn release_expr(&self, e: &mut *mut ffi::SCIP_EXPR) {
+        unsafe {
+            let _ = ffi::SCIPreleaseExpr(self.raw, e);
+        }
+    }
+
+    /// Build children in order, releasing the ones already built if any fails.
+    fn build_expr_children(&self, exs: &[&Expr]) -> Result<Vec<*mut ffi::SCIP_EXPR>, Retcode> {
+        let mut built: Vec<*mut ffi::SCIP_EXPR> = Vec::with_capacity(exs.len());
+        for e in exs {
+            match self.create_expr_tree(e) {
+                Ok(p) => built.push(p),
+                Err(err) => {
+                    for c in built.iter_mut() {
+                        self.release_expr(c);
+                    }
+                    return Err(err);
+                }
+            }
+        }
+        Ok(built)
+    }
+
+    /// `SCIPcreateExprSum` over `(coefficient, subexpression)` terms plus a constant.
+    fn create_expr_sum(
+        &self,
+        terms: &[(f64, Expr)],
+        constant: f64,
+    ) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let exs: Vec<&Expr> = terms.iter().map(|(_, e)| e).collect();
+        let mut coefs: Vec<f64> = terms.iter().map(|(c, _)| *c).collect();
+        let mut children = self.build_expr_children(&exs)?;
+
+        let mut out = MaybeUninit::uninit();
+        let rc = unsafe {
+            ffi::SCIPcreateExprSum(
+                self.raw,
+                out.as_mut_ptr(),
+                children.len() as std::os::raw::c_int,
+                children.as_mut_ptr(),
+                coefs.as_mut_ptr(),
+                constant,
+                None,
+                std::ptr::null_mut(),
+            )
+        };
+
+        // The sum captured the children, so drop our own references either way.
+        for c in children.iter_mut() {
+            self.release_expr(c);
+        }
+
+        let rc = Retcode::from(rc);
+        if rc != Retcode::Okay {
+            return Err(rc);
+        }
+        Ok(unsafe { out.assume_init() })
+    }
+
+    /// `SCIPcreateExprProduct` over the given factors, scaled by `coefficient`.
+    fn create_expr_product(
+        &self,
+        factors: &[Expr],
+        coefficient: f64,
+    ) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        let exs: Vec<&Expr> = factors.iter().collect();
+        let mut children = self.build_expr_children(&exs)?;
+
+        let mut out = MaybeUninit::uninit();
+        let rc = unsafe {
+            ffi::SCIPcreateExprProduct(
+                self.raw,
+                out.as_mut_ptr(),
+                children.len() as std::os::raw::c_int,
+                children.as_mut_ptr(),
+                coefficient,
+                None,
+                std::ptr::null_mut(),
+            )
+        };
+
+        for c in children.iter_mut() {
+            self.release_expr(c);
+        }
+
+        let rc = Retcode::from(rc);
+        if rc != Retcode::Okay {
+            return Err(rc);
+        }
+        Ok(unsafe { out.assume_init() })
+    }
+
+    /// Recursively build a `SCIP_EXPR` tree from an [`Expr`] description.
+    ///
+    /// Every SCIP expression constructor captures its children, so each child
+    /// reference created here is released once its parent holds it. The
+    /// returned expression is owned by the caller.
+    ///
+    /// Recursion depth follows the *nesting* of the expression, not the number
+    /// of terms: [`Expr`] keeps sums and products n-ary, so a sum over a million
+    /// variables is a single `SCIPcreateExprSum` call one level deep.
+    pub(crate) fn create_expr_tree(&self, ex: &Expr) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
+        match ex {
+            Expr::Const(c) => {
+                let mut out = MaybeUninit::uninit();
+                scip_call! { ffi::SCIPcreateExprValue(
+                    self.raw,
+                    out.as_mut_ptr(),
+                    *c,
+                    None,
+                    std::ptr::null_mut(),
+                ) };
+                Ok(unsafe { out.assume_init() })
+            }
+
+            Expr::Var(v) => {
+                let mut out = MaybeUninit::uninit();
+                scip_call! { ffi::SCIPcreateExprVar(
+                    self.raw,
+                    out.as_mut_ptr(),
+                    v.raw,
+                    None,
+                    std::ptr::null_mut(),
+                ) };
+                Ok(unsafe { out.assume_init() })
+            }
+
+            Expr::Sum(terms, constant) => self.create_expr_sum(terms, *constant),
+            Expr::Product(factors, coef) => self.create_expr_product(factors, *coef),
+
+            Expr::Pow(a, p) | Expr::Signpower(a, p) => {
+                let mut child = self.create_expr_tree(a)?;
+                let mut out = MaybeUninit::uninit();
+                let signed = matches!(ex, Expr::Signpower(..));
+                let rc = unsafe {
+                    let ctor = if signed {
+                        ffi::SCIPcreateExprSignpower
+                    } else {
+                        ffi::SCIPcreateExprPow
+                    };
+                    ctor(
+                        self.raw,
+                        out.as_mut_ptr(),
+                        child,
+                        *p,
+                        None,
+                        std::ptr::null_mut(),
+                    )
+                };
+                self.release_expr(&mut child);
+                let rc = Retcode::from(rc);
+                if rc != Retcode::Okay {
+                    return Err(rc);
+                }
+                Ok(unsafe { out.assume_init() })
+            }
+
+            Expr::Exp(a)
+            | Expr::Log(a)
+            | Expr::Sin(a)
+            | Expr::Cos(a)
+            | Expr::Abs(a)
+            | Expr::Entropy(a) => {
+                let mut child = self.create_expr_tree(a)?;
+                let mut out = MaybeUninit::uninit();
+                let p = out.as_mut_ptr();
+                let nil = std::ptr::null_mut();
+                let rc = unsafe {
+                    match ex {
+                        Expr::Exp(_) => ffi::SCIPcreateExprExp(self.raw, p, child, None, nil),
+                        Expr::Log(_) => ffi::SCIPcreateExprLog(self.raw, p, child, None, nil),
+                        Expr::Sin(_) => ffi::SCIPcreateExprSin(self.raw, p, child, None, nil),
+                        Expr::Cos(_) => ffi::SCIPcreateExprCos(self.raw, p, child, None, nil),
+                        Expr::Abs(_) => ffi::SCIPcreateExprAbs(self.raw, p, child, None, nil),
+                        _ => ffi::SCIPcreateExprEntropy(self.raw, p, child, None, nil),
+                    }
+                };
+                self.release_expr(&mut child);
+                let rc = Retcode::from(rc);
+                if rc != Retcode::Okay {
+                    return Err(rc);
+                }
+                Ok(unsafe { out.assume_init() })
+            }
+        }
     }
 
     /// Create set packing constraint

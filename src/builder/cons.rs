@@ -1,4 +1,5 @@
 use crate::builder::CanBeAddedToModel;
+use crate::expr::{Expr, split_constant};
 use crate::{
     Constraint, Model, ModelStageProblemOrSolving, ModelStageWithProblem, ModelWithProblem,
     ProblemOrSolving, Variable,
@@ -13,8 +14,12 @@ pub struct ConsBuilder<'a> {
     pub(crate) rhs: f64,
     /// (Optional) name of constraint
     pub(crate) name: Option<&'a str>,
-    /// Coefficients of constraint
+    /// Coefficients of constraint, used when the body is linear
     pub(crate) coefs: Vec<(&'a Variable, f64)>,
+    /// A (possibly nonlinear) expression body. When set, this is what the
+    /// constraint is built from and `coefs` is ignored — the builder records
+    /// which kind it is rather than inferring it later.
+    pub(crate) ex: Option<Expr>,
     /// Modifiable flag of constraint
     pub(crate) modifiable: Option<bool>,
     /// Removable flag of constraint
@@ -35,6 +40,7 @@ impl Default for ConsBuilder<'_> {
             rhs: f64::INFINITY,
             name: None,
             coefs: Vec::new(),
+            ex: None,
             modifiable: None,
             removable: None,
             separated: None,
@@ -90,6 +96,34 @@ impl<'a> ConsBuilder<'a> {
         self
     }
 
+    /// Uses a (possibly nonlinear) [`Expr`] as the constraint body.
+    ///
+    /// Any coefficients previously added with [`ConsBuilder::coef`] are
+    /// ignored. A body that turns out to be linear becomes a genuine linear
+    /// constraint rather than a nonlinear one presolve has to upgrade.
+    ///
+    /// ```
+    /// # use russcip::prelude::*;
+    /// let mut model = Model::default().maximize().hide_output();
+    /// let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+    ///
+    /// model.add(cons().expression(Expr::pow(Expr::var(&x), 2.0)).le(16.0));
+    ///
+    /// let solved = model.solve();
+    /// assert!((solved.obj_val() - 4.0).abs() < 1e-6);
+    /// ```
+    pub fn expression(mut self, ex: Expr) -> Self {
+        self.ex = Some(ex);
+        self
+    }
+
+    /// Sets both sides at once, for a two-sided constraint `lhs <= body <= rhs`.
+    pub fn bounds(mut self, lhs: f64, rhs: f64) -> Self {
+        self.lhs = lhs;
+        self.rhs = rhs;
+        self
+    }
+
     /// Sets the modifiable flag of the constraint
     pub fn modifiable(mut self, modifiable: bool) -> Self {
         self.modifiable = Some(modifiable);
@@ -126,7 +160,38 @@ where
             let n_cons = model.n_conss();
             format!("cons{n_cons}")
         });
-        let cons = model.add_cons(vars, &coefs, self.lhs, self.rhs, &name);
+
+        // Shifting a body constant into the bounds: `x^2 - 16 <= 0` is
+        // `x^2 <= 16`.
+        fn shift(bound: f64, k: f64) -> f64 {
+            if bound.is_finite() { bound - k } else { bound }
+        }
+
+        let cons = match self.ex {
+            // A linear body becomes a linear constraint, not a nonlinear one
+            // that presolve has to upgrade.
+            Some(ref ex) if ex.as_linear().is_some() => {
+                let (terms, k) = ex.as_linear().expect("checked above");
+                let lhs = shift(self.lhs, k);
+                let rhs = shift(self.rhs, k);
+                let vars: Vec<&Variable> = terms.iter().map(|(v, _)| v).collect();
+                let coefs: Vec<f64> = terms.iter().map(|(_, c)| *c).collect();
+                model.add_cons(vars, &coefs, lhs, rhs, &name)
+            }
+            Some(ex) => {
+                // A body written as `x^2 - 16` with a bound of 0 is the same
+                // constraint as `x^2 <= 16`, so move any constant out of the
+                // expression and into the bounds.
+                let (ex, k) = split_constant(ex);
+                let lhs = shift(self.lhs, k);
+                let rhs = shift(self.rhs, k);
+                let built = model
+                    .build_expr(&ex)
+                    .expect("failed to build constraint expression");
+                model.add_cons_nonlinear(&built, lhs, rhs, &name)
+            }
+            None => model.add_cons(vars, &coefs, self.lhs, self.rhs, &name),
+        };
 
         if let Some(modifiable) = self.modifiable {
             model.set_cons_modifiable(&cons, modifiable);
