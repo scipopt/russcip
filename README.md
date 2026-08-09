@@ -35,6 +35,64 @@ For other installation methods, please check [INSTALL.md](INSTALL.md).
 
 We provide multiple examples listed [here](examples/README.md), and you can also check the [documentation](https://docs.rs/russcip/).
 
+## Nonlinear constraints
+
+`Expr` is an expression tree over the model's variables. It is plain Rust data — building one
+touches SCIP not at all — and `cons().expression(..)` turns it into a constraint:
+
+```rust
+use russcip::prelude::*;
+
+let mut model = Model::default().maximize().hide_output();
+let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+let y = model.add(var().name("y").cont(0.0..=10.0));
+
+// x² + y² <= 16
+let circle = Expr::pow(Expr::var(&x), 2.0) + Expr::pow(Expr::var(&y), 2.0);
+model.add(cons().expression(circle).le(16.0));
+
+// 1 <= x + y <= 5
+model.add(cons().expression(Expr::var(&x) + Expr::var(&y)).bounds(1.0, 5.0).name("band"));
+
+// variables on both sides: `x = y` is `x - y = 0`
+model.add(cons().expression(Expr::var(&x) - Expr::var(&y)).eq(0.0));
+
+let solved = model.solve();
+assert_eq!(solved.status(), Status::Optimal);
+```
+
+Sums and products are n-ary and come from iterators, so a coefficient array and a variable array
+pair up with `zip`:
+
+```rust
+use russcip::prelude::*;
+
+let mut model = Model::default().maximize().hide_output();
+let n = 4;
+let xs: Vec<_> = (0..n)
+    .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+    .collect();
+let c = [1.0, 2.0, 3.0, 0.5];
+
+// Σ cᵢ·xᵢ <= 10
+let weighted = Expr::sum_weighted(c.iter().zip(&xs).map(|(c, x)| (*c, Expr::var(x))));
+model.add(cons().expression(weighted).le(10.0));
+
+// Σ xᵢ² <= 4
+let squares = Expr::sum(xs.iter().map(|x| Expr::pow(Expr::var(x), 2.0)));
+model.add(cons().expression(squares).le(4.0));
+
+let solved = model.solve();
+assert_eq!(solved.status(), Status::Optimal);
+```
+
+The arithmetic operators are implemented on `Expr`, but `^` is not: Rust's `^` is `BitXor` and
+binds *looser* than `+` and `*`, so `a ^ 2 + b` would mean `a ^ (2 + b)`. Powers are written
+`Expr::pow(a, 2.0)`.
+
+See [NONLINEAR.md](NONLINEAR.md) for the full API, the flattening rules, and SCIP's string
+syntax, or the [worked example](examples/nonlinear.rs).
+
 ## Accessing unsafe functions
 
 The `ffi` module provides access to the raw C-API of SCIP. This can be used to call functions that are not wrapped in
