@@ -748,7 +748,10 @@ impl ScipPtr {
         Ok(scip_cons)
     }
 
-    /// Create a nonlinear constraint `lhs <= expr <= rhs` from a parsed expression.
+    /// Create a nonlinear constraint `lhs <= expr <= rhs` from an expression.
+    ///
+    /// The expression may come from either [`ScipPtr::parse_expr`] (by name) or
+    /// [`ScipPtr::create_expr_tree`] (by handle); both routes pass through here.
     pub(crate) fn create_cons_nonlinear(
         &self,
         expr: &ScipExpr,
@@ -833,6 +836,13 @@ impl ScipPtr {
         // the string, so verify the whole input was consumed,
         // otherwise the parse silently dropped part of the expression.
         unsafe {
+            // Guard against `SCIPparseExpr` returning `SCIP_OKAY` without setting
+            // the end position (an empty or whitespace-only string can do this);
+            // dereferencing the null it leaves behind would be undefined behaviour.
+            if final_pos.is_null() {
+                let _ = ffi::SCIPreleaseExpr(self.raw, &mut scip_expr);
+                return Err(Retcode::ReadError);
+            }
             let mut p = final_pos;
             while *p != 0 && (*p as u8).is_ascii_whitespace() {
                 p = p.add(1);

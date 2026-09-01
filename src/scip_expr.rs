@@ -17,7 +17,9 @@ use std::rc::Rc;
 /// its name wrapped in angle brackets (`<name>`); the name is resolved against
 /// the variables already added to the model, so add the variables first. SCIP's
 /// syntax supports the usual operators (`+ - * / ^`) and functions such as
-/// `exp`, `log`, `sqrt`, `sin`, `cos`, and `abs`.
+/// `exp`, `log`, `sqrt`, `sin`, `cos`, and `abs`. The string parser accepts
+/// `sqrt` (lowering it to `x^0.5`); `Expr` has no `Sqrt` variant, so write
+/// `Expr::pow(x, 0.5)` when building by hand.
 ///
 /// ```
 /// use russcip::prelude::*;

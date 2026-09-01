@@ -463,7 +463,10 @@ impl Expr {
 pub(crate) fn split_constant(ex: Expr) -> (Expr, f64) {
     match ex {
         Expr::Sum(terms, k) => (Expr::Sum(terms, 0.0), k),
-        Expr::Const(k) => (Expr::Sum(Vec::new(), 0.0), k),
+        // A pure constant folds entirely into the bound. Keep it a `Const`
+        // rather than a childless `Sum`, which would lower to a 0-term
+        // `SCIPcreateExprSum`.
+        Expr::Const(k) => (Expr::Const(0.0), k),
         other => (other, 0.0),
     }
 }
@@ -1224,6 +1227,31 @@ mod tests {
             "got {}",
             solved.obj_val()
         );
+    }
+
+    /// A body that is itself a constant folds entirely into the bounds. It is
+    /// linear, so it routes through `add_cons` as `0 <= bound - constant`.
+    #[test]
+    fn constant_body_folds_into_bounds() {
+        let mut model = Model::default().maximize().hide_output();
+        let _x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+        // 2 <= 5 is always true, so x is unconstrained and reaches its bound.
+        model.add(cons().expression(Expr::constant(2.0)).le(5.0));
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!(
+            (solved.obj_val() - 10.0).abs() < 1e-6,
+            "got {}",
+            solved.obj_val()
+        );
+
+        // 6 <= 5 is infeasible.
+        let mut model = Model::default().maximize().hide_output();
+        let _x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+        model.add(cons().expression(Expr::constant(6.0)).le(5.0));
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Infeasible);
     }
 
     /// The operator traits, including the ones with `f64` on the left.
