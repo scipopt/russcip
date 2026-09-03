@@ -3086,7 +3086,18 @@ mod tests {
                 // Building the constraint rewrites them to the transformed one.
                 if self.by_handle {
                     let body = Expr::pow(Expr::var(&x), 2.0);
-                    model.add(cons().expression(body).le(16.0).name("x_sq"));
+                    // `.removable(true)` is applied to the *returned*
+                    // `Constraint` after it is added. This is the path that
+                    // used to dereference null: the constraint was released at
+                    // add time during solving, nulling the handle.
+                    let c = model.add(
+                        cons()
+                            .expression(body)
+                            .le(16.0)
+                            .name("x_sq")
+                            .removable(true),
+                    );
+                    assert_eq!(c.name(), "x_sq");
                 } else {
                     let expr = model.parse_expr("<x>^2").expect("parse failed");
                     model.add_cons_nonlinear(&expr, -f64::INFINITY, 16.0, "x_sq");
