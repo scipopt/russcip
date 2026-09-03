@@ -324,9 +324,15 @@ impl<R: Into<Expr>> std::ops::Mul<R> for Expr {
 impl<R: Into<Expr>> std::ops::Div<R> for Expr {
     type Output = Expr;
     fn div(self, rhs: R) -> Expr {
-        // SCIP has no division expression; `a / b` is `a * b^-1`.
+        // SCIP has no division expression; `a / b` is `a * b^-1`. A constant
+        // divisor folds into the coefficient instead of becoming a `Pow(Const,
+        // -1)` factor, so `x / 2.0` lowers to `0.5 * x` and stays linear —
+        // `x * 2^-1` would not be recognised by `as_linear`.
         let (mut acc, mut coef) = into_product_parts(self);
-        push_product_factor(&mut acc, &mut coef, Expr::pow(rhs.into(), -1.0));
+        match rhs.into() {
+            Expr::Const(c) => coef /= c,
+            rhs => push_product_factor(&mut acc, &mut coef, Expr::pow(rhs, -1.0)),
+        }
         finish_product(acc, coef)
     }
 }
@@ -709,10 +715,17 @@ mod tests {
         assert_eq!(diff.to_string(), "(<x> - <y> - <x>)");
         assert!(matches!(&diff, Expr::Sum(terms, _) if terms.len() == 3));
 
-        // Division is `a * b^-1`, so a division chain is one product.
+        // Division is `a * b^-1`, so a division chain is one product. A
+        // constant divisor folds into the coefficient, so only the variable
+        // divisor stays as a negative-power factor.
         let quot = Expr::var(&x) / Expr::var(&y) / 2.0;
-        assert_eq!(quot.to_string(), "(<x> / <y> / 2)");
-        assert!(matches!(&quot, Expr::Product(factors, _) if factors.len() == 3));
+        assert_eq!(quot.to_string(), "(0.5 * <x> / <y>)");
+        assert!(matches!(&quot, Expr::Product(factors, _) if factors.len() == 2));
+
+        // A constant divisor alone folds fully, so the body is linear.
+        let half = Expr::var(&x) / 2.0;
+        assert_eq!(half.to_string(), "(0.5 * <x>)");
+        assert!(half.as_linear().is_some());
     }
 
     /// The string API resolves `<x>` by name; the builder uses handles, so
@@ -1069,6 +1082,36 @@ mod tests {
         );
     }
 
+    /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear
+    /// constraint on a continuous variable, and both the integer decision and
+    /// the objective are checked.
+    #[test]
+    fn mixed_integer_nonlinear() {
+        let mut model = Model::default().maximize().hide_output();
+        let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+        let b = model.add(var().name("b").bin());
+
+        // x^2 - 16*b <= 0: if b = 0 then x = 0, if b = 1 then x <= 4. With
+        // maximize x the solver must pick b = 1 and x = 4.
+        model.add(
+            cons()
+                .expression(Expr::pow(Expr::var(&x), 2.0) - 16.0 * Expr::var(&b))
+                .le(0.0)
+                .name("gate"),
+        );
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        let sol = solved.best_sol().unwrap();
+        assert!(
+            (solved.obj_val() - 4.0).abs() < 1e-4,
+            "got {}",
+            solved.obj_val()
+        );
+        assert!((sol.val(&b) - 1.0).abs() < 1e-6, "b = {}", sol.val(&b));
+        assert!((sol.val(&x) - 4.0).abs() < 1e-3, "x = {}", sol.val(&x));
+    }
+
     // ---- aggregates as constraint bodies ----
 
     #[test]
@@ -1291,5 +1334,38 @@ mod tests {
             "got {}",
             solved.obj_val()
         );
+    }
+
+    /// A variable from another model must be rejected before it reaches
+    /// `SCIPcreateExprVar`, rather than making a cross-model FFI call.
+    #[test]
+    fn foreign_variable_is_rejected() {
+        let mut model_a = Model::default().hide_output();
+        let _x = model_a.add(var().name("x").cont(0.0..=10.0));
+
+        let mut model_b = Model::default().hide_output();
+        let y = model_b.add(var().name("y").cont(0.0..=10.0));
+
+        // A variable from `model_b` cannot be built into `model_a`'s SCIP.
+        let e = Expr::pow(Expr::var(&y), 2.0);
+        assert_eq!(model_a.build_expr(&e).err(), Some(Retcode::InvalidData));
+    }
+
+    /// An expression built by one model cannot be added as a constraint to
+    /// another; `add_cons_nonlinear` rejects it (and, being a non-`Result`
+    /// API, reports the rejection as a panic, like the other `add_cons_*`
+    /// methods).
+    #[test]
+    #[should_panic(expected = "Failed to create nonlinear constraint")]
+    fn foreign_scip_expr_is_rejected() {
+        let mut model_a = Model::default().hide_output();
+        let _x = model_a.add(var().name("x").cont(0.0..=10.0));
+
+        let mut model_b = Model::default().hide_output();
+        let y = model_b.add(var().name("y").cont(0.0..=10.0));
+
+        let e = Expr::pow(Expr::var(&y), 2.0);
+        let foreign = model_b.build_expr(&e).unwrap();
+        model_a.add_cons_nonlinear(&foreign, 0.0, 1.0, "c");
     }
 }

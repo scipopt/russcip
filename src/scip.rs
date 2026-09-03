@@ -1,5 +1,6 @@
 #[cfg(feature = "datastore")]
 use anymap3::AnyMap;
+use std::cell::RefCell;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
 use crate::expr::Expr;
@@ -35,6 +36,11 @@ pub struct ScipPtr {
     pub(crate) weak: bool,
     /// Variables added during solving (to be released after solving)
     vars_added_in_solving: Vec<*mut ffi::SCIP_VAR>,
+    /// Constraints added during solving. These are not original constraints, so
+    /// `ScipPtr::drop`'s release of the original ones never reaches them; the
+    /// reference is kept here so the returned [`Constraint`](crate::Constraint)
+    /// stays valid, and released from `ScipPtr::drop`.
+    conss_added_in_solving: RefCell<Vec<*mut ffi::SCIP_CONS>>,
 }
 
 /// The `ownercreate` callback threaded through SCIP's expression copy API.
@@ -119,6 +125,7 @@ impl ScipPtr {
             raw: scip_ptr,
             weak: false,
             vars_added_in_solving: Vec::new(),
+            conss_added_in_solving: RefCell::new(Vec::new()),
         })
     }
 
@@ -127,6 +134,7 @@ impl ScipPtr {
             raw,
             weak,
             vars_added_in_solving: Vec::new(),
+            conss_added_in_solving: RefCell::new(Vec::new()),
         }
     }
 
@@ -759,6 +767,13 @@ impl ScipPtr {
         rhs: f64,
         name: &str,
     ) -> Result<*mut SCIP_Cons, Retcode> {
+        // The expression was built against a specific SCIP instance; reject it
+        // if it came from a different model, rather than making a cross-model
+        // FFI call.
+        if expr.scip.raw != self.raw {
+            return Err(Retcode::InvalidData);
+        }
+
         let c_name = CString::new(name).map_err(|_| Retcode::Error)?;
 
         // Once the problem is transformed, the expression has to reference
@@ -801,12 +816,17 @@ impl ScipPtr {
         if rc != Retcode::Okay {
             return Err(rc);
         }
-        let mut scip_cons = unsafe { scip_cons.assume_init() };
+        let scip_cons = unsafe { scip_cons.assume_init() };
         scip_call! { ffi::SCIPaddCons(self.raw, scip_cons) };
 
         let stage = unsafe { ffi::SCIPgetStage(self.raw) };
         if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
-            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+            // A constraint added mid-solve is not an original constraint, so
+            // `ScipPtr::drop`'s release of the original constraints never reaches
+            // it. Keep the reference alive and release it from `ScipPtr::drop`
+            // instead: releasing here would null the pointer the caller is
+            // handed, making the returned `Constraint` invalid.
+            self.conss_added_in_solving.borrow_mut().push(scip_cons);
         }
         Ok(scip_cons)
     }
@@ -977,6 +997,13 @@ impl ScipPtr {
             }
 
             Expr::Var(v) => {
+                // `Expr::Var` is built from the safe API, so a variable from
+                // another model can reach here. Building a var expression in a
+                // different SCIP instance is a cross-model FFI call, so reject
+                // it up front.
+                if v.scip.raw != self.raw {
+                    return Err(Retcode::InvalidData);
+                }
                 let mut out = MaybeUninit::uninit();
                 scip_call! { ffi::SCIPcreateExprVar(
                     self.raw,
@@ -2447,6 +2474,11 @@ impl Drop for ScipPtr {
             // release vars added in solving
             for var_ptr in self.vars_added_in_solving.iter_mut() {
                 scip_call_panic!(ffi::SCIPreleaseVar(self.raw, var_ptr));
+            }
+
+            // release constraints added in solving
+            for cons_ptr in self.conss_added_in_solving.borrow_mut().iter_mut() {
+                scip_call_panic!(ffi::SCIPreleaseCons(self.raw, cons_ptr));
             }
 
             // release constraints
