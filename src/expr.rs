@@ -1176,6 +1176,30 @@ mod tests {
     /// constraint on a continuous variable, and both the integer decision and
     /// the objective are checked.
     #[test]
+    fn cons_macro_mixed_integer() {
+        let mut model = Model::default().minimize().hide_output();
+        let x = model.add(var().name("x").cont(0.0..=10.0));
+        let b = model.add(var().name("b").bin());
+        let t = model.add(var().name("t").obj(1.).cont(0.0..=1e6));
+
+        // Objective lifting: minimise t subject to t >= x^2. A binary gate
+        // `x <= 10*b` and a lower bound `x >= 2` force b=1, and the nonlinear
+        // constraint then pins t to the smallest x^2 = 4.
+        model.add(cons!(x ^ 2 <= t));
+        model.add(cons!(x <= 10 * b));
+        model.add(cons!(x >= 2));
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        let sol = solved.best_sol().unwrap();
+        assert_eq!(sol.val(&b), 1.0);
+        assert!((solved.obj_val() - 4.0).abs() < 1e-4, "got {}", solved.obj_val());
+    }
+
+    /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear
+    /// constraint on a continuous variable, and both the integer decision and
+    /// the objective are checked.
+    #[test]
     fn mixed_integer_nonlinear() {
         let mut model = Model::default().maximize().hide_output();
         let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));

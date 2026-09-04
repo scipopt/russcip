@@ -7,7 +7,34 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::{Delimiter, Group, Spacing, Span, TokenStream as TS2, TokenTree};
+use proc_macro_crate::{FoundCrate, crate_name};
 use quote::{quote, quote_spanned};
+
+/// The path to the `russcip` crate as seen from the crate invoking the macro.
+///
+/// `proc_macro_crate` resolves the real name, so a downstream crate that renames
+/// the dependency (`scip = { package = "russcip", .. }`) still expands to a
+/// resolvable path. When the macro is used inside the `russcip` package it stays
+/// `::russcip` (see the match below), which resolves through
+/// `extern crate self as russcip;` in the library and through the dependency in
+/// doctests and examples.
+fn russcip_path() -> TS2 {
+    match crate_name("russcip") {
+        // `Itself` is returned for every compilation unit that belongs to the
+        // `russcip` package — the library, its unit tests, its doctests and its
+        // examples. `crate` is only correct for the first two, so always use
+        // `::russcip`, which resolves inside the library via
+        // `extern crate self as russcip;` and in doctests/examples through the
+        // dependency.
+        Ok(FoundCrate::Itself) | Err(_) => quote!(::russcip),
+        // A downstream crate may rename the dependency (`scip = { package =
+        // "russcip", .. }`); resolve the real name so the path still works.
+        Ok(FoundCrate::Name(name)) => {
+            let ident = proc_macro2::Ident::new(&name, Span::call_site());
+            quote!(::#ident)
+        }
+    }
+}
 
 /// Unary functions SCIP has an expression handler for.
 ///
@@ -24,9 +51,30 @@ enum Cmp {
     Eq,
 }
 
+/// Parses a Rust numeric literal as an `f64`.
+///
+/// `Literal::to_string()` keeps the source spelling, so it can carry separators
+/// and a type suffix: `1_000`, `2.0_f64`, `1.5e3f32`. `parse::<f64>()` rejects
+/// all of those, so strip the underscores and any trailing type suffix (the
+/// trailing run of alphabetic characters — exponent digits stop the scan, so
+/// `1.5e3f64` leaves `1.5e3`) before parsing.
+fn parse_number(s: &str) -> Option<f64> {
+    let s = s.replace('_', "");
+    if let Ok(v) = s.parse::<f64>() {
+        return Some(v);
+    }
+    let end = s
+        .bytes()
+        .rposition(|b| !b.is_ascii_alphabetic())
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    s[..end].parse::<f64>().ok()
+}
+
 struct Parser {
     toks: Vec<TokenTree>,
     pos: usize,
+    crate_path: TS2,
 }
 
 impl Parser {
@@ -34,6 +82,7 @@ impl Parser {
         Parser {
             toks: ts.into_iter().collect(),
             pos: 0,
+            crate_path: russcip_path(),
         }
     }
 
@@ -168,7 +217,8 @@ impl Parser {
         let base = self.atom()?;
         if self.eat('^') {
             let (v, span) = self.signed_number()?;
-            return Ok(quote_spanned! { span => ::russcip::Expr::pow(#base, #v) });
+            let cp = &self.crate_path;
+            return Ok(quote_spanned! { span => #cp::Expr::pow(#base, #v) });
         }
         Ok(base)
     }
@@ -204,9 +254,9 @@ impl Parser {
             Some(TokenTree::Literal(lit)) => {
                 self.pos += 1;
                 let s = lit.to_string();
-                match s.parse::<f64>() {
-                    Ok(v) => Ok((v, lit.span())),
-                    Err(_) => Err((lit.span(), format!("`{s}` is not a numeric literal"))),
+                match parse_number(&s) {
+                    Some(v) => Ok((v, lit.span())),
+                    None => Err((lit.span(), format!("`{s}` is not a numeric literal"))),
                 }
             }
             Some(other) => Err((
@@ -236,7 +286,8 @@ impl Parser {
             TokenTree::Group(g) if g.delimiter() == Delimiter::Brace => {
                 self.pos += 1;
                 let inner = g.stream();
-                Ok(quote_spanned! { g.span() => ::russcip::Expr::of(#inner) })
+                let cp = &self.crate_path;
+                Ok(quote_spanned! { g.span() => #cp::Expr::of(#inner) })
             }
 
             TokenTree::Group(g) if g.delimiter() == Delimiter::Parenthesis => {
@@ -280,8 +331,9 @@ impl Parser {
                         }
                         let (v, _) = inner.signed_number()?;
                         inner.finish()?;
+                        let cp = &self.crate_path;
                         return Ok(
-                            quote_spanned! { id.span() => ::russcip::Expr::signpower(#arg, #v) },
+                            quote_spanned! { id.span() => #cp::Expr::signpower(#arg, #v) },
                         );
                     }
 
@@ -300,7 +352,8 @@ impl Parser {
                     let arg = inner.expr()?;
                     inner.finish()?;
                     let f = proc_macro2::Ident::new(&name, id.span());
-                    return Ok(quote_spanned! { id.span() => ::russcip::Expr::#f(#arg) });
+                    let cp = &self.crate_path;
+                    return Ok(quote_spanned! { id.span() => #cp::Expr::#f(#arg) });
                 }
 
                 // A bare identifier, possibly indexed (`x`, `x[i]`, `g[i][j]`),
@@ -308,15 +361,17 @@ impl Parser {
                 // `Variable` becomes a variable term and an `f64` a constant —
                 // which is what lets `c[i] * x[i]` work without annotation.
                 let place = self.place(&id);
-                Ok(quote_spanned! { id.span() => ::russcip::AsExpr::as_expr(&#place) })
+                let cp = &self.crate_path;
+                Ok(quote_spanned! { id.span() => #cp::AsExpr::as_expr(&#place) })
             }
 
             TokenTree::Literal(lit) => {
                 self.pos += 1;
                 let s = lit.to_string();
-                match s.parse::<f64>() {
-                    Ok(v) => Ok(quote_spanned! { lit.span() => ::russcip::Expr::constant(#v) }),
-                    Err(_) => Err((lit.span(), format!("`{s}` is not a numeric literal"))),
+                let cp = &self.crate_path;
+                match parse_number(&s) {
+                    Some(v) => Ok(quote_spanned! { lit.span() => #cp::Expr::constant(#v) }),
+                    None => Err((lit.span(), format!("`{s}` is not a numeric literal"))),
                 }
             }
 
@@ -379,9 +434,10 @@ impl Parser {
         inner.finish()?;
 
         let ctor = proc_macro2::Ident::new(if kind == "sum" { "sum" } else { "product" }, span);
+        let cp = &self.crate_path;
 
         Ok(quote_spanned! { span =>
-            ::russcip::Expr::#ctor(
+            #cp::Expr::#ctor(
                 ::core::iter::IntoIterator::into_iter(#iterable).map(|#pattern| #body)
             )
         })
@@ -421,7 +477,8 @@ fn parse_constraint(ts: TS2) -> Result<TS2, PErr> {
         Cmp::Ge => quote! { .ge(0.0) },
         Cmp::Eq => quote! { .eq(0.0) },
     };
-    Ok(quote! { ::russcip::builder::cons::cons().expression(#diff) #bounded })
+    let cp = &p.crate_path;
+    Ok(quote! { #cp::builder::cons::cons().expression(#diff) #bounded })
 }
 
 /// Speculatively parses `lit <= expr <= lit` (or `>=`), rewinding if the input
@@ -481,8 +538,9 @@ fn try_chained(p: &mut Parser) -> Result<Option<TS2>, PErr> {
     } else {
         (hi, lo)
     };
+    let cp = &p.crate_path;
     Ok(Some(
-        quote! { ::russcip::builder::cons::cons().expression(#ex).bounds(#lhs, #rhs) },
+        quote! { #cp::builder::cons::cons().expression(#ex).bounds(#lhs, #rhs) },
     ))
 }
 
@@ -494,9 +552,13 @@ fn try_chained(p: &mut Parser) -> Result<Option<TS2>, PErr> {
 /// constant, so `c[i] * x[i]` needs no annotation.
 ///
 /// Operator precedence is mathematical, **not** Rust's: `^` binds tighter than
-/// `*` and is right-associative, so `x^2 + 3*y` means `(x^2) + (3*y)`. This is
-/// why the macro parses the raw token stream instead of a `syn::ScipExpr` — Rust
-/// itself parses `^` as `BitXor`, which binds looser than both `+` and `*`.
+/// `*`, so `x^2 + 3*y` means `(x^2) + (3*y)`. This is why the macro parses the
+/// raw token stream instead of a `syn::ScipExpr` — Rust itself parses `^` as
+/// `BitXor`, which binds looser than both `+` and `*`.
+///
+/// The exponent must be a numeric literal and `^` is **not** chainable: SCIP's
+/// `SCIPcreateExprPow` takes a `SCIP_Real` exponent, so `x ^ 2 ^ 3` has no
+/// meaning. Write `x ^ 8` instead.
 ///
 /// ```ignore
 /// expr!(x^2 + 3*y - exp(x))
