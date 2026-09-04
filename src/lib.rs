@@ -16,6 +16,59 @@
 //! assert_eq!(solved.status(), Status::Optimal);
 //! assert_eq!(solved.obj_val(), 1.0);
 //! ```
+//!
+//! # Nonlinear constraints
+//!
+//! [`Expr`] is an expression tree built from variables and constants. It is
+//! plain Rust data — constructing it touches SCIP not at all — and
+//! [`ConsBuilder::expression`](crate::builder::cons::ConsBuilder::expression)
+//! turns one into a constraint:
+//!
+//! ```rust
+//! use russcip::prelude::*;
+//!
+//! let mut model = Model::default().maximize().hide_output();
+//! let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+//! let y = model.add(var().name("y").cont(0.0..=10.0));
+//!
+//! // x² + y² <= 16
+//! let circle = Expr::pow(Expr::var(&x), 2.0) + Expr::pow(Expr::var(&y), 2.0);
+//! model.add(cons().expression(circle).le(16.0));
+//!
+//! // 1 <= x + y <= 5
+//! model.add(cons().expression(Expr::var(&x) + Expr::var(&y)).bounds(1.0, 5.0));
+//!
+//! let solved = model.solve();
+//! assert_eq!(solved.status(), Status::Optimal);
+//! ```
+//!
+//! Aggregates come from iterators, so a coefficient array and a variable array
+//! pair up with `zip`:
+//!
+//! ```rust
+//! use russcip::prelude::*;
+//!
+//! let mut model = Model::default().maximize().hide_output();
+//! let n = 4;
+//! let xs: Vec<_> = (0..n)
+//!     .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+//!     .collect();
+//! let c = [1.0, 2.0, 3.0, 0.5];
+//!
+//! // Σ cᵢ·xᵢ <= 10
+//! let weighted = Expr::sum_weighted(c.iter().zip(&xs).map(|(c, x)| (*c, Expr::var(x))));
+//! model.add(cons().expression(weighted).le(10.0));
+//!
+//! // Σ xᵢ² <= 4
+//! let squares = Expr::sum(xs.iter().map(|x| Expr::pow(Expr::var(x), 2.0)));
+//! model.add(cons().expression(squares).le(4.0));
+//!
+//! let solved = model.solve();
+//! assert_eq!(solved.status(), Status::Optimal);
+//! ```
+//!
+//! See [`expr`](mod@crate::expr) for the full API and
+//! [`parse_expr`](ProblemOrSolving::parse_expr) for SCIP's string syntax.
 
 #![deny(missing_docs)]
 #![allow(clippy::macro_metavars_in_unsafe)]
@@ -31,6 +84,15 @@ pub use branchrule::*;
 /// Contains the `Constraint` struct, which represents a constraint in an optimization problem.
 pub mod constraint;
 pub use constraint::*;
+
+/// Contains the `Expr` enum, a model-independent description of a nonlinear
+/// expression. This is the type you build; [`ScipExpr`] is what SCIP makes of it.
+pub mod expr;
+pub use expr::*;
+
+/// Contains the `ScipExpr` struct, a handle on a `SCIP_EXPR` built by SCIP.
+pub mod scip_expr;
+pub use scip_expr::*;
 
 /// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;

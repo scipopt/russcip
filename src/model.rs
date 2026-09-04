@@ -2,12 +2,14 @@ use crate::builder::CanBeAddedToModel;
 use crate::builder::cons::ConsBuilder;
 use crate::constraint::Constraint;
 use crate::eventhdlr::Eventhdlr;
+use crate::expr::Expr;
 use crate::node::Node;
 use crate::nodesel::{NodeSel, SCIPNodesel};
 use crate::param::ScipParameter;
 use crate::probing::Prober;
 use crate::retcode::Retcode;
 use crate::scip::ScipPtr;
+use crate::scip_expr::ScipExpr;
 use crate::solution::{SolError, Solution};
 use crate::status::Status;
 use crate::variable::{VarId, VarType, Variable};
@@ -1258,6 +1260,66 @@ pub trait ProblemOrSolving: sealed::Sealed {
         weights: Option<&[f64]>,
         name: &str,
     ) -> Constraint;
+
+    /// Parses an expression from a string into an [`ScipExpr`].
+    ///
+    /// Variable names in the string (e.g. `<x>`) are resolved against the
+    /// variables already added to the model, so any referenced variable must
+    /// exist before calling this.
+    ///
+    /// Prefer [`ProblemOrSolving::build_expr`] where the expression is known at
+    /// compile time: it refers to variables by handle, so it is unambiguous
+    /// when names are duplicated and works with names this syntax cannot
+    /// express. Use `parse_expr` for expressions that only exist at runtime,
+    /// for instance read from a file.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr_str`: The expression string.
+    ///
+    /// # Returns
+    ///
+    /// The parsed [`ScipExpr`], or a [`Retcode`] error if the string cannot be
+    /// parsed or is only partially consumed.
+    fn parse_expr(&self, expr_str: &str) -> Result<ScipExpr, Retcode>;
+
+    /// Builds an [`ScipExpr`] from an [`Expr`] expression tree.
+    ///
+    /// This is the counterpart to [`ProblemOrSolving::parse_expr`] that does not
+    /// go through SCIP's string syntax. Variables are referenced by handle, so
+    /// duplicate variable names and names containing characters the string
+    /// syntax cannot express (such as `>`) are not a problem.
+    ///
+    /// # Arguments
+    ///
+    /// * `ex`: The expression tree.
+    ///
+    /// # Returns
+    ///
+    /// The constructed [`ScipExpr`], or a [`Retcode`] error if SCIP could not build it.
+    fn build_expr(&self, ex: &Expr) -> Result<ScipExpr, Retcode>;
+
+    /// Adds a nonlinear constraint `lhs <= expr <= rhs` to the model.
+    ///
+    /// The `expr` is typically produced by [`ProblemOrSolving::parse_expr`].
+    /// Use `-f64::INFINITY` / `f64::INFINITY` for one-sided constraints.
+    ///
+    /// # Arguments
+    ///
+    /// * `expr` - The (nonlinear) expression.
+    /// * `lhs` - The left-hand side of the constraint.
+    /// * `rhs` - The right-hand side of the constraint.
+    /// * `name` - The name of the constraint.
+    ///
+    /// # Returns
+    ///
+    /// A reference-counted pointer to the new constraint.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the constraint cannot be created in the current state.
+    fn add_cons_nonlinear(&mut self, expr: &ScipExpr, lhs: f64, rhs: f64, name: &str)
+    -> Constraint;
 }
 
 /// A trait for model stages that have a problem or are during solving.
@@ -1614,6 +1676,40 @@ impl<S: ModelStageProblemOrSolving> ProblemOrSolving for Model<S> {
         self.scip
             .set_cons_separated(cons, separate)
             .expect("Failed to set constraint separated");
+    }
+
+    fn parse_expr(&self, expr_str: &str) -> Result<ScipExpr, Retcode> {
+        let raw = self.scip.parse_expr(expr_str)?;
+        Ok(ScipExpr {
+            raw,
+            scip: self.scip.clone(),
+        })
+    }
+
+    fn build_expr(&self, ex: &Expr) -> Result<ScipExpr, Retcode> {
+        let raw = self.scip.create_expr_tree(ex)?;
+        Ok(ScipExpr {
+            raw,
+            scip: self.scip.clone(),
+        })
+    }
+
+    fn add_cons_nonlinear(
+        &mut self,
+        expr: &ScipExpr,
+        lhs: f64,
+        rhs: f64,
+        name: &str,
+    ) -> Constraint {
+        let cons = self
+            .scip
+            .create_cons_nonlinear(expr, lhs, rhs, name)
+            .expect("Failed to create nonlinear constraint");
+
+        Constraint {
+            raw: cons,
+            scip: self.scip.clone(),
+        }
     }
 }
 
@@ -2890,5 +2986,270 @@ mod tests {
         assert_eq!(solution.val(&x2), 0.);
         assert_eq!(solution.val(&x3), 0.);
         assert_eq!(solved_model.obj_val(), 10.);
+    }
+
+    #[test]
+    fn parse_expr_rejects_trailing_garbage() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .minimize();
+
+        model.add_var(0., 1., 1., "x", VarType::Continuous);
+        model.add_var(0., 1., 1., "y", VarType::Continuous);
+
+        assert_eq!(model.parse_expr("<x> <y>").err(), Some(Retcode::ReadError));
+    }
+
+    #[test]
+    fn parsed_expr_dropped_without_use() {
+        let mut model = Model::new()
+            .hide_output()
+            .include_default_plugins()
+            .create_prob("test")
+            .set_obj_sense(ObjSense::Maximize);
+
+        let x = model.add_var(0., 10., 1., "x", VarType::Continuous);
+
+        {
+            let _unused = model.parse_expr("<x>^2").unwrap();
+        }
+
+        model.add_cons(vec![&x], &[1.0], -f64::INFINITY, 5.0, "c");
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 5.0);
+    }
+
+    /// Adds a nonlinear constraint *during solving*, which is the only way to
+    /// reach the `SCIP_STAGE_SOLVING` branch of `ScipPtr::create_cons_nonlinear`
+    /// — the one that releases the constraint reference immediately, because a
+    /// constraint added mid-solve is not an original constraint and so is never
+    /// released by `ScipPtr::drop`.
+    #[test]
+    fn add_nonlinear_cons_during_solving() {
+        use crate::builder::cons::cons;
+        use crate::builder::var::var;
+        use crate::conshdlr::{Conshdlr, ConshdlrResult, SCIPConshdlr};
+        use crate::expr::Expr;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        // NOTE: the variable is held by *id*, not as a `Variable`. A `Variable`
+        // owns an `Rc<ScipPtr>`, and the model owns this plugin, so storing one
+        // here would form a reference cycle and leak the whole SCIP instance.
+        struct AddsNonlinearCons {
+            x: VarId,
+            added: Rc<Cell<bool>>,
+            /// `true` builds from an [`Expr`] (handles), `false` `parse_expr` (names).
+            by_handle: bool,
+        }
+
+        /// `Model::var` searches *transformed* variables, whose indices differ
+        /// from the original ones, so look the original up instead. Returning it
+        /// by value keeps no `Rc` alive past the callback.
+        fn lookup(model: &Model<Solving>, id: VarId) -> Variable {
+            model
+                .orig_vars()
+                .into_iter()
+                .find(|v| v.index() == id)
+                .expect("variable went away")
+        }
+
+        impl Conshdlr for AddsNonlinearCons {
+            fn check(
+                &mut self,
+                model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                solution: &Solution,
+            ) -> bool {
+                let x = lookup(&model, self.x);
+                solution.val(&x) <= 4.0 + 1e-6
+            }
+
+            fn enforce(
+                &mut self,
+                mut model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
+                let x = lookup(&model, self.x);
+                if model.current_val(&x) <= 4.0 + 1e-6 {
+                    return ConshdlrResult::Feasible;
+                }
+                if self.added.get() {
+                    return ConshdlrResult::CutOff;
+                }
+                // Both routes hand over an expression over the *original*
+                // variable: `parse_expr` resolves `<x>` against the original
+                // problem, and `x` here is the handle captured before solving.
+                // Building the constraint rewrites them to the transformed one.
+                if self.by_handle {
+                    let body = Expr::pow(Expr::var(&x), 2.0);
+                    // `.removable(true)` is applied to the *returned*
+                    // `Constraint` after it is added. This is the path that
+                    // used to dereference null: the constraint was released at
+                    // add time during solving, nulling the handle.
+                    let c = model.add(
+                        cons()
+                            .expression(body)
+                            .le(16.0)
+                            .name("x_sq")
+                            .removable(true),
+                    );
+                    assert_eq!(c.name(), "x_sq");
+                } else {
+                    let expr = model.parse_expr("<x>^2").expect("parse failed");
+                    model.add_cons_nonlinear(&expr, -f64::INFINITY, 16.0, "x_sq");
+                }
+                self.added.set(true);
+                ConshdlrResult::ConsAdded
+            }
+        }
+
+        fn run(by_handle: bool) {
+            // Presolve would otherwise fix `x` at its bound and solve the model
+            // outright, so `enforce` would never run.
+            let mut model = Model::default()
+                .maximize()
+                .hide_output()
+                .set_presolving(ParamSetting::Off);
+            let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+            let added = Rc::new(Cell::new(false));
+            model.include_conshdlr(
+                "AddsNonlinearCons",
+                "adds a nonlinear constraint while solving",
+                -1,
+                -1,
+                Box::new(AddsNonlinearCons {
+                    x: x.index(),
+                    added: Rc::clone(&added),
+                    by_handle,
+                }),
+            );
+
+            let solved = model.solve();
+
+            // The branch must actually have been taken, or this proves nothing.
+            assert!(added.get(), "no constraint was added during solving");
+            assert_eq!(solved.status(), Status::Optimal);
+            assert!(
+                solved.obj_val() <= 4.0 + 1e-4,
+                "constraint had no effect, obj = {}",
+                solved.obj_val()
+            );
+        }
+
+        run(false); // parse_expr, by name
+        run(true); // Expr, by handle
+    }
+
+    /// The linear counterpart of [`add_nonlinear_cons_during_solving`]: a
+    /// constraint added through `cons().coef(..)` during solving goes via
+    /// `ScipPtr::create_cons`, which used to release the constraint at add time
+    /// and hand back a null `Constraint`. Chaining `.name()` on the returned
+    /// handle is the path that dereferenced null.
+    #[test]
+    fn add_linear_cons_during_solving() {
+        use crate::builder::cons::cons;
+        use crate::builder::var::var;
+        use crate::conshdlr::{Conshdlr, ConshdlrResult, SCIPConshdlr};
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        // Held by id, as in the nonlinear test: a `Variable` owns an `Rc<ScipPtr>`
+        // and the model owns this plugin, so storing one here would form a
+        // reference cycle and leak the SCIP instance.
+        struct AddsLinearCons {
+            x: VarId,
+            added: Rc<Cell<bool>>,
+        }
+
+        fn lookup(model: &Model<Solving>, id: VarId) -> Variable {
+            model
+                .orig_vars()
+                .into_iter()
+                .find(|v| v.index() == id)
+                .expect("variable went away")
+        }
+
+        impl Conshdlr for AddsLinearCons {
+            fn check(
+                &mut self,
+                model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                solution: &Solution,
+            ) -> bool {
+                let x = lookup(&model, self.x);
+                solution.val(&x) <= 4.0 + 1e-6
+            }
+
+            fn enforce(
+                &mut self,
+                mut model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
+                let x = lookup(&model, self.x);
+                if model.current_val(&x) <= 4.0 + 1e-6 {
+                    return ConshdlrResult::Feasible;
+                }
+                if self.added.get() {
+                    return ConshdlrResult::CutOff;
+                }
+                // The linear path. `.removable(true)` is chained on the builder,
+                // and `.name()` is read from the returned `Constraint` — the
+                // handle that used to be nulled by releasing at add time.
+                let c = model.add(cons().coef(&x, 1.0).le(4.0).name("x_le").removable(true));
+                assert_eq!(c.name(), "x_le");
+                self.added.set(true);
+                ConshdlrResult::ConsAdded
+            }
+        }
+
+        let mut model = Model::default()
+            .maximize()
+            .hide_output()
+            .set_presolving(ParamSetting::Off);
+        let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+        let added = Rc::new(Cell::new(false));
+        model.include_conshdlr(
+            "AddsLinearCons",
+            "adds a linear constraint while solving",
+            -1,
+            -1,
+            Box::new(AddsLinearCons {
+                x: x.index(),
+                added: Rc::clone(&added),
+            }),
+        );
+
+        let solved = model.solve();
+
+        assert!(added.get(), "no constraint was added during solving");
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!(
+            solved.obj_val() <= 4.0 + 1e-4,
+            "constraint had no effect, obj = {}",
+            solved.obj_val()
+        );
+    }
+
+    #[test]
+    fn add_nonlinear_cons_from_expr() {
+        use crate::prelude::var;
+
+        let mut model = Model::default().maximize().hide_output();
+
+        model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+        // x^2 <= 16  =>  x <= 4, so max x = 4
+        let expr = model.parse_expr("<x>^2").unwrap();
+        model.add_cons_nonlinear(&expr, -f64::INFINITY, 16.0, "c");
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 4.0).abs() < 1e-6);
     }
 }
