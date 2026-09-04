@@ -20,6 +20,22 @@ use std::fmt;
 /// variable names and by names containing characters the string syntax cannot
 /// express (such as `>`).
 ///
+/// The [`expr!`](macro@crate::expr) and [`cons!`](macro@crate::cons) macros build
+/// an `Expr` (and a whole constraint) from mathematical syntax, with `^` binding
+/// tighter than `*`:
+///
+/// ```
+/// use russcip::prelude::*;
+///
+/// let mut model = Model::default().maximize().hide_output();
+/// let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+///
+/// model.add(cons!(x ^ 2 <= 16));
+///
+/// let solved = model.solve();
+/// assert!((solved.obj_val() - 4.0).abs() < 1e-6);
+/// ```
+///
 /// Expressions are built from [`Expr::var`] and [`Expr::constant`] with the
 /// arithmetic operators and the named constructors ([`Expr::pow`],
 /// [`Expr::exp`], …):
@@ -1103,6 +1119,81 @@ mod tests {
             "got {}",
             solved.obj_val()
         );
+    }
+
+    /// `expr!` builds an `Expr` with `^` binding tighter than `*`, matching
+    /// mathematical convention rather than Rust's bitwise `^`.
+    #[test]
+    fn expr_macro_renders() {
+        let mut model = Model::default().hide_output();
+        let x = model.add(var().name("x").cont(0.0..=10.0));
+        let y = model.add(var().name("y").cont(0.0..=10.0));
+
+        assert_eq!(expr!(x ^ 2 + 3 * y).to_string(), "((<x>^2) + (3 * <y>))");
+        assert_eq!(expr!(x ^ 2 + y ^ 2).to_string(), "((<x>^2) + (<y>^2))");
+    }
+
+    /// The `cons!` macro is sugar for `cons().expression(body).cmp(..)`, so the
+    /// resulting constraint solves the same way as the builder API.
+    #[test]
+    fn cons_macro_simple() {
+        let mut model = Model::default().maximize().hide_output();
+        let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+        model.add(cons!(x ^ 2 <= 16));
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 4.0).abs() < 1e-6, "got {}", solved.obj_val());
+    }
+
+    #[test]
+    fn cons_macro_two_sided() {
+        let mut model = Model::default().minimize().hide_output();
+        let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+        let y = model.add(var().name("y").obj(1.).cont(0.0..=10.0));
+        model.add(cons!(1 <= x + y <= 5));
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!((solved.obj_val() - 1.0).abs() < 1e-6, "got {}", solved.obj_val());
+    }
+
+    /// A comprehension sums over an iterator, so `cons!` can aggregate the same
+    /// way the builder's `Expr::sum` does.
+    #[test]
+    fn cons_macro_comprehension() {
+        let mut model = Model::default().maximize().hide_output();
+        let xs: Vec<_> = (0..4)
+            .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+            .collect();
+        model.add(cons!(sum(x in &xs, x ^ 2) <= 16));
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        // Maximising sum(x_i) over the ball sum(x_i^2) <= 16 puts every x_i on
+        // the boundary along (1,1,1,1): x_i = 4/2 = 2, so the objective is 8.
+        assert!((solved.obj_val() - 8.0).abs() < 1e-4, "got {}", solved.obj_val());
+    }
+
+    /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear
+    /// constraint on a continuous variable, and both the integer decision and
+    /// the objective are checked.
+    #[test]
+    fn cons_macro_mixed_integer() {
+        let mut model = Model::default().minimize().hide_output();
+        let x = model.add(var().name("x").cont(0.0..=10.0));
+        let b = model.add(var().name("b").bin());
+        let t = model.add(var().name("t").obj(1.).cont(0.0..=1e6));
+
+        // Objective lifting: minimise t subject to t >= x^2. A binary gate
+        // `x <= 10*b` and a lower bound `x >= 2` force b=1, and the nonlinear
+        // constraint then pins t to the smallest x^2 = 4.
+        model.add(cons!(x ^ 2 <= t));
+        model.add(cons!(x <= 10 * b));
+        model.add(cons!(x >= 2));
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), Status::Optimal);
+        let sol = solved.best_sol().unwrap();
+        assert_eq!(sol.val(&b), 1.0);
+        assert!((solved.obj_val() - 4.0).abs() < 1e-4, "got {}", solved.obj_val());
     }
 
     /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear

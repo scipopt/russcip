@@ -1,3 +1,6 @@
+[workspace]
+members = ["russcip-macros"]
+
 [package]
 name = "russcip"
 authors = ["Mohammed Ghannam <ghannam@zib.de>"]
@@ -26,6 +29,7 @@ serde = ["dep:serde_json"]
 scip-sys = { version = "0.1.28", default-features = false }
 anymap3 = { version = "1.0.1", optional = true }
 serde_json = { version = "1.0", optional = true }
+russcip-macros = { version = "0.11.0", path = "russcip-macros" }
 
 [dev-dependencies]
 rayon = "1.5.1"

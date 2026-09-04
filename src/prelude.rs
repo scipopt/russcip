@@ -27,3 +27,4 @@ pub use crate::scip_expr::ScipExpr;
 pub use crate::separator::*;
 pub use crate::status::Status;
 pub use crate::variable::VarType;
+pub use russcip_macros::{cons, expr};
