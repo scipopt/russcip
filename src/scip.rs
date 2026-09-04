@@ -1068,7 +1068,13 @@ impl ScipPtr {
                         ExprKind::Sin(_) => ffi::SCIPcreateExprSin(self.raw, p, child, None, nil),
                         ExprKind::Cos(_) => ffi::SCIPcreateExprCos(self.raw, p, child, None, nil),
                         ExprKind::Abs(_) => ffi::SCIPcreateExprAbs(self.raw, p, child, None, nil),
-                        _ => ffi::SCIPcreateExprEntropy(self.raw, p, child, None, nil),
+                        ExprKind::Entropy(_) => {
+                            ffi::SCIPcreateExprEntropy(self.raw, p, child, None, nil)
+                        }
+                        // The outer match arm only lets the six unary variants
+                        // reach this block, so the remaining `ExprKind` variants
+                        // cannot occur here.
+                        _ => unreachable!("only unary expression variants reach here"),
                     }
                 };
                 self.release_expr(&mut child);
