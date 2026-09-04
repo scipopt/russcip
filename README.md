@@ -61,6 +61,31 @@ let solved = model.solve();
 assert_eq!(solved.status(), Status::Optimal);
 ```
 
+[`cons!`] and [`expr!`] write the same thing as mathematical syntax, with `^` binding tighter
+than `*` (unlike Rust's `^`, which is bitwise xor):
+
+```rust
+use russcip::prelude::*;
+
+let mut model = Model::default().maximize().hide_output();
+let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+let y = model.add(var().name("y").cont(0.0..=10.0));
+let n = 4;
+let xs: Vec<_> = (0..n)
+    .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+    .collect();
+
+// x² + y² <= 16
+model.add(cons!(x ^ 2 + y ^ 2 <= 16));
+// 1 <= x + y <= 5
+model.add(cons!(1 <= x + y <= 5));
+// Σ xᵢ² <= 4
+model.add(cons!(sum(i in 0..n, xs[i] ^ 2) <= 4));
+
+let solved = model.solve();
+assert_eq!(solved.status(), Status::Optimal);
+```
+
 Sums and products are n-ary and come from iterators, so a coefficient array and a variable array
 pair up with `zip`:
 
