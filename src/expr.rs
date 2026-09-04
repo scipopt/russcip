@@ -361,9 +361,10 @@ impl std::ops::Neg for Expr {
     fn neg(self) -> Expr {
         match self.0 {
             ExprKind::Const(k) => Expr(ExprKind::Const(-k)),
-            ExprKind::Sum(terms, k) => {
-                Expr(ExprKind::Sum(terms.into_iter().map(|(c, e)| (-c, e)).collect(), -k))
-            }
+            ExprKind::Sum(terms, k) => Expr(ExprKind::Sum(
+                terms.into_iter().map(|(c, e)| (-c, e)).collect(),
+                -k,
+            )),
             ExprKind::Product(factors, c) => Expr(ExprKind::Product(factors, -c)),
             other => Expr(ExprKind::Sum(vec![(-1.0, Expr(other))], 0.0)),
         }
