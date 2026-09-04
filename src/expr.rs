@@ -72,8 +72,22 @@ use std::fmt;
 /// let solved = model.solve();
 /// assert_eq!(solved.status(), Status::Optimal);
 /// ```
+/// # Construction
+///
+/// `Expr` is a newtype over a crate-private `ExprKind`. It is built through
+/// the constructors ([`Expr::var`], [`Expr::pow`], …) and the arithmetic
+/// operators, which keep the invariants — sums and products stay n-ary and
+/// flattened, and constants fold away — so a `Sum`/`Product` is never empty or
+/// nested. Because the inner kind is not public, users cannot construct a
+/// variant directly and bypass those invariants.
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub struct Expr(pub(crate) ExprKind);
+
+/// The node kinds of an [`Expr`] tree. Crate-private so that `Expr` can only be
+/// built through its constructors and operators, which maintain the flattening
+/// and constant-folding invariants.
+#[derive(Debug, Clone)]
+pub(crate) enum ExprKind {
     /// A model variable.
     Var(Variable),
     /// A numeric constant.
@@ -84,7 +98,7 @@ pub enum Expr {
     Product(Vec<Expr>, f64),
     /// A subexpression raised to a constant power.
     Pow(Box<Expr>, f64),
-    /// Signed power, `sign(a)*|a|^p`. Unlike [`Expr::Pow`] this is defined and
+    /// Signed power, `sign(a)*|a|^p`. Unlike [`ExprKind::Pow`] this is defined and
     /// odd for negative `a` at any exponent, which is why gas- and
     /// water-network models use it for direction-dependent flow terms.
     Signpower(Box<Expr>, f64),
@@ -106,12 +120,12 @@ impl Expr {
     /// Refers to a model variable. Borrows, so the same variable may appear in
     /// any number of expressions.
     pub fn var(v: &Variable) -> Expr {
-        Expr::Var(v.clone())
+        Expr(ExprKind::Var(v.clone()))
     }
 
     /// A numeric constant.
     pub fn constant(c: f64) -> Expr {
-        Expr::Const(c)
+        Expr(ExprKind::Const(c))
     }
 
     /// Converts anything expression-like into an [`Expr`].
@@ -178,42 +192,42 @@ impl Expr {
     /// `a^p`, where `p` is a constant — SCIP's power expression takes a
     /// `SCIP_Real` exponent, so a variable exponent is not representable.
     pub fn pow(a: Expr, p: f64) -> Expr {
-        Expr::Pow(Box::new(a), p)
+        Expr(ExprKind::Pow(Box::new(a), p))
     }
 
     /// `sign(a)*|a|^p`, with a constant exponent.
     pub fn signpower(a: Expr, p: f64) -> Expr {
-        Expr::Signpower(Box::new(a), p)
+        Expr(ExprKind::Signpower(Box::new(a), p))
     }
 
     /// `exp(a)`
     pub fn exp(a: Expr) -> Expr {
-        Expr::Exp(Box::new(a))
+        Expr(ExprKind::Exp(Box::new(a)))
     }
 
     /// `log(a)`
     pub fn log(a: Expr) -> Expr {
-        Expr::Log(Box::new(a))
+        Expr(ExprKind::Log(Box::new(a)))
     }
 
     /// `sin(a)`
     pub fn sin(a: Expr) -> Expr {
-        Expr::Sin(Box::new(a))
+        Expr(ExprKind::Sin(Box::new(a)))
     }
 
     /// `cos(a)`
     pub fn cos(a: Expr) -> Expr {
-        Expr::Cos(Box::new(a))
+        Expr(ExprKind::Cos(Box::new(a)))
     }
 
     /// `abs(a)`
     pub fn abs(a: Expr) -> Expr {
-        Expr::Abs(Box::new(a))
+        Expr(ExprKind::Abs(Box::new(a)))
     }
 
     /// `entropy(a)`, i.e. `-a*log(a)`
     pub fn entropy(a: Expr) -> Expr {
-        Expr::Entropy(Box::new(a))
+        Expr(ExprKind::Entropy(Box::new(a)))
     }
 }
 
@@ -223,17 +237,17 @@ impl Expr {
 /// bound if it is a `Const`.
 fn finish_sum(terms: Vec<(f64, Expr)>, constant: f64) -> Expr {
     if terms.is_empty() {
-        Expr::Const(constant)
+        Expr(ExprKind::Const(constant))
     } else {
-        Expr::Sum(terms, constant)
+        Expr(ExprKind::Sum(terms, constant))
     }
 }
 
 fn finish_product(factors: Vec<Expr>, coef: f64) -> Expr {
     if factors.is_empty() {
-        Expr::Const(coef)
+        Expr(ExprKind::Const(coef))
     } else {
-        Expr::Product(factors, coef)
+        Expr(ExprKind::Product(factors, coef))
     }
 }
 
@@ -241,48 +255,48 @@ fn finish_product(factors: Vec<Expr>, coef: f64) -> Expr {
 /// constants into the running constant. Flattening here is what keeps
 /// `a + b + c + …` one node wide instead of `n` nodes deep.
 fn push_sum_term(acc: &mut Vec<(f64, Expr)>, constant: &mut f64, c: f64, t: Expr) {
-    match t {
-        Expr::Const(k) => *constant += c * k,
-        Expr::Sum(terms, k) => {
+    match t.0 {
+        ExprKind::Const(k) => *constant += c * k,
+        ExprKind::Sum(terms, k) => {
             *constant += c * k;
             for (ci, ti) in terms {
                 push_sum_term(acc, constant, c * ci, ti);
             }
         }
-        other => acc.push((c, other)),
+        other => acc.push((c, Expr(other))),
     }
 }
 
 /// Appends a factor to a product, flattening nested products and folding
 /// constants into the running coefficient.
 fn push_product_factor(acc: &mut Vec<Expr>, coef: &mut f64, f: Expr) {
-    match f {
-        Expr::Const(k) => *coef *= k,
-        Expr::Product(factors, k) => {
+    match f.0 {
+        ExprKind::Const(k) => *coef *= k,
+        ExprKind::Product(factors, k) => {
             *coef *= k;
             for fi in factors {
                 push_product_factor(acc, coef, fi);
             }
         }
-        other => acc.push(other),
+        other => acc.push(Expr(other)),
     }
 }
 
 impl From<&Variable> for Expr {
     fn from(v: &Variable) -> Expr {
-        Expr::Var(v.clone())
+        Expr(ExprKind::Var(v.clone()))
     }
 }
 
 impl From<Variable> for Expr {
     fn from(v: Variable) -> Expr {
-        Expr::Var(v)
+        Expr(ExprKind::Var(v))
     }
 }
 
 impl From<f64> for Expr {
     fn from(c: f64) -> Expr {
-        Expr::Const(c)
+        Expr(ExprKind::Const(c))
     }
 }
 
@@ -329,9 +343,14 @@ impl<R: Into<Expr>> std::ops::Div<R> for Expr {
         // -1)` factor, so `x / 2.0` lowers to `0.5 * x` and stays linear —
         // `x * 2^-1` would not be recognised by `as_linear`.
         let (mut acc, mut coef) = into_product_parts(self);
-        match rhs.into() {
-            Expr::Const(c) => coef /= c,
-            rhs => push_product_factor(&mut acc, &mut coef, Expr::pow(rhs, -1.0)),
+        match rhs.into().0 {
+            // Fold a finite, non-zero constant divisor into the coefficient, so
+            // `x / 2.0` lowers to `0.5 * x` and stays linear. A zero or
+            // non-finite divisor is kept as a `Pow(rhs, -1)` factor instead:
+            // folding it would silently produce an infinite/NaN coefficient,
+            // where the division stays visible as `x / 0` in the tree.
+            ExprKind::Const(c) if c.is_finite() && c != 0.0 => coef /= c,
+            other => push_product_factor(&mut acc, &mut coef, Expr::pow(Expr(other), -1.0)),
         }
         finish_product(acc, coef)
     }
@@ -340,11 +359,13 @@ impl<R: Into<Expr>> std::ops::Div<R> for Expr {
 impl std::ops::Neg for Expr {
     type Output = Expr;
     fn neg(self) -> Expr {
-        match self {
-            Expr::Const(k) => Expr::Const(-k),
-            Expr::Sum(terms, k) => Expr::Sum(terms.into_iter().map(|(c, e)| (-c, e)).collect(), -k),
-            Expr::Product(factors, c) => Expr::Product(factors, -c),
-            other => Expr::Sum(vec![(-1.0, other)], 0.0),
+        match self.0 {
+            ExprKind::Const(k) => Expr(ExprKind::Const(-k)),
+            ExprKind::Sum(terms, k) => {
+                Expr(ExprKind::Sum(terms.into_iter().map(|(c, e)| (-c, e)).collect(), -k))
+            }
+            ExprKind::Product(factors, c) => Expr(ExprKind::Product(factors, -c)),
+            other => Expr(ExprKind::Sum(vec![(-1.0, Expr(other))], 0.0)),
         }
     }
 }
@@ -354,7 +375,7 @@ macro_rules! impl_lhs_f64 {
         impl std::ops::$tr<Expr> for f64 {
             type Output = Expr;
             fn $method(self, rhs: Expr) -> Expr {
-                std::ops::$tr::$method(Expr::Const(self), rhs)
+                std::ops::$tr::$method(Expr(ExprKind::Const(self)), rhs)
             }
         }
     };
@@ -368,20 +389,20 @@ impl_lhs_f64!(Div, div);
 /// Decomposes an expression into sum terms so an operator can extend it in
 /// place instead of nesting.
 fn into_sum_parts(e: Expr) -> (Vec<(f64, Expr)>, f64) {
-    match e {
-        Expr::Sum(terms, k) => (terms, k),
-        Expr::Const(k) => (Vec::new(), k),
-        other => (vec![(1.0, other)], 0.0),
+    match e.0 {
+        ExprKind::Sum(terms, k) => (terms, k),
+        ExprKind::Const(k) => (Vec::new(), k),
+        other => (vec![(1.0, Expr(other))], 0.0),
     }
 }
 
 /// Decomposes an expression into product factors, as [`into_sum_parts`] does
 /// for sums.
 fn into_product_parts(e: Expr) -> (Vec<Expr>, f64) {
-    match e {
-        Expr::Product(factors, c) => (factors, c),
-        Expr::Const(k) => (Vec::new(), k),
-        other => (vec![other], 1.0),
+    match e.0 {
+        ExprKind::Product(factors, c) => (factors, c),
+        ExprKind::Const(k) => (Vec::new(), k),
+        other => (vec![Expr(other)], 1.0),
     }
 }
 
@@ -399,13 +420,13 @@ pub trait AsExpr {
 
 impl AsExpr for Variable {
     fn as_expr(&self) -> Expr {
-        Expr::Var(self.clone())
+        Expr(ExprKind::Var(self.clone()))
     }
 }
 
 impl AsExpr for f64 {
     fn as_expr(&self) -> Expr {
-        Expr::Const(*self)
+        Expr(ExprKind::Const(*self))
     }
 }
 
@@ -433,27 +454,27 @@ impl Expr {
     pub(crate) fn as_linear(&self) -> Option<(Vec<(Variable, f64)>, f64)> {
         // A product is linear only when it is a single variable scaled by a
         // coefficient; constants have already been folded into that coefficient.
-        fn scaled_var(e: &Expr) -> Option<(Variable, f64)> {
-            match e {
-                Expr::Var(v) => Some((v.clone(), 1.0)),
-                Expr::Product(factors, c) if factors.len() == 1 => match &factors[0] {
-                    Expr::Var(v) => Some((v.clone(), *c)),
+        fn scaled_var(k: &ExprKind) -> Option<(Variable, f64)> {
+            match k {
+                ExprKind::Var(v) => Some((v.clone(), 1.0)),
+                ExprKind::Product(factors, c) if factors.len() == 1 => match &factors[0].0 {
+                    ExprKind::Var(v) => Some((v.clone(), *c)),
                     _ => None,
                 },
                 _ => None,
             }
         }
 
-        match self {
-            Expr::Const(k) => Some((Vec::new(), *k)),
-            Expr::Sum(terms, k) => {
+        match &self.0 {
+            ExprKind::Const(k) => Some((Vec::new(), *k)),
+            ExprKind::Sum(terms, k) => {
                 let mut out = Vec::with_capacity(terms.len());
                 let mut constant = *k;
                 for (c, e) in terms {
-                    if let Expr::Const(kk) = e {
+                    if let ExprKind::Const(kk) = &e.0 {
                         constant += c * kk;
                     } else {
-                        let (v, vc) = scaled_var(e)?;
+                        let (v, vc) = scaled_var(&e.0)?;
                         out.push((v, c * vc));
                     }
                 }
@@ -467,13 +488,13 @@ impl Expr {
 /// Peels the constant off a sum, so a constraint can move it into its bounds:
 /// `x^2 - 16 <= 0` becomes `x^2 <= 16`.
 pub(crate) fn split_constant(ex: Expr) -> (Expr, f64) {
-    match ex {
-        Expr::Sum(terms, k) => (Expr::Sum(terms, 0.0), k),
+    match ex.0 {
+        ExprKind::Sum(terms, k) => (Expr(ExprKind::Sum(terms, 0.0)), k),
         // A pure constant folds entirely into the bound. Keep it a `Const`
         // rather than a childless `Sum`, which would lower to a 0-term
         // `SCIPcreateExprSum`.
-        Expr::Const(k) => (Expr::Const(0.0), k),
-        other => (other, 0.0),
+        ExprKind::Const(k) => (Expr(ExprKind::Const(0.0)), k),
+        other => (Expr(other), 0.0),
     }
 }
 
@@ -534,45 +555,45 @@ impl Expr {
             format!("{prefix}│  ")
         };
 
-        match self {
-            Expr::Sum(terms, _) => {
+        match &self.0 {
+            ExprKind::Sum(terms, _) => {
                 for (i, (c, e)) in terms.iter().enumerate() {
                     e.write_tree(out, &child_prefix, false, i + 1 == terms.len(), Some(*c));
                 }
             }
-            Expr::Product(factors, _) => {
+            ExprKind::Product(factors, _) => {
                 for (i, e) in factors.iter().enumerate() {
                     e.write_tree(out, &child_prefix, false, i + 1 == factors.len(), None);
                 }
             }
-            Expr::Pow(a, _)
-            | Expr::Signpower(a, _)
-            | Expr::Exp(a)
-            | Expr::Log(a)
-            | Expr::Sin(a)
-            | Expr::Cos(a)
-            | Expr::Abs(a)
-            | Expr::Entropy(a) => a.write_tree(out, &child_prefix, false, true, None),
-            Expr::Var(_) | Expr::Const(_) => {}
+            ExprKind::Pow(a, _)
+            | ExprKind::Signpower(a, _)
+            | ExprKind::Exp(a)
+            | ExprKind::Log(a)
+            | ExprKind::Sin(a)
+            | ExprKind::Cos(a)
+            | ExprKind::Abs(a)
+            | ExprKind::Entropy(a) => a.write_tree(out, &child_prefix, false, true, None),
+            ExprKind::Var(_) | ExprKind::Const(_) => {}
         }
     }
 
     fn node_label(&self) -> String {
-        match self {
-            Expr::Var(v) => format!("Var({})", v.name()),
-            Expr::Const(c) => format!("Const({c})"),
-            Expr::Sum(_, k) if *k != 0.0 => format!("Sum (+{k})"),
-            Expr::Sum(..) => "Sum".to_string(),
-            Expr::Product(_, c) if *c != 1.0 => format!("Product ×{c}"),
-            Expr::Product(..) => "Product".to_string(),
-            Expr::Pow(_, p) => format!("Pow({p})"),
-            Expr::Signpower(_, p) => format!("Signpower({p})"),
-            Expr::Exp(_) => "Exp".to_string(),
-            Expr::Log(_) => "Log".to_string(),
-            Expr::Sin(_) => "Sin".to_string(),
-            Expr::Cos(_) => "Cos".to_string(),
-            Expr::Abs(_) => "Abs".to_string(),
-            Expr::Entropy(_) => "Entropy".to_string(),
+        match &self.0 {
+            ExprKind::Var(v) => format!("Var({})", v.name()),
+            ExprKind::Const(c) => format!("Const({c})"),
+            ExprKind::Sum(_, k) if *k != 0.0 => format!("Sum (+{k})"),
+            ExprKind::Sum(..) => "Sum".to_string(),
+            ExprKind::Product(_, c) if *c != 1.0 => format!("Product ×{c}"),
+            ExprKind::Product(..) => "Product".to_string(),
+            ExprKind::Pow(_, p) => format!("Pow({p})"),
+            ExprKind::Signpower(_, p) => format!("Signpower({p})"),
+            ExprKind::Exp(_) => "Exp".to_string(),
+            ExprKind::Log(_) => "Log".to_string(),
+            ExprKind::Sin(_) => "Sin".to_string(),
+            ExprKind::Cos(_) => "Cos".to_string(),
+            ExprKind::Abs(_) => "Abs".to_string(),
+            ExprKind::Entropy(_) => "Entropy".to_string(),
         }
     }
 }
@@ -580,11 +601,11 @@ impl Expr {
 /// Parenthesised rendering, so the grouping is visible.
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Expr::Var(v) => write!(f, "<{}>", v.name()),
-            Expr::Const(c) => write!(f, "{c}"),
+        match &self.0 {
+            ExprKind::Var(v) => write!(f, "<{}>", v.name()),
+            ExprKind::Const(c) => write!(f, "{c}"),
 
-            Expr::Sum(terms, constant) => {
+            ExprKind::Sum(terms, constant) => {
                 if terms.is_empty() {
                     return write!(f, "{constant}");
                 }
@@ -624,7 +645,7 @@ impl fmt::Display for Expr {
                 write!(f, ")")
             }
 
-            Expr::Product(factors, coef) => {
+            ExprKind::Product(factors, coef) => {
                 if factors.is_empty() {
                     return write!(f, "{coef}");
                 }
@@ -637,7 +658,7 @@ impl fmt::Display for Expr {
                 }
                 for (i, e) in factors.iter().enumerate() {
                     // `a * b^-1` reads better as `a / b`.
-                    if let Expr::Pow(base, p) = e
+                    if let ExprKind::Pow(base, p) = &e.0
                         && *p == -1.0
                         && i > 0
                     {
@@ -652,20 +673,21 @@ impl fmt::Display for Expr {
                 write!(f, ")")
             }
 
-            Expr::Pow(a, p) => write!(f, "({a}^{p})"),
-            Expr::Signpower(a, p) => write!(f, "signpower({a}, {p})"),
-            Expr::Exp(a) => write!(f, "exp({a})"),
-            Expr::Log(a) => write!(f, "log({a})"),
-            Expr::Sin(a) => write!(f, "sin({a})"),
-            Expr::Cos(a) => write!(f, "cos({a})"),
-            Expr::Abs(a) => write!(f, "abs({a})"),
-            Expr::Entropy(a) => write!(f, "entropy({a})"),
+            ExprKind::Pow(a, p) => write!(f, "({a}^{p})"),
+            ExprKind::Signpower(a, p) => write!(f, "signpower({a}, {p})"),
+            ExprKind::Exp(a) => write!(f, "exp({a})"),
+            ExprKind::Log(a) => write!(f, "log({a})"),
+            ExprKind::Sin(a) => write!(f, "sin({a})"),
+            ExprKind::Cos(a) => write!(f, "cos({a})"),
+            ExprKind::Abs(a) => write!(f, "abs({a})"),
+            ExprKind::Entropy(a) => write!(f, "entropy({a})"),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::expr::ExprKind;
     use crate::prelude::*;
 
     #[test]
@@ -713,14 +735,14 @@ mod tests {
 
         let diff = Expr::var(&x) - Expr::var(&y) - Expr::var(&x);
         assert_eq!(diff.to_string(), "(<x> - <y> - <x>)");
-        assert!(matches!(&diff, Expr::Sum(terms, _) if terms.len() == 3));
+        assert!(matches!(&diff.0, ExprKind::Sum(terms, _) if terms.len() == 3));
 
         // Division is `a * b^-1`, so a division chain is one product. A
         // constant divisor folds into the coefficient, so only the variable
         // divisor stays as a negative-power factor.
         let quot = Expr::var(&x) / Expr::var(&y) / 2.0;
         assert_eq!(quot.to_string(), "(0.5 * <x> / <y>)");
-        assert!(matches!(&quot, Expr::Product(factors, _) if factors.len() == 2));
+        assert!(matches!(&quot.0, ExprKind::Product(factors, _) if factors.len() == 2));
 
         // A constant divisor alone folds fully, so the body is linear.
         let half = Expr::var(&x) / 2.0;
@@ -905,7 +927,7 @@ mod tests {
         // Extending the aggregate widens it rather than nesting it.
         let e = total + Expr::pow(Expr::var(&y), 2.0);
         assert_eq!(e.to_string(), "(<x0> + <x1> + <x2> + (<y>^2))");
-        assert!(matches!(&e, Expr::Sum(terms, _) if terms.len() == 4));
+        assert!(matches!(&e.0, ExprKind::Sum(terms, _) if terms.len() == 4));
 
         let built = model.build_expr(&e).unwrap();
         model.add_cons_nonlinear(&built, -f64::INFINITY, 4.0, "c");
@@ -975,7 +997,7 @@ mod tests {
 
         // Both spellings must stay flat: the iterator constructor...
         let e = Expr::sum(xs.iter().map(Expr::var));
-        assert!(matches!(&e, Expr::Sum(terms, _) if terms.len() == 20000));
+        assert!(matches!(&e.0, ExprKind::Sum(terms, _) if terms.len() == 20000));
         assert!(model.build_expr(&e).is_ok());
 
         // ...and folding with the `+` operator.
@@ -983,7 +1005,7 @@ mod tests {
             .iter()
             .skip(1)
             .fold(Expr::var(&xs[0]), |acc, v| acc + Expr::var(v));
-        assert!(matches!(&folded, Expr::Sum(terms, _) if terms.len() == 20000));
+        assert!(matches!(&folded.0, ExprKind::Sum(terms, _) if terms.len() == 20000));
         assert!(model.build_expr(&folded).is_ok());
     }
 
@@ -1312,6 +1334,30 @@ mod tests {
         model.add_cons_nonlinear(&built, -f64::INFINITY, 16.0, "c");
         let solved = model.solve();
         assert!((solved.obj_val() - 4.0).abs() < 1e-6);
+    }
+
+    /// A zero (or non-finite) divisor must not be folded into the coefficient,
+    /// which would silently produce an infinite/NaN `0.5 * x`-style term. It
+    /// stays a `Pow(rhs, -1)` factor, so the division is visible as `x / 0`.
+    #[test]
+    fn division_by_zero_is_not_silently_folded() {
+        let mut model = Model::default().hide_output();
+        let x = model.add(var().name("x").cont(0.0..=10.0));
+
+        // `x / 0` is a product with a `0^-1` factor, not a constant divisor
+        // folded into the coefficient.
+        let q = Expr::var(&x) / 0.0;
+        assert_eq!(q.to_string(), "(<x> / 0)");
+        assert!(q.as_linear().is_none());
+
+        // A non-finite divisor is likewise kept structurally.
+        let q2 = Expr::var(&x) / f64::INFINITY;
+        assert_eq!(q2.to_string(), "(<x> / inf)");
+
+        // A genuine finite divisor still folds, and stays linear.
+        let half = Expr::var(&x) / 2.0;
+        assert_eq!(half.to_string(), "(0.5 * <x>)");
+        assert!(half.as_linear().is_some());
     }
 
     /// Nothing is moved, so a variable can appear in many expressions.

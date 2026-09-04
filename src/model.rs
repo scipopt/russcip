@@ -3145,6 +3145,97 @@ mod tests {
         run(true); // Expr, by handle
     }
 
+    /// The linear counterpart of [`add_nonlinear_cons_during_solving`]: a
+    /// constraint added through `cons().coef(..)` during solving goes via
+    /// `ScipPtr::create_cons`, which used to release the constraint at add time
+    /// and hand back a null `Constraint`. Chaining `.name()` on the returned
+    /// handle is the path that dereferenced null.
+    #[test]
+    fn add_linear_cons_during_solving() {
+        use crate::builder::cons::cons;
+        use crate::builder::var::var;
+        use crate::conshdlr::{Conshdlr, ConshdlrResult, SCIPConshdlr};
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        // Held by id, as in the nonlinear test: a `Variable` owns an `Rc<ScipPtr>`
+        // and the model owns this plugin, so storing one here would form a
+        // reference cycle and leak the SCIP instance.
+        struct AddsLinearCons {
+            x: VarId,
+            added: Rc<Cell<bool>>,
+        }
+
+        fn lookup(model: &Model<Solving>, id: VarId) -> Variable {
+            model
+                .orig_vars()
+                .into_iter()
+                .find(|v| v.index() == id)
+                .expect("variable went away")
+        }
+
+        impl Conshdlr for AddsLinearCons {
+            fn check(
+                &mut self,
+                model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+                solution: &Solution,
+            ) -> bool {
+                let x = lookup(&model, self.x);
+                solution.val(&x) <= 4.0 + 1e-6
+            }
+
+            fn enforce(
+                &mut self,
+                mut model: Model<Solving>,
+                _conshdlr: SCIPConshdlr,
+            ) -> ConshdlrResult {
+                let x = lookup(&model, self.x);
+                if model.current_val(&x) <= 4.0 + 1e-6 {
+                    return ConshdlrResult::Feasible;
+                }
+                if self.added.get() {
+                    return ConshdlrResult::CutOff;
+                }
+                // The linear path. `.removable(true)` is chained on the builder,
+                // and `.name()` is read from the returned `Constraint` — the
+                // handle that used to be nulled by releasing at add time.
+                let c = model.add(cons().coef(&x, 1.0).le(4.0).name("x_le").removable(true));
+                assert_eq!(c.name(), "x_le");
+                self.added.set(true);
+                ConshdlrResult::ConsAdded
+            }
+        }
+
+        let mut model = Model::default()
+            .maximize()
+            .hide_output()
+            .set_presolving(ParamSetting::Off);
+        let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+
+        let added = Rc::new(Cell::new(false));
+        model.include_conshdlr(
+            "AddsLinearCons",
+            "adds a linear constraint while solving",
+            -1,
+            -1,
+            Box::new(AddsLinearCons {
+                x: x.index(),
+                added: Rc::clone(&added),
+            }),
+        );
+
+        let solved = model.solve();
+
+        assert!(added.get(), "no constraint was added during solving");
+        assert_eq!(solved.status(), Status::Optimal);
+        assert!(
+            solved.obj_val() <= 4.0 + 1e-4,
+            "constraint had no effect, obj = {}",
+            solved.obj_val()
+        );
+    }
+
     #[test]
     fn add_nonlinear_cons_from_expr() {
         use crate::prelude::var;

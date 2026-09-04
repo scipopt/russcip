@@ -3,7 +3,7 @@ use anymap3::AnyMap;
 use std::cell::RefCell;
 
 use crate::branchrule::{BranchRule, BranchingCandidate};
-use crate::expr::Expr;
+use crate::expr::{Expr, ExprKind};
 use crate::node::Node;
 use crate::nodesel::NodeSel;
 use crate::pricer::{Pricer, PricerResultState};
@@ -633,7 +633,7 @@ impl ScipPtr {
             lhs,
             rhs,
         ) };
-        let mut scip_cons = unsafe { scip_cons.assume_init() };
+        let scip_cons = unsafe { scip_cons.assume_init() };
         for (i, var) in vars.iter().enumerate() {
             scip_call! { ffi::SCIPaddCoefLinear(self.raw, scip_cons, var.raw, coefs[i]) };
         }
@@ -651,7 +651,13 @@ impl ScipPtr {
 
         let stage = unsafe { ffi::SCIPgetStage(self.raw) };
         if stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVING {
-            scip_call! { ffi::SCIPreleaseCons(self.raw, &mut scip_cons) };
+            // A constraint added mid-solve is not an original constraint, so
+            // `ScipPtr::drop`'s release of the original constraints never
+            // reaches it. Keep the reference alive and release it from
+            // `ScipPtr::drop`, matching `create_cons_nonlinear`: releasing here
+            // would null the pointer the caller is handed, making the returned
+            // `Constraint` invalid.
+            self.conss_added_in_solving.borrow_mut().push(scip_cons);
         }
         Ok(scip_cons)
     }
@@ -983,8 +989,8 @@ impl ScipPtr {
     /// of terms: [`Expr`] keeps sums and products n-ary, so a sum over a million
     /// variables is a single `SCIPcreateExprSum` call one level deep.
     pub(crate) fn create_expr_tree(&self, ex: &Expr) -> Result<*mut ffi::SCIP_EXPR, Retcode> {
-        match ex {
-            Expr::Const(c) => {
+        match &ex.0 {
+            ExprKind::Const(c) => {
                 let mut out = MaybeUninit::uninit();
                 scip_call! { ffi::SCIPcreateExprValue(
                     self.raw,
@@ -996,8 +1002,8 @@ impl ScipPtr {
                 Ok(unsafe { out.assume_init() })
             }
 
-            Expr::Var(v) => {
-                // `Expr::Var` is built from the safe API, so a variable from
+            ExprKind::Var(v) => {
+                // `ExprKind::Var` is built from the safe API, so a variable from
                 // another model can reach here. Building a var expression in a
                 // different SCIP instance is a cross-model FFI call, so reject
                 // it up front.
@@ -1015,13 +1021,13 @@ impl ScipPtr {
                 Ok(unsafe { out.assume_init() })
             }
 
-            Expr::Sum(terms, constant) => self.create_expr_sum(terms, *constant),
-            Expr::Product(factors, coef) => self.create_expr_product(factors, *coef),
+            ExprKind::Sum(terms, constant) => self.create_expr_sum(terms, *constant),
+            ExprKind::Product(factors, coef) => self.create_expr_product(factors, *coef),
 
-            Expr::Pow(a, p) | Expr::Signpower(a, p) => {
+            ExprKind::Pow(a, p) | ExprKind::Signpower(a, p) => {
                 let mut child = self.create_expr_tree(a)?;
                 let mut out = MaybeUninit::uninit();
-                let signed = matches!(ex, Expr::Signpower(..));
+                let signed = matches!(&ex.0, ExprKind::Signpower(..));
                 let rc = unsafe {
                     let ctor = if signed {
                         ffi::SCIPcreateExprSignpower
@@ -1045,23 +1051,23 @@ impl ScipPtr {
                 Ok(unsafe { out.assume_init() })
             }
 
-            Expr::Exp(a)
-            | Expr::Log(a)
-            | Expr::Sin(a)
-            | Expr::Cos(a)
-            | Expr::Abs(a)
-            | Expr::Entropy(a) => {
+            ExprKind::Exp(a)
+            | ExprKind::Log(a)
+            | ExprKind::Sin(a)
+            | ExprKind::Cos(a)
+            | ExprKind::Abs(a)
+            | ExprKind::Entropy(a) => {
                 let mut child = self.create_expr_tree(a)?;
                 let mut out = MaybeUninit::uninit();
                 let p = out.as_mut_ptr();
                 let nil = std::ptr::null_mut();
                 let rc = unsafe {
-                    match ex {
-                        Expr::Exp(_) => ffi::SCIPcreateExprExp(self.raw, p, child, None, nil),
-                        Expr::Log(_) => ffi::SCIPcreateExprLog(self.raw, p, child, None, nil),
-                        Expr::Sin(_) => ffi::SCIPcreateExprSin(self.raw, p, child, None, nil),
-                        Expr::Cos(_) => ffi::SCIPcreateExprCos(self.raw, p, child, None, nil),
-                        Expr::Abs(_) => ffi::SCIPcreateExprAbs(self.raw, p, child, None, nil),
+                    match &ex.0 {
+                        ExprKind::Exp(_) => ffi::SCIPcreateExprExp(self.raw, p, child, None, nil),
+                        ExprKind::Log(_) => ffi::SCIPcreateExprLog(self.raw, p, child, None, nil),
+                        ExprKind::Sin(_) => ffi::SCIPcreateExprSin(self.raw, p, child, None, nil),
+                        ExprKind::Cos(_) => ffi::SCIPcreateExprCos(self.raw, p, child, None, nil),
+                        ExprKind::Abs(_) => ffi::SCIPcreateExprAbs(self.raw, p, child, None, nil),
                         _ => ffi::SCIPcreateExprEntropy(self.raw, p, child, None, nil),
                     }
                 };
@@ -2443,6 +2449,17 @@ impl ScipPtr {
 
 impl Drop for ScipPtr {
     fn drop(&mut self) {
+        // Constraints added during solving are not original constraints, so the
+        // `SCIPgetOrigConss` loop below never reaches them. They are typically
+        // created on a *throwaway* `ScipPtr` (from a SCIP callback) that is
+        // `weak`, so they must be released here, before the `weak` early-return:
+        // otherwise the create reference leaks, and the variables they capture
+        // keep a use count above one when SCIP frees the problem (the
+        // "variable not released" warning).
+        for cons_ptr in self.conss_added_in_solving.borrow_mut().iter_mut() {
+            scip_call_panic!(ffi::SCIPreleaseCons(self.raw, cons_ptr));
+        }
+
         if self.weak {
             return;
         }
@@ -2463,6 +2480,21 @@ impl Drop for ScipPtr {
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_SOLVED
             || scip_stage == ffi::SCIP_Stage_SCIP_STAGE_EXITSOLVE
         {
+            // Release constraints *before* the variables they capture: each
+            // constraint holds references to the variables in it, so releasing
+            // a variable while a constraint still references it leaves the
+            // variable's use count above one when SCIP frees the problem.
+            //
+            // Constraints added during solving were already released above.
+
+            // release constraints
+            let n_conss = unsafe { ffi::SCIPgetNOrigConss(self.raw) };
+            let conss = unsafe { ffi::SCIPgetOrigConss(self.raw) };
+            for i in 0..n_conss {
+                let mut cons = unsafe { *conss.add(i as usize) };
+                scip_call_panic!(ffi::SCIPreleaseCons(self.raw, &mut cons));
+            }
+
             // release original variables
             let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.raw) };
             let vars = unsafe { ffi::SCIPgetOrigVars(self.raw) };
@@ -2474,19 +2506,6 @@ impl Drop for ScipPtr {
             // release vars added in solving
             for var_ptr in self.vars_added_in_solving.iter_mut() {
                 scip_call_panic!(ffi::SCIPreleaseVar(self.raw, var_ptr));
-            }
-
-            // release constraints added in solving
-            for cons_ptr in self.conss_added_in_solving.borrow_mut().iter_mut() {
-                scip_call_panic!(ffi::SCIPreleaseCons(self.raw, cons_ptr));
-            }
-
-            // release constraints
-            let n_conss = unsafe { ffi::SCIPgetNOrigConss(self.raw) };
-            let conss = unsafe { ffi::SCIPgetOrigConss(self.raw) };
-            for i in 0..n_conss {
-                let mut cons = unsafe { *conss.add(i as usize) };
-                scip_call_panic!(ffi::SCIPreleaseCons(self.raw, &mut cons));
             }
         }
 
