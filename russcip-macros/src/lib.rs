@@ -6,8 +6,8 @@
 //! which binds looser than `+` and `*`.
 
 use proc_macro::TokenStream;
-use proc_macro2::{Delimiter, Group, Spacing, Span, TokenStream as TS2, TokenTree};
 use proc_macro_crate::{FoundCrate, crate_name};
+use proc_macro2::{Delimiter, Group, Spacing, Span, TokenStream as TS2, TokenTree};
 use quote::{quote, quote_spanned};
 
 /// The path to the `russcip` crate as seen from the crate invoking the macro.
@@ -332,9 +332,7 @@ impl Parser {
                         let (v, _) = inner.signed_number()?;
                         inner.finish()?;
                         let cp = &self.crate_path;
-                        return Ok(
-                            quote_spanned! { id.span() => #cp::Expr::signpower(#arg, #v) },
-                        );
+                        return Ok(quote_spanned! { id.span() => #cp::Expr::signpower(#arg, #v) });
                     }
 
                     if !FUNCS.contains(&name.as_str()) {

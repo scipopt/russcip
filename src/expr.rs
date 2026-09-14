@@ -1142,7 +1142,11 @@ mod tests {
         model.add(cons!(x ^ 2 <= 16));
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
-        assert!((solved.obj_val() - 4.0).abs() < 1e-6, "got {}", solved.obj_val());
+        assert!(
+            (solved.obj_val() - 4.0).abs() < 1e-6,
+            "got {}",
+            solved.obj_val()
+        );
     }
 
     #[test]
@@ -1153,7 +1157,11 @@ mod tests {
         model.add(cons!(1 <= x + y <= 5));
         let solved = model.solve();
         assert_eq!(solved.status(), Status::Optimal);
-        assert!((solved.obj_val() - 1.0).abs() < 1e-6, "got {}", solved.obj_val());
+        assert!(
+            (solved.obj_val() - 1.0).abs() < 1e-6,
+            "got {}",
+            solved.obj_val()
+        );
     }
 
     /// A comprehension sums over an iterator, so `cons!` can aggregate the same
@@ -1169,7 +1177,11 @@ mod tests {
         assert_eq!(solved.status(), Status::Optimal);
         // Maximising sum(x_i) over the ball sum(x_i^2) <= 16 puts every x_i on
         // the boundary along (1,1,1,1): x_i = 4/2 = 2, so the objective is 8.
-        assert!((solved.obj_val() - 8.0).abs() < 1e-4, "got {}", solved.obj_val());
+        assert!(
+            (solved.obj_val() - 8.0).abs() < 1e-4,
+            "got {}",
+            solved.obj_val()
+        );
     }
 
     /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear
@@ -1193,7 +1205,11 @@ mod tests {
         assert_eq!(solved.status(), Status::Optimal);
         let sol = solved.best_sol().unwrap();
         assert_eq!(sol.val(&b), 1.0);
-        assert!((solved.obj_val() - 4.0).abs() < 1e-4, "got {}", solved.obj_val());
+        assert!(
+            (solved.obj_val() - 4.0).abs() < 1e-4,
+            "got {}",
+            solved.obj_val()
+        );
     }
 
     /// A mixed-integer nonlinear problem: a binary variable gates a nonlinear
