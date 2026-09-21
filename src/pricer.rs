@@ -207,12 +207,12 @@ mod tests {
         c: Option<isize>,
     }
 
-    struct AddSameColumnPricer {
+    struct AddSemiColumnPricer {
         added: bool,
         data: ComplexData,
     }
 
-    impl Pricer for AddSameColumnPricer {
+    impl Pricer for AddSemiColumnPricer {
         fn generate_columns(
             &mut self,
             mut model: Model<Solving>,
@@ -228,8 +228,11 @@ mod tests {
             } else {
                 self.added = true;
                 let nvars_before = model.n_vars();
-                let var = model.add_priced_var(0.0, 1.0, 1.0, "x", VarType::Binary);
                 let conss = model.conss();
+                let var = model.add_priced_var(0.5, 1.0, 1.0, "x", VarType::SemiContinuous);
+                assert_eq!(var.lb(), 0.0);
+                assert_eq!(var.var_type(), VarType::Continuous);
+                assert!(model.find_cons("semicont_x").is_some());
                 for cons in conss {
                     model.add_cons_coef(&cons, &var, 1.0);
                 }
@@ -244,7 +247,7 @@ mod tests {
     }
 
     #[test]
-    fn add_same_column_pricer() {
+    fn add_semi_column_pricer() {
         let mut model = crate::model::Model::new()
             .hide_output()
             .include_default_plugins()
@@ -256,7 +259,7 @@ mod tests {
             model.set_cons_modifiable(&c, true);
         }
 
-        let pr = AddSameColumnPricer {
+        let pr = AddSemiColumnPricer {
             added: false,
             data: ComplexData {
                 a: (0..1000).collect::<Vec<usize>>(),

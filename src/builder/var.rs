@@ -12,6 +12,8 @@ use std::ops::RangeBounds;
 /// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
 /// let binary_var = var().name("y").bin(); // Binary variable
 /// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
+/// let semi_continuous_var = var().name("s").semi_cont(2.0..=10.0);
+/// let semi_integer_var = var().name("t").semi_int(2..=10);
 /// ```
 pub struct VarBuilder<'a> {
     name: Option<&'a str>,
@@ -31,6 +33,8 @@ pub struct VarBuilder<'a> {
 /// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
 /// let binary_var = var().name("y").bin(); // Binary variable
 /// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
+/// let semi_continuous_var = var().name("s").semi_cont(2.0..=10.0);
+/// let semi_integer_var = var().name("t").semi_int(2..=10);
 ///
 /// let mut model = Model::default();
 /// model.add(integer_var);
@@ -126,6 +130,42 @@ impl<'a> VarBuilder<'a> {
         self
     }
 
+    /// Sets the variable to be semi-continuous.
+    ///
+    /// A semi-continuous variable is either zero or lies within `bounds`.
+    /// The lower bound must be finite and strictly positive.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use russcip::prelude::*;
+    ///
+    /// let var = var().semi_cont(2.0..=10.0);
+    /// ```
+    pub fn semi_cont<B: RangeBounds<f64>>(self, bounds: B) -> Self {
+        let mut builder = self.cont(bounds);
+        builder.var_type = VarType::SemiContinuous;
+        builder
+    }
+
+    /// Sets the variable to be semi-integer.
+    ///
+    /// A semi-integer variable is either zero or integer-valued within
+    /// `bounds`. The lower bound must be strictly positive.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use russcip::prelude::*;
+    ///
+    /// let var = var().semi_int(2..=10);
+    /// ```
+    pub fn semi_int<B: RangeBounds<isize>>(self, bounds: B) -> Self {
+        let mut builder = self.int(bounds);
+        builder.var_type = VarType::SemiInteger;
+        builder
+    }
+
     /// Sets the variable to be an implicit integer variable.
     ///
     /// # Example
@@ -203,6 +243,19 @@ mod tests {
         assert_eq!(var.obj, 1.0);
         assert_eq!(var.lb, 0.0);
         assert_eq!(var.ub, 1.0);
+    }
+
+    #[test]
+    fn test_semi_var_builder() {
+        let semi_cont = var().semi_cont(2.0..=10.0);
+        assert_eq!(semi_cont.lb, 2.0);
+        assert_eq!(semi_cont.ub, 10.0);
+        assert_eq!(semi_cont.var_type, VarType::SemiContinuous);
+
+        let semi_int = var().semi_int(2..10);
+        assert_eq!(semi_int.lb, 2.0);
+        assert_eq!(semi_int.ub, 9.0);
+        assert_eq!(semi_int.var_type, VarType::SemiInteger);
     }
 
     #[test]

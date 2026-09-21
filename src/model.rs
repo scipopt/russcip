@@ -182,7 +182,8 @@ impl Model<ProblemCreated> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable.
+    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
+    ///   this is the strictly positive lower bound when the variable is nonzero.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective coefficient of the variable.
     /// * `name` - The name of the variable.
@@ -194,7 +195,8 @@ impl Model<ProblemCreated> {
     ///
     /// # Panics
     ///
-    /// This method panics if the variable cannot be created in the current state.
+    /// This method panics if the variable cannot be created in the current state. Semi-continuous
+    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
     pub fn add_var(
         &mut self,
         lb: f64,
@@ -494,7 +496,8 @@ impl Model<Solving> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable.
+    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
+    ///   this is the strictly positive lower bound when the variable is nonzero.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective coefficient of the variable.
     /// * `name` - The name of the variable.
@@ -506,7 +509,8 @@ impl Model<Solving> {
     ///
     /// # Panics
     ///
-    /// This method panics if the variable cannot be created in the current state.
+    /// This method panics if the variable cannot be created in the current state. Semi-continuous
+    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
     pub fn add_var(
         &mut self,
         lb: f64,
@@ -630,7 +634,8 @@ impl Model<Solving> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable.
+    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
+    ///   this is the strictly positive lower bound when the variable is nonzero.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective function coefficient for the variable.
     /// * `name` - The name of the variable. This should be a unique identifier.
@@ -639,6 +644,11 @@ impl Model<Solving> {
     /// # Returns
     ///
     /// The created `Variable`
+    ///
+    /// # Panics
+    ///
+    /// This method panics if the variable cannot be created in the current state. Semi-continuous
+    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
     pub fn add_priced_var(
         &mut self,
         lb: f64,

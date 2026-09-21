@@ -349,4 +349,42 @@ mod tests {
 
         assert_eq!(solved.status(), crate::Status::Infeasible);
     }
+
+    struct SemiVariableAddingSeparator {
+        added: bool,
+    }
+
+    impl Separator for SemiVariableAddingSeparator {
+        fn execute_lp(
+            &mut self,
+            mut model: Model<Solving>,
+            _sepa: SCIPSeparator,
+        ) -> SeparationResult {
+            if self.added {
+                return SeparationResult::DidNotFind;
+            }
+
+            self.added = true;
+            let var = model.add_var(2.0, 5.0, 0.0, "semi", VarType::SemiContinuous);
+            assert_eq!(var.lb(), 0.0);
+            assert_eq!(var.var_type(), VarType::Continuous);
+            assert!(model.find_cons("semicont_semi").is_some());
+            SeparationResult::ConsAdded
+        }
+    }
+
+    #[test]
+    fn adds_semi_variable_during_solving() {
+        let mut model = minimal_model().hide_output().maximize();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Continuous);
+        model.add_cons(vec![&x], &[1.0], 0.0, 1.0, "bounds");
+        model.add(
+            sepa(SemiVariableAddingSeparator { added: false })
+                .name("SemiVariableAddingSeparator")
+                .desc("Adds a semi-continuous variable"),
+        );
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+    }
 }

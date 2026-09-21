@@ -78,7 +78,12 @@ impl Variable {
         unsafe { ffi::SCIPvarGetUbGlobal(self.raw) }
     }
 
-    /// Returns the type of the variable.
+    /// Returns SCIP's native type for the variable.
+    ///
+    /// Semi-continuous and semi-integer variables are represented internally by
+    /// a continuous or integer variable plus a bound-disjunction constraint, so
+    /// this method returns [`VarType::Continuous`] or [`VarType::Integer`] for
+    /// them, respectively.
     pub fn var_type(&self) -> VarType {
         let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
         var_type.into()
@@ -190,6 +195,26 @@ pub enum VarType {
     Binary,
     /// The variable is an implicit integer variable.
     ImplInt,
+    /// The variable is either zero or continuous within its positive bounds.
+    ///
+    /// SCIP represents this as a continuous variable plus a bound-disjunction
+    /// constraint. Converting this variant directly to [`ffi::SCIP_Vartype`]
+    /// only returns the underlying continuous type and does not create that
+    /// constraint; use the `Model` variable-creation APIs instead.
+    SemiContinuous,
+    /// The variable is either zero or integer-valued within its positive bounds.
+    ///
+    /// SCIP represents this as an integer variable plus a bound-disjunction
+    /// constraint. Converting this variant directly to [`ffi::SCIP_Vartype`]
+    /// only returns the underlying integer type and does not create that
+    /// constraint; use the `Model` variable-creation APIs instead.
+    SemiInteger,
+}
+
+impl VarType {
+    pub(crate) fn is_semi(self) -> bool {
+        matches!(self, VarType::SemiContinuous | VarType::SemiInteger)
+    }
 }
 
 impl From<VarType> for ffi::SCIP_Vartype {
@@ -199,6 +224,8 @@ impl From<VarType> for ffi::SCIP_Vartype {
             VarType::Integer => ffi::SCIP_Vartype_SCIP_VARTYPE_INTEGER,
             VarType::Binary => ffi::SCIP_Vartype_SCIP_VARTYPE_BINARY,
             VarType::ImplInt => ffi::SCIP_Vartype_SCIP_VARTYPE_IMPLINT,
+            VarType::SemiContinuous => ffi::SCIP_Vartype_SCIP_VARTYPE_CONTINUOUS,
+            VarType::SemiInteger => ffi::SCIP_Vartype_SCIP_VARTYPE_INTEGER,
         }
     }
 }
@@ -253,8 +280,8 @@ impl From<SCIP_Status> for VarStatus {
 mod tests {
     use super::*;
     use crate::{
-        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, minimal_model,
-        prelude::{cons, pricer},
+        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, WithSolutions, minimal_model,
+        prelude::{cons, pricer, var},
     };
 
     #[test]
@@ -309,6 +336,71 @@ mod tests {
         model.solve();
 
         assert_eq!(x.sol_val(), 1.0);
+    }
+
+    #[test]
+    fn semi_variables_enforce_nonzero_domain() {
+        let mut model = Model::default().hide_output().minimize();
+        let continuous = model.add_var(2.0, 5.0, 1.0, "sc", VarType::SemiContinuous);
+        let integer = model.add_var(2.0, 5.0, 1.0, "si", VarType::SemiInteger);
+
+        assert_eq!(continuous.lb(), 0.0);
+        assert_eq!(continuous.ub(), 5.0);
+        assert_eq!(continuous.var_type(), VarType::Continuous);
+        assert_eq!(integer.lb(), 0.0);
+        assert_eq!(integer.ub(), 5.0);
+        assert_eq!(integer.var_type(), VarType::Integer);
+        assert_eq!(model.n_conss(), 2);
+        assert!(model.find_cons("semicont_sc").is_some());
+        assert!(model.find_cons("semicont_si").is_some());
+
+        model.add_cons(
+            vec![&continuous],
+            &[1.0],
+            1.0,
+            f64::INFINITY,
+            "force_sc_nonzero",
+        );
+        model.add_cons(
+            vec![&integer],
+            &[1.0],
+            2.5,
+            f64::INFINITY,
+            "force_si_nonzero",
+        );
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        let solution = solved.best_sol().unwrap();
+        assert!((solution.val(&continuous) - 2.0).abs() < 1e-6);
+        assert!((solution.val(&integer) - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn semi_variables_allow_zero() {
+        let mut model = Model::default().hide_output().minimize();
+        let continuous = model.add(var().obj(1.0).semi_cont(2.0..=5.0));
+        let integer = model.add(var().obj(1.0).semi_int(2..=5));
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        let solution = solved.best_sol().unwrap();
+        assert!(solution.val(&continuous).abs() < 1e-6);
+        assert!(solution.val(&integer).abs() < 1e-6);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to create variable")]
+    fn semi_variable_requires_positive_lower_bound() {
+        let mut model = Model::default();
+        model.add_var(0.0, 5.0, 0.0, "sc", VarType::SemiContinuous);
+    }
+
+    #[test]
+    #[should_panic(expected = "Failed to create variable")]
+    fn semi_variable_requires_ordered_bounds() {
+        let mut model = Model::default();
+        model.add_var(5.0, 2.0, 0.0, "si", VarType::SemiInteger);
     }
 
     struct PricerRedcost;
