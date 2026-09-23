@@ -365,7 +365,7 @@ mod tests {
             }
 
             self.added = true;
-            let var = model.add_var(2.0, 5.0, 0.0, "semi", VarType::SemiContinuous);
+            let var = model.add_semi_continuous_var(2.0, 5.0, 0.0, "semi");
             assert_eq!(var.lb(), 0.0);
             assert_eq!(var.var_type(), VarType::Continuous);
             assert!(model.find_cons("semicont_semi").is_some());

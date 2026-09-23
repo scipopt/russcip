@@ -21,6 +21,13 @@ pub struct VarBuilder<'a> {
     lb: f64,
     ub: f64,
     var_type: VarType,
+    semi_kind: Option<SemiVarKind>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum SemiVarKind {
+    Continuous(f64),
+    Integer(f64),
 }
 
 /// Creates a new default `VarBuilder`. It can be chained with other methods to set the properties of the variable.
@@ -53,6 +60,7 @@ impl Default for VarBuilder<'_> {
             lb: 0.0,
             ub: f64::INFINITY,
             var_type: VarType::Continuous,
+            semi_kind: None,
         }
     }
 }
@@ -83,6 +91,7 @@ impl<'a> VarBuilder<'a> {
             }
         }
         self.var_type = VarType::Integer;
+        self.semi_kind = None;
         self
     }
 
@@ -98,6 +107,7 @@ impl<'a> VarBuilder<'a> {
         self.lb = 0.0;
         self.ub = 1.0;
         self.var_type = VarType::Binary;
+        self.semi_kind = None;
         self
     }
 
@@ -127,6 +137,7 @@ impl<'a> VarBuilder<'a> {
             }
         }
         self.var_type = VarType::Continuous;
+        self.semi_kind = None;
         self
     }
 
@@ -144,7 +155,8 @@ impl<'a> VarBuilder<'a> {
     /// ```
     pub fn semi_cont<B: RangeBounds<f64>>(self, bounds: B) -> Self {
         let mut builder = self.cont(bounds);
-        builder.var_type = VarType::SemiContinuous;
+        builder.semi_kind = Some(SemiVarKind::Continuous(builder.lb));
+        builder.lb = 0.0;
         builder
     }
 
@@ -162,7 +174,8 @@ impl<'a> VarBuilder<'a> {
     /// ```
     pub fn semi_int<B: RangeBounds<isize>>(self, bounds: B) -> Self {
         let mut builder = self.int(bounds);
-        builder.var_type = VarType::SemiInteger;
+        builder.semi_kind = Some(SemiVarKind::Integer(builder.lb));
+        builder.lb = 0.0;
         builder
     }
 
@@ -191,6 +204,7 @@ impl<'a> VarBuilder<'a> {
             }
         }
         self.var_type = VarType::ImplInt;
+        self.semi_kind = None;
         self
     }
 
@@ -215,7 +229,15 @@ impl CanBeAddedToModel<ProblemCreated> for VarBuilder<'_> {
             format!("x{n_vars}")
         });
 
-        model.add_var(self.lb, self.ub, self.obj, &name, self.var_type)
+        match self.semi_kind {
+            Some(SemiVarKind::Continuous(lb)) => {
+                model.add_semi_continuous_var(lb, self.ub, self.obj, &name)
+            }
+            Some(SemiVarKind::Integer(lb)) => {
+                model.add_semi_integer_var(lb, self.ub, self.obj, &name)
+            }
+            None => model.add_var(self.lb, self.ub, self.obj, &name, self.var_type),
+        }
     }
 }
 
@@ -227,7 +249,15 @@ impl CanBeAddedToModel<Solving> for VarBuilder<'_> {
             format!("x{n_vars}")
         });
 
-        model.add_var(self.lb, self.ub, self.obj, &name, self.var_type)
+        match self.semi_kind {
+            Some(SemiVarKind::Continuous(lb)) => {
+                model.add_semi_continuous_var(lb, self.ub, self.obj, &name)
+            }
+            Some(SemiVarKind::Integer(lb)) => {
+                model.add_semi_integer_var(lb, self.ub, self.obj, &name)
+            }
+            None => model.add_var(self.lb, self.ub, self.obj, &name, self.var_type),
+        }
     }
 }
 
@@ -248,14 +278,29 @@ mod tests {
     #[test]
     fn test_semi_var_builder() {
         let semi_cont = var().semi_cont(2.0..=10.0);
-        assert_eq!(semi_cont.lb, 2.0);
+        assert_eq!(semi_cont.lb, 0.0);
         assert_eq!(semi_cont.ub, 10.0);
-        assert_eq!(semi_cont.var_type, VarType::SemiContinuous);
+        assert_eq!(semi_cont.var_type, VarType::Continuous);
+        assert_eq!(semi_cont.semi_kind, Some(SemiVarKind::Continuous(2.0)));
 
         let semi_int = var().semi_int(2..10);
-        assert_eq!(semi_int.lb, 2.0);
+        assert_eq!(semi_int.lb, 0.0);
         assert_eq!(semi_int.ub, 9.0);
-        assert_eq!(semi_int.var_type, VarType::SemiInteger);
+        assert_eq!(semi_int.var_type, VarType::Integer);
+        assert_eq!(semi_int.semi_kind, Some(SemiVarKind::Integer(2.0)));
+    }
+
+    #[test]
+    fn changing_variable_type_clears_semi_kind() {
+        let mut model = Model::default();
+        let continuous = model.add(var().semi_int(2..=5).cont(1.0..=5.0));
+        let integer = model.add(var().semi_cont(2.0..=5.0).int(1..=5));
+
+        assert_eq!(continuous.lb(), 1.0);
+        assert_eq!(continuous.var_type(), VarType::Continuous);
+        assert_eq!(integer.lb(), 1.0);
+        assert_eq!(integer.var_type(), VarType::Integer);
+        assert_eq!(model.n_conss(), 0);
     }
 
     #[test]

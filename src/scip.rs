@@ -520,19 +520,7 @@ impl ScipPtr {
         unsafe { ffi::SCIPgetDualbound(self.raw) }
     }
 
-    fn variable_lb(var_type: VarType, lb: f64, ub: f64) -> Result<f64, Retcode> {
-        if !var_type.is_semi() {
-            return Ok(lb);
-        }
-
-        if !lb.is_finite() || lb <= 0.0 || ub.is_nan() || ub < lb {
-            return Err(Retcode::ParameterWrongVal);
-        }
-
-        Ok(0.0)
-    }
-
-    fn create_semicont_cons(
+    pub(crate) fn create_semicont_cons(
         &self,
         var: *mut SCIP_Var,
         nonzero_lb: f64,
@@ -575,23 +563,19 @@ impl ScipPtr {
         name: &str,
         var_type: VarType,
     ) -> Result<*mut SCIP_Var, Retcode> {
-        let scip_lb = Self::variable_lb(var_type, lb, ub)?;
         let c_name = CString::new(name).unwrap();
         let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
             self.raw,
             var_ptr.as_mut_ptr(),
             c_name.as_ptr(),
-            scip_lb,
+            lb,
             ub,
             obj,
             var_type.into(),
         ) };
         let var_ptr = unsafe { var_ptr.assume_init() };
         scip_call! { ffi::SCIPaddVar(self.raw, var_ptr) };
-        if var_type.is_semi() {
-            self.create_semicont_cons(var_ptr, lb, name)?;
-        }
         Ok(var_ptr)
     }
 
@@ -603,14 +587,13 @@ impl ScipPtr {
         name: &str,
         var_type: VarType,
     ) -> Result<*mut SCIP_Var, Retcode> {
-        let scip_lb = Self::variable_lb(var_type, lb, ub)?;
         let c_name = CString::new(name).unwrap();
         let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
             self.raw,
             var_ptr.as_mut_ptr(),
             c_name.as_ptr(),
-            scip_lb,
+            lb,
             ub,
             obj,
             var_type.into(),
@@ -621,9 +604,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        if var_type.is_semi() {
-            self.create_semicont_cons(trans_var_ptr, lb, name)?;
-        }
         Ok(trans_var_ptr)
     }
 
@@ -645,14 +625,13 @@ impl ScipPtr {
         name: &str,
         var_type: VarType,
     ) -> Result<*mut SCIP_Var, Retcode> {
-        let scip_lb = Self::variable_lb(var_type, lb, ub)?;
         let c_name = CString::new(name).unwrap();
         let mut var_ptr = MaybeUninit::uninit();
         scip_call! { ffi::SCIPcreateVarBasic(
             self.raw,
             var_ptr.as_mut_ptr(),
             c_name.as_ptr(),
-            scip_lb,
+            lb,
             ub,
             obj,
             var_type.into(),
@@ -663,9 +642,6 @@ impl ScipPtr {
         scip_call! { ffi::SCIPgetTransformedVar(self.raw, var_ptr, transformed_var.as_mut_ptr()) };
         let trans_var_ptr = unsafe { transformed_var.assume_init() };
         scip_call! { ffi::SCIPreleaseVar(self.raw, &mut var_ptr) };
-        if var_type.is_semi() {
-            self.create_semicont_cons(trans_var_ptr, lb, name)?;
-        }
         Ok(trans_var_ptr)
     }
 

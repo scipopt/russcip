@@ -48,6 +48,13 @@ pub struct Solving;
 #[derive(Debug)]
 pub struct Solved;
 
+fn validate_semi_bounds(lb: f64, ub: f64) {
+    assert!(
+        lb.is_finite() && lb > 0.0 && !ub.is_nan() && ub >= lb,
+        "Semi-variable bounds require a finite positive lower bound and upper bound >= lower bound"
+    );
+}
+
 /// Sealing for the crate's model-behavior and stage-marker traits.
 ///
 /// These traits exist only to organize `Model<S>`'s methods by lifecycle stage;
@@ -182,8 +189,7 @@ impl Model<ProblemCreated> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
-    ///   this is the strictly positive lower bound when the variable is nonzero.
+    /// * `lb` - The lower bound of the variable.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective coefficient of the variable.
     /// * `name` - The name of the variable.
@@ -195,8 +201,7 @@ impl Model<ProblemCreated> {
     ///
     /// # Panics
     ///
-    /// This method panics if the variable cannot be created in the current state. Semi-continuous
-    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
+    /// This method panics if the variable cannot be created in the current state.
     pub fn add_var(
         &mut self,
         lb: f64,
@@ -214,6 +219,32 @@ impl Model<ProblemCreated> {
             raw: var,
             scip: self.scip.clone(),
         }
+    }
+
+    /// Adds a variable whose value is zero or continuous in `[lb, ub]`.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    /// The SCIP variable has lower bound zero; a bound-disjunction constraint
+    /// enforces the nonzero range.
+    pub fn add_semi_continuous_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_var(0.0, ub, obj, name, VarType::Continuous);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-continuous constraint");
+        var
+    }
+
+    /// Adds a variable whose value is zero or an integer in `[lb, ub]`.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    /// The SCIP variable has lower bound zero; a bound-disjunction constraint
+    /// enforces the nonzero range.
+    pub fn add_semi_integer_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_var(0.0, ub, obj, name, VarType::Integer);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-integer constraint");
+        var
     }
 
     /// Includes a new branch rule in the model with the given name, description, priority, maximum depth, maximum bound distance, and implementation.
@@ -496,8 +527,7 @@ impl Model<Solving> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
-    ///   this is the strictly positive lower bound when the variable is nonzero.
+    /// * `lb` - The lower bound of the variable.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective coefficient of the variable.
     /// * `name` - The name of the variable.
@@ -509,8 +539,7 @@ impl Model<Solving> {
     ///
     /// # Panics
     ///
-    /// This method panics if the variable cannot be created in the current state. Semi-continuous
-    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
+    /// This method panics if the variable cannot be created in the current state.
     pub fn add_var(
         &mut self,
         lb: f64,
@@ -528,6 +557,28 @@ impl Model<Solving> {
             raw: var,
             scip: self.scip.clone(),
         }
+    }
+
+    /// Adds a variable whose value is zero or continuous in `[lb, ub]` during solving.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    pub fn add_semi_continuous_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_var(0.0, ub, obj, name, VarType::Continuous);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-continuous constraint");
+        var
+    }
+
+    /// Adds a variable whose value is zero or an integer in `[lb, ub]` during solving.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    pub fn add_semi_integer_var(&mut self, lb: f64, ub: f64, obj: f64, name: &str) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_var(0.0, ub, obj, name, VarType::Integer);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-integer constraint");
+        var
     }
 
     /// Creates a new solution initialized to zero.
@@ -634,8 +685,7 @@ impl Model<Solving> {
     ///
     /// # Arguments
     ///
-    /// * `lb` - The lower bound of the variable. For semi-continuous and semi-integer variables,
-    ///   this is the strictly positive lower bound when the variable is nonzero.
+    /// * `lb` - The lower bound of the variable.
     /// * `ub` - The upper bound of the variable.
     /// * `obj` - The objective function coefficient for the variable.
     /// * `name` - The name of the variable. This should be a unique identifier.
@@ -647,8 +697,7 @@ impl Model<Solving> {
     ///
     /// # Panics
     ///
-    /// This method panics if the variable cannot be created in the current state. Semi-continuous
-    /// and semi-integer variables also require a finite `lb > 0` and `ub >= lb`.
+    /// This method panics if the variable cannot be created in the current state.
     pub fn add_priced_var(
         &mut self,
         lb: f64,
@@ -666,6 +715,40 @@ impl Model<Solving> {
             raw: var,
             scip: self.scip.clone(),
         }
+    }
+
+    /// Adds a priced variable whose value is zero or continuous in `[lb, ub]`.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    pub fn add_priced_semi_continuous_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+    ) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_priced_var(0.0, ub, obj, name, VarType::Continuous);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-continuous constraint");
+        var
+    }
+
+    /// Adds a priced variable whose value is zero or an integer in `[lb, ub]`.
+    /// `lb` must be finite and positive, and `ub` must be at least `lb`.
+    pub fn add_priced_semi_integer_var(
+        &mut self,
+        lb: f64,
+        ub: f64,
+        obj: f64,
+        name: &str,
+    ) -> Variable {
+        validate_semi_bounds(lb, ub);
+        let var = self.add_priced_var(0.0, ub, obj, name, VarType::Integer);
+        self.scip
+            .create_semicont_cons(var.raw, lb, name)
+            .expect("Failed to create semi-integer constraint");
+        var
     }
 
     /// Locally adds a constraint to the current node and its subnodes.

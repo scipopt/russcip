@@ -229,7 +229,7 @@ mod tests {
                 self.added = true;
                 let nvars_before = model.n_vars();
                 let conss = model.conss();
-                let var = model.add_priced_var(0.5, 1.0, 1.0, "x", VarType::SemiContinuous);
+                let var = model.add_priced_semi_continuous_var(0.5, 1.0, 1.0, "x");
                 assert_eq!(var.lb(), 0.0);
                 assert_eq!(var.var_type(), VarType::Continuous);
                 assert!(model.find_cons("semicont_x").is_some());
