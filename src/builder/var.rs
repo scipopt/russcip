@@ -12,8 +12,8 @@ use std::ops::RangeBounds;
 /// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
 /// let binary_var = var().name("y").bin(); // Binary variable
 /// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
-/// let semi_continuous_var = var().name("s").semi_cont(2.0..=10.0);
-/// let semi_integer_var = var().name("t").semi_int(2..=10);
+/// let semi_continuous_var = var().name("s").cont(2.0..=10.0).semi_cont();
+/// let semi_integer_var = var().name("t").int(2..=10).semi_int();
 /// ```
 pub struct VarBuilder<'a> {
     name: Option<&'a str>,
@@ -26,8 +26,8 @@ pub struct VarBuilder<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum SemiVarKind {
-    Continuous(f64),
-    Integer(f64),
+    Continuous,
+    Integer,
 }
 
 /// Creates a new default `VarBuilder`. It can be chained with other methods to set the properties of the variable.
@@ -40,8 +40,8 @@ enum SemiVarKind {
 /// let integer_var = var().name("x").int(0..=10); // Integer variable with bounds [0, 10]
 /// let binary_var = var().name("y").bin(); // Binary variable
 /// let continuous_var = var().name("z").cont(0.0..); // Continuous variable with lower bound 0.0
-/// let semi_continuous_var = var().name("s").semi_cont(2.0..=10.0);
-/// let semi_integer_var = var().name("t").semi_int(2..=10);
+/// let semi_continuous_var = var().name("s").cont(2.0..=10.0).semi_cont();
+/// let semi_integer_var = var().name("t").int(2..=10).semi_int();
 ///
 /// let mut model = Model::default();
 /// model.add(integer_var);
@@ -143,40 +143,42 @@ impl<'a> VarBuilder<'a> {
 
     /// Sets the variable to be semi-continuous.
     ///
-    /// A semi-continuous variable is either zero or lies within `bounds`.
-    /// The lower bound must be finite and strictly positive.
+    /// Set the nonzero domain first with [`cont`](Self::cont); calling this
+    /// additionally allows the variable to be zero. The lower bound must be
+    /// finite and strictly positive. The SCIP variable is created with lower
+    /// bound zero and a bound-disjunction constraint enforces the nonzero range.
     ///
     /// # Example
     ///
     /// ```rust
     /// use russcip::prelude::*;
     ///
-    /// let var = var().semi_cont(2.0..=10.0);
+    /// let var = var().cont(2.0..=10.0).semi_cont();
     /// ```
-    pub fn semi_cont<B: RangeBounds<f64>>(self, bounds: B) -> Self {
-        let mut builder = self.cont(bounds);
-        builder.semi_kind = Some(SemiVarKind::Continuous(builder.lb));
-        builder.lb = 0.0;
-        builder
+    pub fn semi_cont(mut self) -> Self {
+        self.var_type = VarType::Continuous;
+        self.semi_kind = Some(SemiVarKind::Continuous);
+        self
     }
 
     /// Sets the variable to be semi-integer.
     ///
-    /// A semi-integer variable is either zero or integer-valued within
-    /// `bounds`. The lower bound must be strictly positive.
+    /// Set the nonzero domain first with [`int`](Self::int); calling this
+    /// additionally allows the variable to be zero. The lower bound must be
+    /// strictly positive. The SCIP variable is created with lower bound zero
+    /// and a bound-disjunction constraint enforces the nonzero range.
     ///
     /// # Example
     ///
     /// ```rust
     /// use russcip::prelude::*;
     ///
-    /// let var = var().semi_int(2..=10);
+    /// let var = var().int(2..=10).semi_int();
     /// ```
-    pub fn semi_int<B: RangeBounds<isize>>(self, bounds: B) -> Self {
-        let mut builder = self.int(bounds);
-        builder.semi_kind = Some(SemiVarKind::Integer(builder.lb));
-        builder.lb = 0.0;
-        builder
+    pub fn semi_int(mut self) -> Self {
+        self.var_type = VarType::Integer;
+        self.semi_kind = Some(SemiVarKind::Integer);
+        self
     }
 
     /// Sets the variable to be an implicit integer variable.
@@ -230,11 +232,11 @@ impl CanBeAddedToModel<ProblemCreated> for VarBuilder<'_> {
         });
 
         match self.semi_kind {
-            Some(SemiVarKind::Continuous(lb)) => {
-                model.add_semi_continuous_var(lb, self.ub, self.obj, &name)
+            Some(SemiVarKind::Continuous) => {
+                model.add_semi_continuous_var(self.lb, self.ub, self.obj, &name)
             }
-            Some(SemiVarKind::Integer(lb)) => {
-                model.add_semi_integer_var(lb, self.ub, self.obj, &name)
+            Some(SemiVarKind::Integer) => {
+                model.add_semi_integer_var(self.lb, self.ub, self.obj, &name)
             }
             None => model.add_var(self.lb, self.ub, self.obj, &name, self.var_type),
         }
@@ -250,11 +252,11 @@ impl CanBeAddedToModel<Solving> for VarBuilder<'_> {
         });
 
         match self.semi_kind {
-            Some(SemiVarKind::Continuous(lb)) => {
-                model.add_semi_continuous_var(lb, self.ub, self.obj, &name)
+            Some(SemiVarKind::Continuous) => {
+                model.add_semi_continuous_var(self.lb, self.ub, self.obj, &name)
             }
-            Some(SemiVarKind::Integer(lb)) => {
-                model.add_semi_integer_var(lb, self.ub, self.obj, &name)
+            Some(SemiVarKind::Integer) => {
+                model.add_semi_integer_var(self.lb, self.ub, self.obj, &name)
             }
             None => model.add_var(self.lb, self.ub, self.obj, &name, self.var_type),
         }
@@ -277,24 +279,24 @@ mod tests {
 
     #[test]
     fn test_semi_var_builder() {
-        let semi_cont = var().semi_cont(2.0..=10.0);
-        assert_eq!(semi_cont.lb, 0.0);
+        let semi_cont = var().cont(2.0..=10.0).semi_cont();
+        assert_eq!(semi_cont.lb, 2.0);
         assert_eq!(semi_cont.ub, 10.0);
         assert_eq!(semi_cont.var_type, VarType::Continuous);
-        assert_eq!(semi_cont.semi_kind, Some(SemiVarKind::Continuous(2.0)));
+        assert_eq!(semi_cont.semi_kind, Some(SemiVarKind::Continuous));
 
-        let semi_int = var().semi_int(2..10);
-        assert_eq!(semi_int.lb, 0.0);
+        let semi_int = var().int(2..10).semi_int();
+        assert_eq!(semi_int.lb, 2.0);
         assert_eq!(semi_int.ub, 9.0);
         assert_eq!(semi_int.var_type, VarType::Integer);
-        assert_eq!(semi_int.semi_kind, Some(SemiVarKind::Integer(2.0)));
+        assert_eq!(semi_int.semi_kind, Some(SemiVarKind::Integer));
     }
 
     #[test]
     fn changing_variable_type_clears_semi_kind() {
         let mut model = Model::default();
-        let continuous = model.add(var().semi_int(2..=5).cont(1.0..=5.0));
-        let integer = model.add(var().semi_cont(2.0..=5.0).int(1..=5));
+        let continuous = model.add(var().int(2..=5).semi_int().cont(1.0..=5.0));
+        let integer = model.add(var().cont(2.0..=5.0).semi_cont().int(1..=5));
 
         assert_eq!(continuous.lb(), 1.0);
         assert_eq!(continuous.var_type(), VarType::Continuous);

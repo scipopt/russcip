@@ -352,8 +352,8 @@ mod tests {
     #[test]
     fn semi_variables_allow_zero() {
         let mut model = Model::default().hide_output().minimize();
-        let continuous = model.add(var().obj(1.0).semi_cont(2.0..=5.0));
-        let integer = model.add(var().obj(1.0).semi_int(2..=5));
+        let continuous = model.add(var().obj(1.0).cont(2.0..=5.0).semi_cont());
+        let integer = model.add(var().obj(1.0).int(2..=5).semi_int());
 
         let solved = model.solve();
         assert_eq!(solved.status(), crate::Status::Optimal);
