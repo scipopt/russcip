@@ -78,7 +78,7 @@ impl Variable {
         unsafe { ffi::SCIPvarGetUbGlobal(self.raw) }
     }
 
-    /// Returns the type of the variable.
+    /// Returns SCIP's native type for the variable.
     pub fn var_type(&self) -> VarType {
         let var_type = unsafe { ffi::SCIPvarGetType(self.raw) };
         var_type.into()
@@ -253,8 +253,8 @@ impl From<SCIP_Status> for VarStatus {
 mod tests {
     use super::*;
     use crate::{
-        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, minimal_model,
-        prelude::{cons, pricer},
+        Model, ModelWithProblem, ObjSense, Pricer, ProblemOrSolving, WithSolutions, minimal_model,
+        prelude::{cons, pricer, var},
     };
 
     #[test]
@@ -309,6 +309,71 @@ mod tests {
         model.solve();
 
         assert_eq!(x.sol_val(), 1.0);
+    }
+
+    #[test]
+    fn semi_variables_enforce_nonzero_domain() {
+        let mut model = Model::default().hide_output().minimize();
+        let continuous = model.add_semi_continuous_var(2.0, 5.0, 1.0, "sc");
+        let integer = model.add_semi_integer_var(2.0, 5.0, 1.0, "si");
+
+        assert_eq!(continuous.lb(), 0.0);
+        assert_eq!(continuous.ub(), 5.0);
+        assert_eq!(continuous.var_type(), VarType::Continuous);
+        assert_eq!(integer.lb(), 0.0);
+        assert_eq!(integer.ub(), 5.0);
+        assert_eq!(integer.var_type(), VarType::Integer);
+        assert_eq!(model.n_conss(), 2);
+        assert!(model.find_cons("semicont_sc").is_some());
+        assert!(model.find_cons("semicont_si").is_some());
+
+        model.add_cons(
+            vec![&continuous],
+            &[1.0],
+            1.0,
+            f64::INFINITY,
+            "force_sc_nonzero",
+        );
+        model.add_cons(
+            vec![&integer],
+            &[1.0],
+            2.5,
+            f64::INFINITY,
+            "force_si_nonzero",
+        );
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        let solution = solved.best_sol().unwrap();
+        assert!((solution.val(&continuous) - 2.0).abs() < 1e-6);
+        assert!((solution.val(&integer) - 3.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn semi_variables_allow_zero() {
+        let mut model = Model::default().hide_output().minimize();
+        let continuous = model.add(var().obj(1.0).cont(2.0..=5.0).semi_cont());
+        let integer = model.add(var().obj(1.0).int(2..=5).semi_int());
+
+        let solved = model.solve();
+        assert_eq!(solved.status(), crate::Status::Optimal);
+        let solution = solved.best_sol().unwrap();
+        assert!(solution.val(&continuous).abs() < 1e-6);
+        assert!(solution.val(&integer).abs() < 1e-6);
+    }
+
+    #[test]
+    #[should_panic(expected = "Semi-variable bounds require")]
+    fn semi_variable_requires_positive_lower_bound() {
+        let mut model = Model::default();
+        model.add_semi_continuous_var(0.0, 5.0, 0.0, "sc");
+    }
+
+    #[test]
+    #[should_panic(expected = "Semi-variable bounds require")]
+    fn semi_variable_requires_ordered_bounds() {
+        let mut model = Model::default();
+        model.add_semi_integer_var(5.0, 2.0, 0.0, "si");
     }
 
     struct PricerRedcost;
