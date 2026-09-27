@@ -16,6 +16,39 @@ let solved = model.solve();
 assert!((solved.obj_val() - 4.0).abs() < 1e-6);
 ```
 
+## The `cons!` and `expr!` macros
+
+[`cons!`] and [`expr!`] write the same thing as mathematical syntax. Inside them `^` binds
+tighter than `*`, as it does in mathematics — unlike Rust's own `^`, which is bitwise xor and
+binds looser than `+`. A comparison becomes a whole constraint, and a `sum(i in <iter>, <expr>)`
+comprehension makes an aggregate:
+
+```rust
+use russcip::prelude::*;
+
+let mut model = Model::default().maximize().hide_output();
+let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+let y = model.add(var().name("y").cont(0.0..=10.0));
+let n = 4;
+let xs: Vec<_> = (0..n)
+    .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+    .collect();
+
+// x^2 + y^2 <= 16
+model.add(cons!(x ^ 2 + y ^ 2 <= 16));
+// 1 <= x + y <= 5
+model.add(cons!(1 <= x + y <= 5));
+// sum(x_i^2) <= 4
+model.add(cons!(sum(i in 0..n, xs[i] ^ 2) <= 4));
+
+let solved = model.solve();
+assert_eq!(solved.status(), Status::Optimal);
+```
+
+[`expr!`] builds just the expression, so it can be used anywhere an [`Expr`] is expected:
+`let e = expr!(x ^ 2 + 3 * y);`. The macros are re-exported from the crate root and the
+[`prelude`].
+
 ## Building an expression
 
 The leaves are `Expr::var(&v)` for a model variable and `Expr::constant(k)` for a number. From

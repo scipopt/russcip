@@ -42,6 +42,32 @@
 //! assert_eq!(solved.status(), Status::Optimal);
 //! ```
 //!
+//! The [`cons!`] and [`expr!`] macros write the same thing as mathematical
+//! syntax, with `^` binding tighter than `*` (unlike Rust's `^`, which is
+//! bitwise xor). A comprehension makes an aggregate over an iterator:
+//!
+//! ```rust
+//! use russcip::prelude::*;
+//!
+//! let mut model = Model::default().maximize().hide_output();
+//! let x = model.add(var().name("x").obj(1.).cont(0.0..=10.0));
+//! let y = model.add(var().name("y").cont(0.0..=10.0));
+//! let n = 4;
+//! let xs: Vec<_> = (0..n)
+//!     .map(|i| model.add(var().name(&format!("x{i}")).obj(1.).cont(0.0..=10.0)))
+//!     .collect();
+//!
+//! // x² + y² <= 16
+//! model.add(cons!(x ^ 2 + y ^ 2 <= 16));
+//! // 1 <= x + y <= 5
+//! model.add(cons!(1 <= x + y <= 5));
+//! // Σ xᵢ² <= 4
+//! model.add(cons!(sum(i in 0..n, xs[i] ^ 2) <= 4));
+//!
+//! let solved = model.solve();
+//! assert_eq!(solved.status(), Status::Optimal);
+//! ```
+//!
 //! Aggregates come from iterators, so a coefficient array and a variable array
 //! pair up with `zip`:
 //!
@@ -77,6 +103,9 @@ extern crate core;
 /// Re-exports the `scip_sys` crate, which provides low-level bindings to the SCIP library.
 pub use scip_sys as ffi;
 
+// Lets the `expr!` macro's `::russcip::…` paths resolve inside this crate too.
+extern crate self as russcip;
+
 /// Contains the `BranchRule` trait used to define custom branching rules.
 pub mod branchrule;
 pub use branchrule::*;
@@ -93,6 +122,14 @@ pub use expr::*;
 /// Contains the `ScipExpr` struct, a handle on a `SCIP_EXPR` built by SCIP.
 pub mod scip_expr;
 pub use scip_expr::*;
+
+/// Builds an [`Expr`] expression tree from mathematical syntax, with `^` binding
+/// tighter than `*` (unlike Rust's `^`, which is `BitXor`).
+pub use russcip_macros::expr;
+
+/// Builds a constraint from a comparison (`<=`, `>=`, `=`), ready for
+/// [`Model::add`].
+pub use russcip_macros::cons;
 
 /// The main module, it contains the `Model` struct, which represents an optimization problem.
 pub mod model;

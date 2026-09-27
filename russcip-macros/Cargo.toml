@@ -1,0 +1,22 @@
+[package]
+name = "russcip-macros"
+version = "0.11.0"
+authors = ["Mohammed Ghannam <ghannam@zib.de>"]
+description = "Procedural macros for russcip"
+license = "Apache-2.0"
+repository = "https://github.com/scipopt/russcip"
+edition = "2024"
+
+[lib]
+proc-macro = true
+# A proc-macro crate runs at compile time and has no runtime tests of its own —
+# its behaviour is covered from `russcip`. Building a test harness for it makes
+# coverage tooling try to ptrace a compiler plugin, which cargo-tarpaulin cannot
+# do, so skip it.
+test = false
+doctest = false
+
+[dependencies]
+proc-macro2 = "1"
+proc-macro-crate = "3"
+quote = "1"
