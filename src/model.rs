@@ -221,6 +221,55 @@ impl Model<ProblemCreated> {
         }
     }
 
+    /// Replaces the lower bound of a variable.
+    ///
+    /// Bounds can be tightened or relaxed, including to `-f64::INFINITY`.
+    /// SCIP rounds fractional bounds for integer variables.
+    /// For semi-variables, this changes the native bound, not the nonzero-range
+    /// threshold enforced by their bound-disjunction constraint.
+    ///
+    /// After solving, call [`Model::try_free_transform`] before making updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Retcode::InvalidData`] for a foreign or non-original variable,
+    /// or a NaN bound, and [`Retcode::InvalidCall`] outside SCIP's problem-creation
+    /// stage. Other SCIP errors are propagated.
+    pub fn chg_var_lb(&mut self, var: &Variable, lb: f64) -> Result<(), Retcode> {
+        self.scip.chg_var_lb(var, lb)
+    }
+
+    /// Replaces the upper bound of a variable.
+    ///
+    /// Bounds can be tightened or relaxed, including to `f64::INFINITY`.
+    /// Integer rounding, crossed bounds, and semi-variable behavior
+    /// follow [`Model::chg_var_lb`]. After solving, call
+    /// [`Model::try_free_transform`] before making updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Retcode::InvalidData`] for a foreign or non-original variable,
+    /// or a NaN bound, and [`Retcode::InvalidCall`] outside SCIP's problem-creation
+    /// stage. Other SCIP errors are propagated.
+    pub fn chg_var_ub(&mut self, var: &Variable, ub: f64) -> Result<(), Retcode> {
+        self.scip.chg_var_ub(var, ub)
+    }
+
+    /// Replaces the objective coefficient of a variable.
+    ///
+    /// The coefficient may be zero or change sign. After solving, call
+    /// [`Model::try_free_transform`] before making updates.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Retcode::InvalidData`] for a foreign or non-original variable,
+    /// a non-finite coefficient, or a coefficient SCIP considers infinite, and
+    /// [`Retcode::InvalidCall`] outside SCIP's problem-creation stage.
+    /// Other SCIP errors are propagated.
+    pub fn chg_var_obj(&mut self, var: &Variable, obj: f64) -> Result<(), Retcode> {
+        self.scip.chg_var_obj(var, obj)
+    }
+
     /// Adds a variable whose value is zero or continuous in `[lb, ub]`.
     /// `lb` must be finite and positive, and `ub` must be at least `lb`.
     /// The SCIP variable has lower bound zero; a bound-disjunction constraint
@@ -958,16 +1007,54 @@ impl Model<Solved> {
         self.scip.n_lp_iterations()
     }
 
-    /// Frees the transformed problem and returns the model the ProblemCreated state where you
-    /// can add variables and constraints, useful for iterated solving
-    pub fn free_transform(self) -> Model<ProblemCreated> {
-        self.scip
-            .free_transform()
-            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {retcode:?}"));
-        Model {
+    /// Frees the transformed problem and returns to the problem-creation state.
+    ///
+    /// Original variables and constraints remain available for updates and
+    /// repeated solves. The transformed problem, search tree, and LP basis are
+    /// discarded.
+    ///
+    /// # Errors
+    ///
+    /// Propagates SCIP errors.
+    /// This method consumes the model, including on error.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use russcip::prelude::*;
+    ///
+    /// let mut model = Model::default().maximize().hide_output();
+    /// let x = model.add(var().cont(0.0..=10.0).obj(1.0));
+    /// let solved = model.try_solve()?;
+    /// assert_eq!(solved.obj_val(), 10.0);
+    ///
+    /// let mut model = solved.try_free_transform()?;
+    /// model.chg_var_lb(&x, 2.0)?;
+    /// model.chg_var_ub(&x, 6.0)?;
+    /// model.chg_var_obj(&x, -1.0)?;
+    /// let solved = model.try_solve()?;
+    /// assert_eq!(solved.obj_val(), -2.0);
+    /// # Ok::<(), russcip::Retcode>(())
+    /// ```
+    pub fn try_free_transform(self) -> Result<Model<ProblemCreated>, Retcode> {
+        self.scip.free_transform()?;
+        Ok(Model {
             scip: self.scip,
             state: PhantomData,
-        }
+        })
+    }
+
+    /// Frees the transformed problem and returns to the problem-creation state.
+    ///
+    /// See [`Model::try_free_transform`] for lifecycle details and a fallible
+    /// alternative.
+    ///
+    /// # Panics
+    ///
+    /// Panics if SCIP cannot free the transformed problem.
+    pub fn free_transform(self) -> Model<ProblemCreated> {
+        self.try_free_transform()
+            .unwrap_or_else(|retcode| panic!("SCIP returned unexpected retcode {retcode:?}"))
     }
 }
 
@@ -3023,6 +3110,199 @@ mod tests {
         assert_eq!(model.param::<i32>("display/verblevel"), 0);
         assert_eq!(model.param::<f64>("limits/time"), 0.0);
         assert_eq!(model.param::<f64>("limits/memory"), 0.0);
+    }
+
+    #[test]
+    fn var_updates_before_solving() {
+        let mut model = Model::default().hide_output().minimize();
+        let x = model.add_var(0.0, 10.0, 1.0, "x", VarType::Continuous);
+        model.chg_var_lb(&x, 2.0).unwrap();
+        model.chg_var_ub(&x, 7.0).unwrap();
+        model.chg_var_obj(&x, -3.0).unwrap();
+        assert_eq!((x.lb(), x.ub(), x.obj()), (2.0, 7.0, -3.0));
+
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), -21.0);
+        assert_eq!(solved.best_sol().unwrap().val(&x), 7.0);
+    }
+
+    #[test]
+    fn var_updates_between_solves() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(-5.0, 10.0, 1.0, "x", VarType::Continuous);
+        let scip_ptr = model.scip_ptr();
+        let var_ptr = x.inner();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.obj_val(), 10.0);
+        let mut model = solved.try_free_transform().unwrap();
+
+        for ub in [6.0, 12.0] {
+            model.chg_var_ub(&x, ub).unwrap();
+            let solved = model.try_solve().unwrap();
+            assert_eq!(solved.status(), Status::Optimal);
+            assert_eq!(solved.obj_val(), ub);
+            model = solved.try_free_transform().unwrap();
+        }
+
+        model.chg_var_obj(&x, -1.0).unwrap();
+        for lb in [2.0, -3.0] {
+            model.chg_var_lb(&x, lb).unwrap();
+            let solved = model.try_solve().unwrap();
+            assert_eq!(solved.status(), Status::Optimal);
+            assert_eq!(solved.obj_val(), -lb);
+            assert_eq!(solved.best_sol().unwrap().val(&x), lb);
+            model = solved.try_free_transform().unwrap();
+            assert_eq!(model.scip_ptr(), scip_ptr);
+            assert_eq!(model.n_vars(), 1);
+            assert_eq!(model.orig_vars()[0].inner(), var_ptr);
+            assert_eq!(x.inner(), var_ptr);
+        }
+    }
+
+    #[test]
+    fn var_updates_objective_replaces_coefficient() {
+        let mut model = Model::default().hide_output().minimize();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Continuous);
+        let y = model.add_var(0.0, 1.0, 3.0, "y", VarType::Continuous);
+        model.add_cons(vec![&x, &y], &[1.0, 1.0], 1.0, 1.0, "choose");
+        for (coef, expected, x_value) in [
+            (1.0, 1.0, 1.0),
+            (5.0, 3.0, 0.0),
+            (0.0, 0.0, 1.0),
+            (-2.0, -2.0, 1.0),
+        ] {
+            model.chg_var_obj(&x, coef).unwrap();
+            assert_eq!(x.obj(), coef);
+            let solved = model.try_solve().unwrap();
+            assert_eq!(solved.status(), Status::Optimal);
+            assert_eq!(solved.obj_val(), expected);
+            assert_eq!(solved.best_sol().unwrap().val(&x), x_value);
+            model = solved.try_free_transform().unwrap();
+        }
+    }
+
+    #[test]
+    fn var_updates_integer_rounding_and_infinite_bounds() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(0.0, 10.0, 1.0, "x", VarType::Integer);
+        model.add_cons(vec![&x], &[1.0], -4.0, 9.0, "range");
+        model.chg_var_lb(&x, 1.2).unwrap();
+        model.chg_var_ub(&x, 7.8).unwrap();
+        assert_eq!((x.lb(), x.ub()), (2.0, 7.0));
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.obj_val(), 7.0);
+
+        let mut model = solved.try_free_transform().unwrap();
+        model.chg_var_lb(&x, f64::NEG_INFINITY).unwrap();
+        model.chg_var_ub(&x, f64::INFINITY).unwrap();
+        let infinity = model.real_param("numerics/infinity");
+        assert_eq!((x.lb(), x.ub()), (-infinity, infinity));
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 9.0);
+    }
+
+    #[test]
+    fn var_updates_binary_fix_and_release() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Binary);
+        model.chg_var_ub(&x, 0.0).unwrap();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.obj_val(), 0.0);
+
+        let mut model = solved.try_free_transform().unwrap();
+        model.chg_var_ub(&x, 1.0).unwrap();
+        model.chg_var_lb(&x, 1.0).unwrap();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.obj_val(), 1.0);
+
+        let mut model = solved.try_free_transform().unwrap();
+        model.chg_var_lb(&x, 0.0).unwrap();
+        model.chg_var_obj(&x, -1.0).unwrap();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 0.0);
+    }
+
+    #[test]
+    fn var_updates_crossed_bounds_can_be_repaired() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Continuous);
+        model.chg_var_lb(&x, 2.0).unwrap();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Infeasible);
+
+        let mut model = solved.try_free_transform().unwrap();
+        model.chg_var_ub(&x, 3.0).unwrap();
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 3.0);
+    }
+
+    #[test]
+    fn var_updates_reject_foreign_variables_and_invalid_numbers() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(1.0, 4.0, 2.0, "x", VarType::Continuous);
+        let mut other = Model::default().hide_output();
+        let foreign = other.add_var(0.0, 1.0, 0.0, "foreign", VarType::Continuous);
+
+        assert_eq!(model.chg_var_lb(&foreign, 0.5), Err(Retcode::InvalidData));
+        assert_eq!(model.chg_var_ub(&foreign, 0.5), Err(Retcode::InvalidData));
+        assert_eq!(model.chg_var_obj(&foreign, 1.0), Err(Retcode::InvalidData));
+        assert_eq!(model.chg_var_lb(&x, f64::NAN), Err(Retcode::InvalidData));
+        assert_eq!(model.chg_var_ub(&x, f64::NAN), Err(Retcode::InvalidData));
+        let infinity = model.real_param("numerics/infinity");
+        for coef in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, infinity] {
+            assert_eq!(model.chg_var_obj(&x, coef), Err(Retcode::InvalidData));
+        }
+        assert_eq!((x.lb(), x.ub(), x.obj()), (1.0, 4.0, 2.0));
+        assert_eq!((foreign.lb(), foreign.ub(), foreign.obj()), (0.0, 1.0, 0.0));
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.status(), Status::Optimal);
+        assert_eq!(solved.obj_val(), 8.0);
+    }
+
+    #[test]
+    fn var_updates_reject_transformed_handle_after_reset() {
+        let mut model = Model::default()
+            .hide_output()
+            .maximize()
+            .set_presolving(ParamSetting::Off);
+        let x = model.add_var(0.0, 4.0, 1.0, "x", VarType::Continuous);
+        let solved = model.try_solve().unwrap();
+        let transformed = x.transformed().unwrap();
+        assert_ne!(transformed.inner(), x.inner());
+        let mut model = solved.try_free_transform().unwrap();
+
+        assert_eq!(
+            model.chg_var_lb(&transformed, 1.0),
+            Err(Retcode::InvalidData)
+        );
+        assert_eq!(
+            model.chg_var_ub(&transformed, 3.0),
+            Err(Retcode::InvalidData)
+        );
+        assert_eq!(
+            model.chg_var_obj(&transformed, 2.0),
+            Err(Retcode::InvalidData)
+        );
+        assert_eq!((x.lb(), x.ub(), x.obj()), (0.0, 4.0, 1.0));
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.obj_val(), 4.0);
+    }
+
+    #[test]
+    fn var_updates_reject_solved_stage() {
+        let mut model = Model::default().hide_output().maximize();
+        let x = model.add_var(0.0, 4.0, 1.0, "x", VarType::Continuous);
+        let solved = model.try_solve().unwrap();
+        assert_eq!(solved.scip.chg_var_lb(&x, 1.0), Err(Retcode::InvalidCall));
+        assert_eq!(solved.scip.chg_var_ub(&x, 3.0), Err(Retcode::InvalidCall));
+        assert_eq!(solved.scip.chg_var_obj(&x, 2.0), Err(Retcode::InvalidCall));
+        let model = solved.try_free_transform().unwrap();
+        assert_eq!((x.lb(), x.ub(), x.obj()), (0.0, 4.0, 1.0));
+        assert_eq!(model.n_vars(), 1);
     }
 
     #[test]
