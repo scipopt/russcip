@@ -3226,6 +3226,44 @@ mod tests {
     }
 
     #[test]
+    fn var_updates_preserve_semi_variable_threshold() {
+        for integer in [false, true] {
+            let mut model = Model::default().hide_output().minimize();
+            let x = if integer {
+                model.add_semi_integer_var(2.0, 5.0, 1.0, "x")
+            } else {
+                model.add_semi_continuous_var(2.0, 5.0, 1.0, "x")
+            };
+
+            for (lb, ub, obj, expected_value) in [
+                // A positive native lower bound excludes zero but preserves the threshold.
+                (1.0, 4.0, 1.0, Some(2.0)),
+                // An upper bound below the threshold leaves only zero feasible.
+                (0.0, 1.0, 1.0, Some(0.0)),
+                // Excluding zero as well makes the semi-variable infeasible.
+                (1.0, 1.0, 1.0, None),
+                // Relaxing the bounds and changing the objective restores the nonzero range.
+                (0.0, 7.0, -1.0, Some(7.0)),
+            ] {
+                model.chg_var_lb(&x, lb).unwrap();
+                model.chg_var_ub(&x, ub).unwrap();
+                model.chg_var_obj(&x, obj).unwrap();
+                assert_eq!((x.lb(), x.ub(), x.obj()), (lb, ub, obj));
+
+                let solved = model.try_solve().unwrap();
+                if let Some(value) = expected_value {
+                    assert_eq!(solved.status(), Status::Optimal);
+                    assert_eq!(solved.best_sol().unwrap().val(&x), value);
+                    assert_eq!(solved.obj_val(), obj * value);
+                } else {
+                    assert_eq!(solved.status(), Status::Infeasible);
+                }
+                model = solved.try_free_transform().unwrap();
+            }
+        }
+    }
+
+    #[test]
     fn var_updates_crossed_bounds_can_be_repaired() {
         let mut model = Model::default().hide_output().maximize();
         let x = model.add_var(0.0, 1.0, 1.0, "x", VarType::Continuous);
