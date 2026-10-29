@@ -267,6 +267,33 @@ impl ScipPtr {
         Ok(())
     }
 
+    pub(crate) fn chg_var_lb(&self, var: &Variable, lb: f64) -> Result<(), Retcode> {
+        self.validate_original_var(var)?;
+        if lb.is_nan() {
+            return Err(Retcode::InvalidData);
+        }
+        scip_call!(ffi::SCIPchgVarLb(self.raw, var.raw, lb));
+        Ok(())
+    }
+
+    pub(crate) fn chg_var_ub(&self, var: &Variable, ub: f64) -> Result<(), Retcode> {
+        self.validate_original_var(var)?;
+        if ub.is_nan() {
+            return Err(Retcode::InvalidData);
+        }
+        scip_call!(ffi::SCIPchgVarUb(self.raw, var.raw, ub));
+        Ok(())
+    }
+
+    pub(crate) fn chg_var_obj(&self, var: &Variable, obj: f64) -> Result<(), Retcode> {
+        self.validate_original_var(var)?;
+        if !obj.is_finite() {
+            return Err(Retcode::InvalidData);
+        }
+        scip_call!(ffi::SCIPchgVarObj(self.raw, var.raw, obj));
+        Ok(())
+    }
+
     pub(crate) fn n_vars(&self) -> usize {
         unsafe { ffi::SCIPgetNVars(self.raw) as usize }
     }
@@ -2451,6 +2478,25 @@ impl ScipPtr {
         }
 
         Ok(())
+    }
+
+    fn validate_original_var(&self, var: &Variable) -> Result<(), Retcode> {
+        if unsafe { ffi::SCIPgetStage(self.raw) } != ffi::SCIP_Stage_SCIP_STAGE_PROBLEM {
+            return Err(Retcode::InvalidCall);
+        }
+        self.validate_vars_ownership(&[var])?;
+
+        // A transformed handle may outlive free_transform(), so we don't
+        // derefer var.raw.
+        // Instead, we compare pointers to the live original variables.
+        let n_vars = unsafe { ffi::SCIPgetNOrigVars(self.raw) };
+        let vars = unsafe { ffi::SCIPgetOrigVars(self.raw) };
+        for i in 0..n_vars {
+            if unsafe { *vars.add(i as usize) } == var.raw {
+                return Ok(());
+            }
+        }
+        Err(Retcode::InvalidData)
     }
 
     pub(crate) fn create_cons_sos1(
